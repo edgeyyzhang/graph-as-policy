@@ -1,0 +1,46 @@
+# Nightly smoke for the G1 grocery acceptance gate: the first two
+# curated tasks x 10 trials = 20 trials, gated at 90%. Same prompts +
+# objects blocks as grocery_acceptance.yaml — only the trial counts and
+# worker budget shrink.
+#
+#   gap benchmark examples/benchmark/grocery_acceptance_smoke.yaml --gate
+#
+task: auto
+skills: ../../../open-robot-skills
+llm:
+  provider: vertex
+  model: gemini-3.1-flash-lite-preview
+  project_id: bc-y7-06
+gate_threshold: 0.9
+suites:
+- suite_name: libero_object_all_variance
+  task_ids:
+  - 0
+  task_prompts:
+    0: Pick up the alphabet soup can and put it in the basket.
+  objects:
+    target: alphabet soup can with a blue and yellow label
+    expected_label: Alphabet Soup
+    shape_hint: metal cylinder about 7 cm wide, wrapped in a blue-and-yellow label
+  num_workers: 4
+- suite_name: libero_object_all_variance
+  task_ids:
+  - 1
+  task_prompts:
+    1: Pick up the cream cheese box and put it in the basket.
+  objects:
+    target: cream cheese box, white with blue accents
+    expected_label: Cream Cheese
+    shape_hint: flat white-and-blue cardboard box roughly 5 cm across
+  num_workers: 4
+trials:
+  trials_per_generation: 10
+  task_ids:
+  - 0
+  - 1
+  num_workers: 8
+  regenerate_code_per_trial: false
+  record_video: true
+  task_timeout_secs: 900
+  enable_tracing: false
+  output_dir: ../../benchmark_runs/grocery_acceptance_smoke

@@ -1,0 +1,29 @@
+# Benchmark smoke: 1 family x 1 variation x 1 mode x 1 task x 1 seed.
+# Quick sanity that codegen + the in-process sim eval handle the
+# grocery-packing scene (teleport-on-In success) without surprises.
+#
+#   gap benchmark examples/benchmark/smoke.yaml
+#
+task: "auto"   # per-task prompts resolved from LIBERO metadata
+
+# open-robot-skills checkout (bundle discovery root) — codegen registries are
+# built from it. OPTIONAL: omit the key entirely to auto-discover the
+# checkout ($GAP_SKILLS_PATH or an open-robot-skills directory next to the gap
+# repo). Explicit relative values resolve against this file's directory.
+skills: ../../../open-robot-skills
+
+llm:
+  provider: anthropic
+  # model: claude-opus-4-8        # default; uncomment to pin
+
+benchmark:
+  families: [grocery_packing]
+  variations: [object]
+  modes: [llm_generation]
+  n_tasks: 1
+  task_ids: [0]
+  n_seeds: 1
+  num_workers: 1
+  record_video: true
+  smoke: true
+  output_dir: ../../benchmark_runs/smoke

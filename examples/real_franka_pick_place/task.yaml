@@ -1,0 +1,21 @@
+# Task metadata for the real-Franka jello pick-and-place example.
+# (Ported from the dev tree's pick_and_place_jello task config; the dev
+# benchmark-harness fields — platform base, ray_serve deployments — do
+# not apply to the public repo and were dropped.)
+
+task: "Pick up all Jello gelatin boxes from the table and place them in the white bucket. Any order is fine."
+
+suite: franka_real
+
+environment:
+  # Must match the CameraNode published by your rr-session config; the env
+  # auto-discovers the wire camera key, this is just gap's name for it.
+  cameras:
+    - robot0_robotview
+
+run:
+  graph: graph/
+  # skills: omitted — the open-robot-skills checkout is auto-discovered
+  # ($GAP_SKILLS_PATH or the checkout next to the graph-as-policy checkout); set an
+  # explicit path here to override (relative paths resolve against this
+  # file's directory).

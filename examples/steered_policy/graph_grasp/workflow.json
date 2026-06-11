@@ -1,0 +1,496 @@
+{
+  "version": 3,
+  "meta": {
+    "name": "graph_obb_policy_grasp",
+    "description": "Long-horizon clean-all-items loop -- VLA-grasp + skill-place hybrid. capture records the episode-start joint config; container perceives the basket once. Each iteration: reset restores the initial pose, target (perception_any) localizes the next floor item, approach pre-positions the end-effector above its OBB, grasp runs the {{policy_id}} VLA until it has closed on the item (gripper-grasp termination), then place geometrically moves the held item over the basket OBB and releases it. The VLA does the dexterous grasp it generalizes well; a geometric skill does the precise placement it does not. The loop ends with success once perception_any reports not_found (all items delivered). Materialized per benchmark cell via the {{policy_id}} placeholder."
+  },
+  "nodes": {
+    "capture": {
+      "type": "subgraph",
+      "ref": "capture_sg"
+    },
+    "container": {
+      "type": "subgraph",
+      "ref": "container_sg"
+    },
+    "reset": {
+      "type": "subgraph",
+      "ref": "reset_sg"
+    },
+    "target": {
+      "type": "subgraph",
+      "ref": "target_sg"
+    },
+    "approach": {
+      "type": "subgraph",
+      "ref": "approach_sg"
+    },
+    "grasp": {
+      "type": "subgraph",
+      "ref": "grasp_sg"
+    },
+    "place": {
+      "type": "subgraph",
+      "ref": "place_sg"
+    },
+    "done": {
+      "type": "end",
+      "status": "success"
+    },
+    "abort": {
+      "type": "end",
+      "status": "failure",
+      "recovery": [
+        {
+          "tool": "robot.open_gripper",
+          "inputs": {
+            "settle_steps": 40
+          }
+        }
+      ]
+    }
+  },
+  "edges": [
+    [
+      "START",
+      "capture"
+    ]
+  ],
+  "conditional_edges": {
+    "capture": {
+      "router_field": "exit",
+      "mapping": {
+        "done": "container",
+        "failed": "abort"
+      }
+    },
+    "container": {
+      "router_field": "exit",
+      "mapping": {
+        "found": "reset",
+        "not_found": "abort"
+      }
+    },
+    "reset": {
+      "router_field": "exit",
+      "mapping": {
+        "done": "target",
+        "failed": "abort"
+      }
+    },
+    "target": {
+      "router_field": "exit",
+      "mapping": {
+        "found": "approach",
+        "not_found": "done"
+      }
+    },
+    "approach": {
+      "router_field": "exit",
+      "mapping": {
+        "ready": "grasp",
+        "failed": "abort"
+      }
+    },
+    "grasp": {
+      "router_field": "exit",
+      "mapping": {
+        "grasped": "place",
+        "failed": "abort"
+      }
+    },
+    "place": {
+      "router_field": "exit",
+      "mapping": {
+        "done": "reset",
+        "failed": "abort"
+      }
+    }
+  },
+  "subgraphs": {
+    "capture_sg": {
+      "skill": "generic",
+      "inputs": {},
+      "outputs": {
+        "initial_joints": {
+          "$ref": "observe.arm_states.0.joint_state"
+        }
+      },
+      "nodes": {
+        "observe": {
+          "type": "tool",
+          "tool": "robot.get_observation"
+        },
+        "done": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "observe"
+        ],
+        [
+          "observe",
+          "done"
+        ],
+        [
+          "done",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "done"
+        ]
+      },
+      "on_error": "failed"
+    },
+    "container_sg": {
+      "skill": "perceiving-objects-oneshot",
+      "inputs": {},
+      "outputs": {
+        "container_obb": {
+          "$ref": "filter_obb.obb"
+        },
+        "container_mask": {
+          "$ref": "perceive.mask"
+        },
+        "container_cloud": {
+          "$ref": "perceive.cloud"
+        }
+      },
+      "nodes": {
+        "observe": {
+          "type": "tool",
+          "tool": "robot.get_observation"
+        },
+        "perceive": {
+          "type": "script",
+          "script": "scripts/target/perceive_simple.py",
+          "inputs": {
+            "cameras": {
+              "$ref": "observe.cameras"
+            },
+            "object_name": "basket"
+          }
+        },
+        "filter_obb": {
+          "type": "tool",
+          "tool": "geometry.filter_and_compute_obb",
+          "inputs": {
+            "points": {
+              "$ref": "perceive.cloud"
+            }
+          }
+        },
+        "found": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "observe"
+        ],
+        [
+          "observe",
+          "perceive"
+        ],
+        [
+          "perceive",
+          "filter_obb"
+        ],
+        [
+          "filter_obb",
+          "found"
+        ],
+        [
+          "found",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "found"
+        ]
+      },
+      "on_error": "not_found"
+    },
+    "reset_sg": {
+      "skill": "generic",
+      "inputs": {
+        "initial_joints": "JointState"
+      },
+      "outputs": {},
+      "nodes": {
+        "open_gripper": {
+          "type": "tool",
+          "tool": "robot.open_gripper",
+          "inputs": {
+            "settle_steps": 20
+          }
+        },
+        "move_to_initial": {
+          "type": "tool",
+          "tool": "robot.move_to_joints",
+          "inputs": {
+            "joint_config": {
+              "$ref": "in.initial_joints"
+            },
+            "tolerance": 0.005,
+            "max_steps": 800
+          }
+        },
+        "done": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "open_gripper"
+        ],
+        [
+          "open_gripper",
+          "move_to_initial"
+        ],
+        [
+          "move_to_initial",
+          "done"
+        ],
+        [
+          "done",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "done"
+        ]
+      },
+      "on_error": "failed"
+    },
+    "target_sg": {
+      "skill": "perceiving-objects-oneshot",
+      "inputs": {},
+      "outputs": {
+        "target_obb": {
+          "$ref": "filter_obb.obb"
+        },
+        "target_mask": {
+          "$ref": "perceive.mask"
+        },
+        "target_cloud": {
+          "$ref": "perceive.cloud"
+        }
+      },
+      "nodes": {
+        "observe": {
+          "type": "tool",
+          "tool": "robot.get_observation"
+        },
+        "perceive": {
+          "type": "script",
+          "script": "scripts/target/perceive_simple.py",
+          "inputs": {
+            "cameras": {
+              "$ref": "observe.cameras"
+            },
+            "object_name": "item on the floor"
+          }
+        },
+        "filter_obb": {
+          "type": "tool",
+          "tool": "geometry.filter_and_compute_obb",
+          "inputs": {
+            "points": {
+              "$ref": "perceive.cloud"
+            }
+          }
+        },
+        "found": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "observe"
+        ],
+        [
+          "observe",
+          "perceive"
+        ],
+        [
+          "perceive",
+          "filter_obb"
+        ],
+        [
+          "filter_obb",
+          "found"
+        ],
+        [
+          "found",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "found"
+        ]
+      },
+      "on_error": "not_found"
+    },
+    "approach_sg": {
+      "skill": "generic",
+      "inputs": {
+        "target_obb": "OrientedBoundingBox"
+      },
+      "outputs": {},
+      "nodes": {
+        "approach_above": {
+          "type": "script",
+          "script": "scripts/approach/approach_above_target.py",
+          "inputs": {
+            "target_obb": {
+              "$ref": "in.target_obb"
+            },
+            "target_z": 0.3,
+            "obb_clearance": 0.12,
+            "move_tolerance": 0.003,
+            "move_max_steps": 400
+          }
+        },
+        "ready": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "approach_above"
+        ],
+        [
+          "approach_above",
+          "ready"
+        ],
+        [
+          "ready",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "ready"
+        ]
+      },
+      "on_error": "failed"
+    },
+    "grasp_sg": {
+      "skill": "generic",
+      "inputs": {
+        "observation_stream": "ObservationStream"
+      },
+      "outputs": {},
+      "nodes": {
+        "run_policy": {
+          "type": "tool",
+          "tool": "running-policies.run",
+          "inputs": {
+            "observation_stream": {
+              "$ref": "in.observation_stream"
+            },
+            "policy_id": "{{policy_id}}",
+            "prompt": "pick up the object",
+            "termination_prompt": "Is the object held in the gripper and lifted off the surface?",
+            "max_windows": 70,
+            "replan_every": 5,
+            "term_period": 6,
+            "arm_id": 0,
+            "vlm_camera": 0,
+            "settle_steps": 10
+          }
+        },
+        "grasped": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "run_policy"
+        ],
+        [
+          "run_policy",
+          "grasped"
+        ],
+        [
+          "grasped",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "grasped"
+        ]
+      },
+      "on_error": "failed"
+    },
+    "place_sg": {
+      "skill": "generic",
+      "inputs": {
+        "container_obb": "OrientedBoundingBox"
+      },
+      "outputs": {},
+      "nodes": {
+        "place": {
+          "type": "script",
+          "script": "scripts/place/place_above_basket.py",
+          "inputs": {
+            "container_obb": {
+              "$ref": "in.container_obb"
+            }
+          }
+        },
+        "done": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "place"
+        ],
+        [
+          "place",
+          "done"
+        ],
+        [
+          "done",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "done"
+        ]
+      },
+      "on_error": "failed"
+    }
+  }
+}

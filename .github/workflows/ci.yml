@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Pinned minor: ruff adds/retires rules between minors and the repo is
+      # kept clean against exactly this line.
+      - run: python -m pip install "ruff>=0.15,<0.16"
+      - run: ruff check gap tests
+
+  test:
+    # The default marker suite (`-m 'not llm and not gpu and not sim and not
+    # real'`, set in pyproject addopts) must collect and pass on a BARE
+    # install: gap core only, no extras, no submodules, no GPU. Heavy deps
+    # (mujoco, torch, model weights) belong to opt-in markers and lazy
+    # imports — a module-scope heavy import that breaks this lane is a bug.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install gap (core only) + test runner
+        run: python -m pip install -e . pytest pytest-timeout
+      - name: Collect check (bare install)
+        run: python -m pytest tests -q --collect-only
+      - name: Default suite
+        run: python -m pytest tests -q
+
+  wheel:
+    # The wheel must ship the pre-built viz frontend (gap/viz/frontend/dist)
+    # so `gap viz` works for pip users without node.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build
+      - run: python -m build --wheel
+      - name: Assert the viz frontend dist ships in the wheel
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+
+          [whl] = glob.glob("dist/*.whl")
+          names = zipfile.ZipFile(whl).namelist()
+          dist_files = [n for n in names if n.startswith("gap/viz/frontend/dist/")]
+          assert any(n.endswith("index.html") for n in dist_files), (
+              f"viz frontend dist missing from {whl}; first entries: {names[:20]}"
+          )
+          src_leaks = [n for n in names if "/frontend/src/" in n or "node_modules" in n]
+          assert not src_leaks, f"frontend sources leaked into the wheel: {src_leaks[:10]}"
+          print(f"{whl}: ships {len(dist_files)} viz dist files, no frontend sources")
+          PY

@@ -1,0 +1,191 @@
+[project]
+name = "graph-as-policy"
+version = "0.1.0.dev0"
+description = "gap — graph as policy: compile language instructions into typed, verified robot skill graphs and execute them on simulators or real robots."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "graph-as-policy authors" }]
+keywords = ["robotics", "LLM", "agents", "manipulation", "code-generation"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+]
+
+# Core stays lean: no gRPC, no protobuf, no torch. Heavy model deps live in
+# open-robot-skills (one pip extra per tool bundle); sim deps live in the [libero]
+# extra; the connector's in-process IK (pyroki, CPU JAX) is core because every
+# motion-capable connector needs it.
+dependencies = [
+  # Pipeline / serving
+  "httpx>=0.27",
+  "pyyaml>=6.0",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.29",
+  "requests",
+
+  # Scientific
+  "numpy>=1.26",
+  "scipy>=1.12",
+  "h5py>=3.0",
+
+  # Data / viz
+  "pillow>=10",
+  "opencv-python-headless>=4.9",
+  "matplotlib>=3.8",
+  "imageio[ffmpeg]>=2.31",
+  "viser>=0.2.3",
+
+  # Robotics: URDF + robot descriptions + in-process IK (connector)
+  "robot_descriptions>=1.16.0",
+  "yourdfpy>=0.0.56",
+  # pyroki pins its own jaxls git ref — do not double-pin jaxls here.
+  "pyroki @ git+https://github.com/chungmin99/pyroki.git@95afccc22658c461ab1042a048ae4e9c24bc2a47",
+
+  # Real-robot msgpack bridge (robots_realtime)
+  "msgpack>=1.0",
+  "msgpack-numpy>=0.4.8",
+
+  # LLM (agent library default provider)
+  "anthropic>=0.40",
+
+  # NotRequired backport for py3.10
+  "typing_extensions>=4.10; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+# LIBERO simulation stack (quickstart, benchmark). The posvar LIBERO fork and
+# robosuite are vendored submodules wired via [tool.uv.sources] below; pip
+# users: `pip install -e third_party/Variational-Automation-Benchmark -e third_party/robosuite`.
+libero = [
+  # Physics-exact pin: the dev tree's uv.lock resolved 3.6.0 and the
+  # acceptance numbers were measured on it — MuJoCo minors change contact
+  # dynamics enough to move grasp/drop success rates materially.
+  "mujoco==3.6.0",
+  "gymnasium>=0.29",
+  "gym==0.25.2",
+  "libero",
+  "robosuite",
+  "bddl==1.0.1",
+  # robomimic deliberately omitted: only LIBERO's lifelong-learning training
+  # stack imports it (gap never does), and its egl-probe dep no longer builds
+  # under cmake >= 4 (CMakeLists targets cmake < 3.5).
+  "easydict==1.9",
+  "einops>=0.4.1",
+  "future>=0.18.2",
+  "cloudpickle>=2.1.0",
+  "mediapy>=1.2.4",
+  "tyro>=0.9.17",
+  # The vab fork's task schema (libero.vab.schema) is pydantic v2.
+  "pydantic>=2.0",
+  # Classic-suite init states are torch pickles (libero.benchmark imports
+  # torch at module scope) — pin explicitly rather than riding robomimic's
+  # loose transitive requirement.
+  "torch>=2.7",
+]
+# Scale-out: shared skill actors for parallel benchmark workers.
+ray = ["ray[serve]>=2.30"]
+# Real hardware (UR + RTDE; pyzed is a manual ZED SDK install — lazy import).
+real = ["ur-rtde>=1.5"]
+# Vertex AI provider (Claude-on-Vertex + Gemini).
+vertex = ["anthropic[vertex]>=0.40", "google-genai>=1.0,<1.60"]
+# Learned-policy nodes — OpenPI websocket client (thin, no JAX).
+policy = [
+  "openpi-client @ git+https://github.com/Physical-Intelligence/openpi.git#subdirectory=packages/openpi-client",
+]
+
+# ---- one-command environments (`uv sync --extra <name>`) -------------------
+# Meta-extras spanning both repos: the engine's sim stack plus the matching
+# open-robot-skills bundle set, resolved from the side-by-side checkout via
+# [tool.uv.sources] below. Per-bundle dependencies and setup stay declared
+# bundle-by-bundle in open-robot-skills/pyproject.toml (one extra per bundle).
+quickstart = ["graph-as-policy[libero]", "open-robot-skills[quickstart]"]
+grocery = ["graph-as-policy[libero]", "open-robot-skills[grocery]"]
+all = ["graph-as-policy[libero,ray,vertex,policy]", "open-robot-skills[all]"]
+
+[dependency-groups]
+# Installed by default with `uv sync` (pip users: `pip install --group dev`).
+dev = [
+  "pytest>=8",
+  "pytest-timeout>=2.3",
+  "ruff>=0.5",
+  "mypy>=1.10",
+]
+
+[project.scripts]
+gap = "gap.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/graph-robots/graph-as-policy"
+
+# ---------------------------------------------------------------------------
+# uv sources — vendored submodules (linux sim stack) + the sibling skills repo
+# ---------------------------------------------------------------------------
+[tool.uv.sources]
+libero = { path = "third_party/Variational-Automation-Benchmark", editable = true }
+robosuite = { path = "third_party/robosuite", editable = true }
+open-robot-skills = { path = "../open-robot-skills", editable = true }
+
+[tool.uv]
+# sam3's published metadata over-pins numpy==1.26, which is unsolvable next to
+# its own decord2 dependency in one strict resolution; the measured release
+# environment runs sam3 on numpy 2.x (same override as open-robot-skills' uv.lock).
+override-dependencies = ["numpy>=1.26"]
+
+# CuRobo compiles CUDA extensions at install time against the environment's
+# torch: build it unisolated (CUDA_HOME must point at a toolkit matching
+# torch's CUDA when syncing --extra grocery/all).
+no-build-isolation-package = ["nvidia-curobo"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gap"]
+# The viz frontend ships pre-built: only the dist/ bundle belongs in the
+# wheel, never the node toolchain inputs.
+exclude = [
+  "gap/viz/frontend/node_modules",
+  "gap/viz/frontend/src",
+  "gap/viz/frontend/public",
+  "gap/viz/frontend/package-lock.json",
+  # dist is excluded from the default package walk and re-added via the
+  # force-include below (single source — avoids duplicate archive entries).
+  "gap/viz/frontend/dist/**",
+]
+
+# Built frontend bundle served by `gap viz` (gap/viz/server.py resolves it
+# path-relative to the installed package).
+[tool.hatch.build.targets.wheel.force-include]
+"gap/viz/frontend/dist" = "gap/viz/frontend/dist"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not llm and not gpu and not sim and not real'"
+markers = [
+  "llm: needs a live LLM API key (generation-equivalence and provider tests)",
+  "gpu: needs model weights + an NVIDIA GPU",
+  "sim: needs the [libero] extra (MuJoCo/EGL)",
+  "real: needs robot hardware",
+]
+timeout = 300
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true

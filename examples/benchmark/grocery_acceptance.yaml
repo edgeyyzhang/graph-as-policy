@@ -1,0 +1,146 @@
+# G1 grocery acceptance gate: libero_object_all_variance x 10 tasks x 50
+# trials = 500 trials, gated at 90% success. Each task gets a curated
+# objects block (target phrase + expected label + shape hint) so codegen
+# writes unambiguous perception prompts for the LIBERO grocery assets.
+#
+#   gap benchmark examples/benchmark/grocery_acceptance.yaml --gate
+#   gap benchmark examples/benchmark/grocery_acceptance.yaml --gate --resume
+#
+# No `benchmark:` block -> suites mode: each suite below is one cell,
+# all cells launch concurrently (per-suite num_workers bounds each
+# cell's pool; the harness staggers cells across GAP_MUJOCO_EGL_DEVICES).
+#
+# Motion stack: the gap connector solves IK in-process (pyroki);
+# collision-aware planning runs through the curobo skill bundle inside
+# the generated graphs.
+
+task: "auto"
+
+# optional — omit to auto-discover the open-robot-skills checkout
+# ($GAP_SKILLS_PATH or the checkout next to the graph-as-policy checkout); explicit
+# relative values resolve against this file's directory.
+skills: ../../../open-robot-skills
+
+llm:
+  provider: vertex
+  model: gemini-3.1-flash-lite-preview
+  project_id: bc-y7-06
+  # Anthropic alternative (set ANTHROPIC_API_KEY):
+  # provider: anthropic
+  # model: claude-opus-4-8
+
+gate_threshold: 0.90
+
+suites:
+  - suite_name: libero_object_all_variance
+    task_ids: [0]
+    task_prompts:
+      0: "Pick up the alphabet soup can and put it in the basket."
+    objects:
+      target: "alphabet soup can with a blue and yellow label"
+      expected_label: "Alphabet Soup"
+      shape_hint: "metal cylinder about 7 cm wide, wrapped in a blue-and-yellow label"
+    num_workers: 1
+
+  - suite_name: libero_object_all_variance
+    task_ids: [1]
+    task_prompts:
+      1: "Pick up the cream cheese box and put it in the basket."
+    objects:
+      target: "cream cheese box, white with blue accents"
+      expected_label: "Cream Cheese"
+      shape_hint: "flat white-and-blue cardboard box roughly 5 cm across"
+    num_workers: 1
+
+  - suite_name: libero_object_all_variance
+    task_ids: [2]
+    task_prompts:
+      2: "Pick up the dark salad dressing bottle with the black cap and put it in the basket."
+    objects:
+      target: "salad dressing bottle, dark with a black cap"
+      expected_label: "Salad Dressing"
+      shape_hint: "tall dark bottle around 15 cm, topped with a black cap"
+    num_workers: 1
+
+  - suite_name: libero_object_all_variance
+    task_ids: [3]
+    task_prompts:
+      3: "Pick up the red bbq sauce bottle and put it in the basket."
+    objects:
+      target: "bbq sauce bottle, red with a red cap"
+      expected_label: "BBQ Sauce"
+      shape_hint: "tall red squeeze bottle around 15 cm with a matching red cap"
+    num_workers: 1
+
+  - suite_name: libero_object_all_variance
+    task_ids: [4]
+    task_prompts:
+      4: "Pick up the ketchup bottle with the silver cap and put it in the basket."
+    objects:
+      target: "ketchup bottle with a silver cap"
+      expected_label: "Ketchup"
+      shape_hint: "tall red bottle around 15 cm with a silver-grey cap"
+    num_workers: 1
+
+  - suite_name: libero_object_all_variance
+    task_ids: [5]
+    task_prompts:
+      5: "Pick up the tomato sauce can and put it in the basket."
+    objects:
+      target: "tomato sauce can"
+      expected_label: "Tomato Sauce"
+      shape_hint: "red-labelled metal can about 8 cm wide"
+    num_workers: 1
+
+  - suite_name: libero_object_all_variance
+    task_ids: [6]
+    task_prompts:
+      6: "Pick up the butter box and put it in the basket."
+    objects:
+      target: "butter box, orange and blue"
+      expected_label: "Butter"
+      shape_hint: "flat orange-and-blue cardboard box roughly 5 cm across"
+    num_workers: 1
+
+  - suite_name: libero_object_all_variance
+    task_ids: [7]
+    task_prompts:
+      7: "Pick up the milk carton and put it in the basket."
+    objects:
+      target: "milk carton"
+      expected_label: "Milk"
+      shape_hint: "white carton with colored print, about 10 cm tall"
+    num_workers: 1
+
+  - suite_name: libero_object_all_variance
+    task_ids: [8]
+    task_prompts:
+      8: "Pick up the chocolate pudding box and put it in the basket."
+    objects:
+      target: "chocolate pudding box"
+      expected_label: "Chocolate Pudding"
+      shape_hint: "brown cardboard box about 8 cm wide"
+    num_workers: 1
+
+  - suite_name: libero_object_all_variance
+    task_ids: [9]
+    task_prompts:
+      9: "Pick up the orange juice and put it in the basket."
+    objects:
+      target: "orange juice carton"
+      expected_label: "Orange Juice"
+      shape_hint: "orange-colored carton 10-12 cm tall"
+    num_workers: 1
+
+trials:
+  trials_per_generation: 50
+  task_ids: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  num_workers: 25
+  regenerate_code_per_trial: false
+  record_video: true
+  # 900s: flat-box grasp planning legitimately reaches ~400s when the
+  # goalset falls back to per-pose iteration (passing trials measured
+  # 391-537s); 600s was killing trials that were on track to succeed.
+  task_timeout_secs: 900
+  enable_tracing: false
+  output_dir: ../../benchmark_runs/grocery_acceptance

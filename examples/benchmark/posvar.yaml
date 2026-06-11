@@ -1,0 +1,54 @@
+# Canonical LIBERO-PosVar variation x ablation sweep.
+#
+#   gap benchmark examples/benchmark/posvar.yaml
+#
+# Modes run sequentially; every mode produces a workflow.json zero-shot
+# and is scored by the same in-process LIBERO eval. The libero_pi05
+# policy (modes llm_plus_policy / policy_only) must be running before
+# the sweep:
+#   gap policy serve pi05-libero --port 9100      # -> ws://127.0.0.1:9100
+#
+task: "auto"   # per-task prompts resolved from LIBERO metadata
+
+# optional — omit to auto-discover the open-robot-skills checkout
+# ($GAP_SKILLS_PATH or the checkout next to the graph-as-policy checkout); explicit
+# relative values resolve against this file's directory.
+skills: ../../../open-robot-skills
+
+llm:
+  provider: anthropic
+  # model: claude-opus-4-8        # default; uncomment to pin
+
+# Shared learned-policy registry (external server). Only the
+# llm_plus_policy / policy_only modes use it; the harness preflights the
+# websocket and never owns the server lifecycle.
+policies:
+  libero_pi05:
+    url: ws://127.0.0.1:9100
+
+policy_manager:
+  startup_timeout_s: 900
+
+benchmark:
+  families: [posvar]
+  variations: [pos_var, permutation, basket_swap, all]
+  modes: [llm_generation, llm_plus_policy, policy_only]
+  n_tasks: 10            # task_id 0..9 per suite
+  n_seeds: 50            # seeds 1..50 -> the 50 baked init-state variations
+  num_workers: 8
+  # render resolution is fixed inside the env layer — not a knob
+  record_video: false
+  output_dir: ../../benchmark_runs/posvar
+  mode_overrides:
+    llm_plus_policy:
+      # The steered-policy example graph (OBB approach + run_policy with
+      # a {{policy_id}} placeholder). NOTE: examples/steered_policy lands
+      # in a follow-up — until then, point workflow_dir at your template.
+      workflow_dir: ../steered_policy/graph
+      # libero_pi05 is a single shared websocket server — throttle to
+      # avoid serializing every worker on one inference endpoint.
+      num_workers: 4
+    policy_only:
+      # Bare VLA baseline: setup + run_policy, no OBB/approach graph.
+      workflow_dir: ../steered_policy/graph
+      num_workers: 4

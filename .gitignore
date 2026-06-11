@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+# uv.lock is committed: it pins the measured-release environment.
+outputs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+MUJOCO_LOG.TXT
+
+# Frontend build: keep gap.viz's built bundle (shipped as package data)
+# despite the generic dist/ ignore above; never track node_modules.
+node_modules/
+!gap/viz/frontend/dist/
+!gap/viz/frontend/dist/**
+curobo_debug/

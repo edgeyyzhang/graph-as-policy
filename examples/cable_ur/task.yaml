@@ -1,0 +1,18 @@
+# Task metadata for the UR + ZED cable-perception example.
+# (Ported from the dev tree's cable task config; the dev benchmark-harness
+# fields — platform base, startup timeouts — do not apply here.)
+
+task: "Locate the white tape on the cable and report its 3D position."
+
+suite: ur_zed
+
+environment:
+  cameras:
+    - zed_left
+
+run:
+  graph: graph/
+  # skills: omitted — the open-robot-skills checkout is auto-discovered
+  # ($GAP_SKILLS_PATH or the checkout next to the graph-as-policy checkout); set an
+  # explicit path here to override (relative paths resolve against this
+  # file's directory).
