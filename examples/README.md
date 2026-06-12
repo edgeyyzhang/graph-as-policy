@@ -27,6 +27,7 @@ the same `gap run`.
 |---|---|---|---|---|
 | [build_a_graph](build_a_graph/) | The full authoring example: 4 subgraphs, a ground-truth checkpoint, recovery actions, optional `--execute` | `uv sync` (CPU to build) | ~1 min | — |
 | [generate_a_graph](generate_a_graph/) | Instruction → validated workflow dir; CLI + Python, all providers | `uv sync` + LLM key | minutes | — |
+| [agent_quickstart](agent_quickstart/) | Step-by-step: Claude Code (one skill) generates a graph from a sentence → validate → sim run → video | `quickstart` + GPU + LLM key + Claude Code | ~10 min | sentence → **task success in sim, 75 s, on video** |
 
 ## Benchmarks & evaluation
 

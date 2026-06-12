@@ -111,6 +111,7 @@ MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
 - `--validate-only` first when in doubt — structural validation without a
   robot.
 - `--inputs key=value` binds top-level workflow inputs.
+- `--record-video` (sim only) saves `<trace-dir>/run_video.mp4` of the run.
 - Every run writes a trace (`dag_trace.json` + per-node assets) under
   `--trace-dir` (default `outputs/run_<timestamp>`). Read it for node
   inputs/outputs, checkpoint results, and failures.

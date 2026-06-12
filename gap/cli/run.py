@@ -58,6 +58,11 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="Trace output directory (overrides the default outputs/run_<timestamp>)",
     )
     sp.add_argument(
+        "--record-video", action="store_true",
+        help="Sim only: record the run and save <trace-dir>/run_video.mp4 "
+             "(plus per-camera videos when the env buffers them)",
+    )
+    sp.add_argument(
         "--checkpoints", default="warn", choices=["off", "warn", "raise"],
         help="Checkpoint enforcement mode (default: warn)",
     )
@@ -144,12 +149,24 @@ def _handle(args: argparse.Namespace) -> int:
 
     if args.sim and args.real:
         raise SystemExit("--sim and --real are mutually exclusive")
+    if args.record_video and not args.sim:
+        print("error: --record-video needs a sim connector (--sim SUITE/TASK)")
+        return 2
+    if args.record_video and trace_dir is None:
+        print("error: --record-video needs a trace dir (drop --no-trace)")
+        return 2
 
     connector = None
     if args.sim:
         import gap.connector
 
-        connector = gap.connector.sim("libero", task=args.sim)
+        connector = gap.connector.sim(
+            "libero", task=args.sim, record_video=args.record_video,
+        )
+        if args.record_video:
+            # Capture only arms itself on reset(); execute() runs on the
+            # already-reset env, so start the frame buffer explicitly.
+            connector.start_video()
     elif args.real:
         import gap.connector
 
@@ -170,6 +187,13 @@ def _handle(args: argparse.Namespace) -> int:
             trace_dir=trace_dir,
             checkpoints=args.checkpoints,
         )
+        if args.record_video and connector is not None:
+            video_path = Path(trace_dir) / "run_video.mp4"
+            saved = connector.save_video(str(video_path))
+            if saved.get("success") and saved.get("num_frames"):
+                print(f"video: {video_path} ({saved['num_frames']} frames)")
+            else:
+                print(f"video: not saved ({saved})")
     finally:
         if connector is not None:
             connector.close()

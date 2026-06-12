@@ -35,7 +35,8 @@ options:
 ```text
 usage: gap run [-h] [--sim SUITE/TASK] [--real {franka,ur_zed}] [--rr-config YAML]
                [--no-rr-autostart] [--skills PATH] [--validate-only] [--no-trace]
-               [--trace-dir TRACE_DIR] [--checkpoints {off,warn,raise}] [--inputs [K=V ...]] [-v]
+               [--trace-dir TRACE_DIR] [--record-video] [--checkpoints {off,warn,raise}]
+               [--inputs [K=V ...]] [-v]
                graph
 
 positional arguments:
@@ -60,6 +61,8 @@ options:
   --no-trace            Disable trace output (default: traces into ./outputs/run_<timestamp>)
   --trace-dir TRACE_DIR
                         Trace output directory (overrides the default outputs/run_<timestamp>)
+  --record-video        Sim only: record the run and save <trace-dir>/run_video.mp4 (plus per-
+                        camera videos when the env buffers them)
   --checkpoints {off,warn,raise}
                         Checkpoint enforcement mode (default: warn)
   --inputs [K=V ...]    Initial workflow inputs as k=v pairs (values parsed as JSON when possible,

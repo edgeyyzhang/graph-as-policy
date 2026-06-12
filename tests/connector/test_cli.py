@@ -90,6 +90,24 @@ def test_run_no_trace(tmp_path, monkeypatch):
     assert not (tmp_path / "outputs").exists()
 
 
+def test_record_video_requires_sim_and_trace(tmp_path, monkeypatch, capsys):
+    wf_dir = tmp_path / "wf"
+    wf_dir.mkdir()
+    (wf_dir / "workflow.json").write_text(json.dumps(_valid_workflow()))
+
+    code = _run_cli(monkeypatch, ["run", str(wf_dir), "--record-video"])
+    assert code == 2
+    assert "--sim" in capsys.readouterr().out
+
+    code = _run_cli(
+        monkeypatch,
+        ["run", str(wf_dir), "--record-video", "--sim", "libero_object/0",
+         "--no-trace"],
+    )
+    assert code == 2
+    assert "trace" in capsys.readouterr().out
+
+
 def test_parse_inputs():
     parsed = _parse_inputs(["k=1", "s=hello", "obj={\"a\": 2}", "flag=true"])
     assert parsed == {"k": 1, "s": "hello", "obj": {"a": 2}, "flag": True}

@@ -227,6 +227,7 @@ robots — the full gallery with time estimates and measured results is
 | **Author & generate graphs** | | |
 | [build_a_graph](examples/build_a_graph/) | The full authoring example: checkpoints, recovery, `--execute` | `uv sync` (CPU to build) |
 | [generate_a_graph](examples/generate_a_graph/) | Instruction → validated workflow dir; CLI + Python, all providers | `uv sync` + LLM key |
+| [agent_quickstart](examples/agent_quickstart/) | Claude Code + one skill: sentence → generated graph → validated → sim success on video, step by step | `quickstart` + LLM key + Claude Code |
 | **Benchmarks & evaluation** | | |
 | [grocery_fulfillment](examples/grocery_fulfillment/) | The flagship acceptance family; graphs LLM-generated per task — **10/10 dev gate** | `grocery` + LLM key |
 | [benchmark](examples/benchmark/) | Grid configs: smoke → position-variance (posvar) grid → the **≥90%** release gate | `grocery` + LLM key |
@@ -298,6 +299,13 @@ the table to my lab registry"*, or *"why did this trial fail?"* (trace
 debugging). Real-robot commands stay gated on explicit human
 confirmation. Other agents (Cursor, Codex, …) and the no-install path:
 [agent/INSTALL.md](agent/INSTALL.md).
+
+Step-by-step walkthrough (from a one-sentence prompt to a verified sim
+success on video, with every command and real outputs):
+[examples/agent_quickstart](examples/agent_quickstart/). Note Claude Code
+needs only this one skill — the robot bundles in open-robot-skills are
+consumed by gap's *internal* codegen agent as files on disk, not
+installed into Claude Code.
 
 ## Authoring graphs in Python
 
