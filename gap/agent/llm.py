@@ -536,13 +536,40 @@ _VERTEX_HINT = (
 )
 
 
+def _vertex_project(config: LlmConfig) -> str:
+    """Resolve the GCP project: config wins, then the documented env vars.
+
+    ``llm.project_id`` from a config YAML takes precedence; otherwise
+    ``$GOOGLE_CLOUD_PROJECT`` (the README's documented knob — also what
+    google-genai reads natively) or the Anthropic SDK's own
+    ``$ANTHROPIC_VERTEX_PROJECT_ID``, so ``--provider vertex`` works with
+    no config file. Resolved here, *before* the client cache key, so two
+    shells with different env projects never share a cached client.
+    """
+    return (
+        config.project_id
+        or os.environ.get("GOOGLE_CLOUD_PROJECT", "").strip()
+        or os.environ.get("ANTHROPIC_VERTEX_PROJECT_ID", "").strip()
+    )
+
+
+def _vertex_region(config: LlmConfig) -> str:
+    """Resolve the Vertex region: config > documented env vars > global."""
+    return (
+        config.region
+        or os.environ.get("GOOGLE_CLOUD_REGION", "").strip()
+        or os.environ.get("GOOGLE_CLOUD_LOCATION", "").strip()
+        or "global"
+    )
+
+
 def _vertex_claude_client(config: LlmConfig) -> Any:
     try:
         from anthropic import AsyncAnthropicVertex
     except ImportError as e:  # pragma: no cover - import-guarded
         raise ImportError(_VERTEX_HINT) from e
-    project = config.project_id or ""
-    region = config.region or "global"
+    project = _vertex_project(config)
+    region = _vertex_region(config)
     key = (project, region)
     client = _vertex_claude_clients.get(key)
     if client is None:
@@ -556,8 +583,8 @@ def _vertex_gemini_client(config: LlmConfig) -> Any:
         from google import genai
     except ImportError as e:  # pragma: no cover - import-guarded
         raise ImportError(_VERTEX_HINT) from e
-    project = config.project_id or ""
-    region = config.region or "global"
+    project = _vertex_project(config)
+    region = _vertex_region(config)
     key = (project, region)
     client = _vertex_gemini_clients.get(key)
     if client is None:

@@ -478,3 +478,46 @@ class TestCacheAndSelection:
         cfg = LlmConfig(provider="nope", model="m")
         with pytest.raises(ValueError, match="unknown LLM provider"):
             run(complete(cfg, system="s", messages=[]))
+
+
+# ---------------------------------------------------------------------------
+# Vertex project resolution (config > documented env vars)
+# ---------------------------------------------------------------------------
+
+
+def test_vertex_project_resolution(monkeypatch):
+    from gap.agent.llm import LlmConfig, _vertex_project
+
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    monkeypatch.delenv("ANTHROPIC_VERTEX_PROJECT_ID", raising=False)
+    assert _vertex_project(LlmConfig(provider="vertex")) == ""
+
+    # The README's documented knob works without a config file...
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "env-proj")
+    assert _vertex_project(LlmConfig(provider="vertex")) == "env-proj"
+
+    # ...the Anthropic SDK's own env var is honored as a fallback...
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT")
+    monkeypatch.setenv("ANTHROPIC_VERTEX_PROJECT_ID", "anthropic-proj")
+    assert _vertex_project(LlmConfig(provider="vertex")) == "anthropic-proj"
+
+    # ...and an explicit config project_id always wins.
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "env-proj")
+    assert _vertex_project(
+        LlmConfig(provider="vertex", project_id="config-proj")
+    ) == "config-proj"
+
+
+def test_vertex_region_resolution(monkeypatch):
+    from gap.agent.llm import LlmConfig, _vertex_region
+
+    monkeypatch.delenv("GOOGLE_CLOUD_REGION", raising=False)
+    monkeypatch.delenv("GOOGLE_CLOUD_LOCATION", raising=False)
+    assert _vertex_region(LlmConfig(provider="vertex")) == "global"
+
+    monkeypatch.setenv("GOOGLE_CLOUD_REGION", "us-central1")
+    assert _vertex_region(LlmConfig(provider="vertex")) == "us-central1"
+
+    assert _vertex_region(
+        LlmConfig(provider="vertex", region="europe-west4")
+    ) == "europe-west4"

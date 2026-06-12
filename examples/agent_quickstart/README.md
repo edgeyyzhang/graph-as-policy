@@ -38,11 +38,22 @@ Pick an LLM provider for generation and the VLM perception bundle
 
 ```bash
 export ANTHROPIC_API_KEY=...          # simplest: one key drives both
-# or vertex: gcloud auth application-default login, then
-#   export GAP_VLM_PROVIDER=vertex GAP_VLM_PROJECT_ID=<proj> \
-#          GAP_VLM_REGION=global GAP_VLM_MODEL=<gemini-model>
-#   and pass a config YAML with the same llm: settings to gap generate
 ```
+
+Or Vertex AI (no API key — uses gcloud ADC):
+
+```bash
+gcloud auth application-default login           # once
+export GOOGLE_CLOUD_PROJECT=<your-project>      # used by gap generate
+# generation: pass the provider + model explicitly, with the vertex extra
+uv run --extra vertex gap generate "..." --provider vertex --model <gemini-model>
+# the VLM perception bundle reads its own env vars at run time:
+export GAP_VLM_PROVIDER=vertex GAP_VLM_PROJECT_ID=$GOOGLE_CLOUD_PROJECT \
+       GAP_VLM_REGION=global GAP_VLM_MODEL=<gemini-model>
+```
+
+Note the `--extra vertex`: a plain `uv run` re-syncs the project venv
+and would prune the vertex SDK again.
 
 ## 1. Install the agent skill (once)
 
@@ -71,7 +82,10 @@ three commands by hand):
 ```bash
 uv run gap check                                   # capability report first
 uv run gap generate "pick up the cream cheese and put it in the basket" \
-    --out outputs/agent_gen_test                   # add --config <yaml> for vertex
+    --out outputs/agent_gen_test
+# vertex variant (verified):
+#   GOOGLE_CLOUD_PROJECT=<proj> uv run --extra vertex gap generate "..." \
+#       --provider vertex --model <gemini-model> --out outputs/agent_gen_test
 uv run gap run outputs/agent_gen_test/task_00 --validate-only
 ```
 
