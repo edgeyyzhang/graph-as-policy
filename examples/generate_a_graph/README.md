@@ -1,5 +1,7 @@
 # generate_a_graph — instruction → validated workflow
 
+> **What:** Instruction → validated workflow dir; CLI + Python, all providers · **Needs:** `uv sync` + LLM key · **Time:** minutes
+
 The canonical generation flows: one natural-language instruction goes
 through the LLM agent pipeline (coordinator → per-subgraph agents →
 checkpoint agent → validation + script-fix loop) and comes out as a typed,

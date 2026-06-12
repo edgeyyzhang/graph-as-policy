@@ -1,5 +1,7 @@
 # cable_ur — locate a marker on a cable with a UR arm + ZED camera
 
+> **What:** Perception-only UR + ZED connector — motion structurally impossible (read-only RTDE) · **Needs:** `real` + ZED SDK + UR arm · **Time:** seconds · **Safety:** read [../../docs/safety.md](../../docs/safety.md) first
+
 Perception-only example: detect a small adhesive sticker on a cable,
 fuse the segmentation with ZED depth into a world-frame point cloud, fit
 an OBB and a local plane, and report the marker's 3D position and

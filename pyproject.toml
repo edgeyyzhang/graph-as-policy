@@ -37,6 +37,8 @@ dependencies = [
   "pillow>=10",
   "opencv-python-headless>=4.9",
   "matplotlib>=3.8",
+  # viz.render's graph layout; otherwise only transitive via trimesh[easy].
+  "networkx>=3",
   "imageio[ffmpeg]>=2.31",
   "viser>=0.2.3",
 

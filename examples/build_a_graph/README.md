@@ -1,5 +1,7 @@
 # build_a_graph — author a workflow in Python with `gap.builder`
 
+> **What:** The full authoring example: checkpoints, recovery, `--execute` · **Needs:** `uv sync` (CPU to build) · **Time:** ~1 min
+
 LLM generation is one producer of graphs, not the only one. This example
 builds the complete quickstart-style pick-and-place workflow by hand with
 the builder API — **the builder is the same artifact pipeline as

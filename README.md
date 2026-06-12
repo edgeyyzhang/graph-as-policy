@@ -3,15 +3,21 @@
 # gap — graph as policy
 
 **The policy is the graph.**
-A natural-language task is compiled by an LLM agent pipeline into a typed,
-verified execution graph of robot skills — and the graph, not a monolithic
-policy, is what runs on simulators and real robots.
+gap compiles a natural-language task into a typed, verified execution
+graph of robot skills — and runs the graph, not a black-box policy, on
+simulators and real robots.
 
-<!-- TODO(release): real badge targets once the repos are public + CI is up:
-     build status, PyPI version, docs, community chat. -->
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Skills: open-robot-skills](https://img.shields.io/badge/skills-gap--skills-orange.svg)](https://github.com/graph-robots/open-robot-skills)
+[![Skills: open-robot-skills](https://img.shields.io/badge/skills-open--robot--skills-orange.svg)](https://github.com/graph-robots/open-robot-skills)
+
+<table><tr>
+  <td width="50%"><img src="docs/assets/quickstart_rollout.gif" alt="quickstart rollout on LIBERO: perceive, grasp, transport"></td>
+  <td width="50%"><img src="docs/assets/quickstart_graph.png" alt="the executed workflow graph"></td>
+</tr><tr>
+  <td align="center"><sub>"pick up the soup can and put it in the basket" — live rollout</sub></td>
+  <td align="center"><sub>the graph that ran it (rendered from <a href="examples/libero_quickstart/">examples/libero_quickstart</a>)</sub></td>
+</tr></table>
 
 </div>
 
@@ -21,6 +27,7 @@ import gap
 conn = gap.connector.sim("libero", task="libero_object/0")        # one process, no extra terminals
 result = gap.execute("examples/libero_quickstart/graph", conn)    # skills auto-discovered
 graph = gap.agent.generate_sync("pick up the soup can and put it in the basket")
+print(graph)                                                      # the policy, as a graph
 gap.viz.serve("outputs")                                          # browse the trial trace
 ```
 
@@ -29,58 +36,6 @@ Agent Skills format, contributable) and are discovered by path — clone the
 two repos side by side and every command finds them, no flags needed.
 Everything runs **in one process**: env, vision models, IK. No gRPC, no
 protobufs, no self-hosted model servers.
-
-## Get started
-
-Requirements: **Linux + NVIDIA GPU (≥ ~10 GB VRAM) + EGL**, an LLM API key
-(Anthropic / OpenAI-compatible / Vertex), and [uv](https://docs.astral.sh/uv/).
-First run downloads ~3.5 GB of model weights (`HF_TOKEN` for gated repos).
-
-```bash
-git clone --recurse-submodules https://github.com/graph-robots/graph-as-policy.git
-git clone https://github.com/graph-robots/open-robot-skills.git
-
-cd graph-as-policy
-uv sync --extra quickstart            # one venv: engine + LIBERO sim + perception models
-uv run gap skills check --download    # verify skill bundles + prefetch model weights
-```
-
-Run the quickstart graph — LIBERO sim + Grounding DINO + SAM3 + a hosted
-VLM + in-process IK, executing a perceive → grasp → transport graph with
-ground-truth checkpoint verification:
-
-```bash
-export ANTHROPIC_API_KEY=...          # or another provider, see "LLM providers"
-
-MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
-  --sim libero_object_all_variance/0
-uv run gap viz                        # browse the recorded trial at localhost:9432
-```
-
-Generate a graph from language instead of running the checked-in one:
-
-```bash
-uv run gap generate "pick up the alphabet soup can and place it in the basket"
-```
-
-(`uv run` needs no venv activation; `source .venv/bin/activate` once if you
-prefer plain `gap …`. pip also works — see [Installation details](#installation-details).)
-
-### Pick your environment
-
-One `uv sync` per setup; everything is declared in `pyproject.toml` and
-pinned by the committed `uv.lock` (the measured-release environment).
-
-| Command | What you get |
-|---|---|
-| `uv sync` | engine only — tests, validation, graph authoring (CPU, any OS) |
-| `uv sync --extra quickstart` | + LIBERO sim + SAM3 / Grounding DINO / geometry bundles |
-| `CUDA_HOME=/usr/local/cuda uv sync --extra grocery` | + CuRobo motion planning (CUDA build) — the acceptance-benchmark set |
-| `CUDA_HOME=/usr/local/cuda uv sync --extra all` | + policy serving, Gemini-ER, Vertex provider, Ray workers |
-
-Per-bundle dependencies and setup are declared bundle-by-bundle in
-[open-robot-skills/pyproject.toml](https://github.com/graph-robots/open-robot-skills/blob/main/pyproject.toml) (one extra per
-bundle); the extras above are the curated sets spanning both repos.
 
 ## Why gap
 
@@ -103,19 +58,184 @@ bundle); the extras above are the curated sets spanning both repos.
   with `--gate`: the grocery-fulfillment acceptance config must clear
   **≥90% success** for a release.
 
+## Measured results
+
+Every number below was measured on this repo at the committed `uv.lock`;
+per-seed tables and conditions are in the linked READMEs. No figures are
+carried over from anywhere else.
+
+- **Quickstart** — [libero_quickstart](examples/libero_quickstart/): **9/10 grasp**,
+  7/10 end-to-end over 10 seeded LIBERO trials; ~25–55 s per trial on one A100.
+- **Acceptance benchmark** — [grocery_fulfillment](examples/grocery_fulfillment/):
+  **10/10** on the 10-task development gate (2026-06-11), graphs LLM-generated
+  per task, nothing hand-written.
+- **Release gate** — [benchmark](examples/benchmark/): `gap benchmark … --gate`
+  must clear **≥90% success** over 10 tasks × 50 trials before any release.
+
+## Get started
+
+Requirements: **Linux + NVIDIA GPU (≥ ~10 GB VRAM) + EGL** (headless GPU
+rendering — the `MUJOCO_GL=egl` in the commands below), an LLM API key
+(Anthropic / OpenAI-compatible / Vertex), and [uv](https://docs.astral.sh/uv/).
+First run downloads ~3.5 GB of model weights; `HF_TOKEN` (a free
+[HuggingFace token](https://huggingface.co/settings/tokens)) is needed only
+for the gated SAM3 weights. **No GPU?** Skip to
+[gap in 2 minutes](#no-gpu-gap-in-2-minutes) — the engine runs anywhere.
+
+```bash
+git clone --recurse-submodules https://github.com/graph-robots/graph-as-policy.git
+git clone https://github.com/graph-robots/open-robot-skills.git
+```
+
+The two repos must sit next to each other — skills are discovered by path:
+
+```
+your-workspace/
+├── graph-as-policy/       # this repo (engine)
+└── open-robot-skills/     # skill bundles — auto-discovered, no flags
+```
+
+```bash
+cd graph-as-policy
+uv sync --extra quickstart            # one venv: engine + LIBERO sim + perception models
+uv run gap skills check --download    # install verification: per-bundle PASS/WARN/FAIL + weight prefetch
+```
+
+`gap skills check` is your install gate — it prints per-bundle
+PASS/WARN/FAIL with an install hint for anything missing.
+
+### 1. Run the quickstart graph
+
+LIBERO sim + Grounding DINO + SAM3 + a hosted VLM + in-process IK,
+executing a perceive → grasp → transport graph:
+
+```bash
+export ANTHROPIC_API_KEY=...          # or another provider, see "LLM providers"
+
+MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
+  --sim libero_object_all_variance/0
+uv run gap viz                        # browse the recorded trial at localhost:9432
+```
+
+That one command, in one process:
+
+- launched LIBERO (MuJoCo + EGL) on the seeded task variation;
+- found the can and the basket with Grounding DINO + SAM3, disambiguated by a hosted VLM;
+- fused masks + depth into oriented bounding boxes (OBBs) and derived a top-down grasp;
+- executed perceive → grasp → transport with in-process IK;
+- verified `target_held` against simulator ground truth at the subgraph exit;
+- recorded the full trace to `outputs/` — that is what `gap viz` is browsing.
+
+### 2. Generate a graph from language
+
+```bash
+uv run gap generate "pick up the alphabet soup can and place it in the basket"
+```
+
+The compiled policy prints right in the terminal (the same rendering
+`print(graph)` gives you in Python) — here on the checked-in
+[sample generated graph](examples/grocery_fulfillment/sample_generated_graph):
+
+```text
+task_00
+Pick the blue and yellow alphabet soup can and place it in the basket.
+
+START
+  │
+  ▼
+┌─ target_sg ───────────────────────────────────────── perceiving-objects ─┐
+│ observe ─▶ perceive ─▶ filter_obb                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+  │ found                                                    abort ▶ ✗ abort
+  ▼
+┌─ container_sg ────────────────────────────────────── perceiving-objects ─┐
+│ observe ─▶ perceive ─▶ filter_obb                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+  │ found                                                    abort ▶ ✗ abort
+  ▼
+┌─ grasp_sg ─────────────────────────────────────── grasping-with-planner ─┐
+│ open ─▶ compute_grasp ─▶ approach ─▶ observe ─▶ build_world ─▶ plan      │
+│   ─▶ execute ─▶ close                                                    │
+└──────────────────────────────────────────────────────────────────────────┘
+  │ grasped                                                  abort ▶ ✗ abort
+  ▼
+┌─ transport_sg ──────────────────────────────────── transporting-objects ─┐
+│ compute_drop ─▶ move_above ─▶ release                                    │
+└──────────────────────────────────────────────────────────────────────────┘
+  │ placed ▶ ✓ done                                          abort ▶ ✗ abort
+
+✓ done (success)   ✗ abort (failure, recovery: open_gripper, go_home)
+```
+
+The [15-minute tour](docs/quickstart.md) walks both steps with the trace
+open. (`uv run` needs no venv activation; `source .venv/bin/activate` once
+if you prefer plain `gap …`. pip also works — see
+[Installation details](#installation-details).)
+
+### Pick your environment
+
+One `uv sync` per setup; everything is declared in `pyproject.toml` and
+pinned by the committed `uv.lock` (the measured-release environment).
+
+| Command | What you get |
+|---|---|
+| `uv sync` | engine only — tests, validation, graph authoring (CPU, any OS) |
+| `uv sync --extra quickstart` | + LIBERO sim + SAM3 / Grounding DINO / geometry bundles |
+| `CUDA_HOME=/usr/local/cuda uv sync --extra grocery` | + CuRobo motion planning (CUDA build) — the acceptance-benchmark set |
+| `CUDA_HOME=/usr/local/cuda uv sync --extra all` | + policy serving, Gemini-ER, Vertex provider, Ray workers |
+
+Per-bundle dependencies and setup are declared bundle-by-bundle in
+[open-robot-skills/pyproject.toml](https://github.com/graph-robots/open-robot-skills/blob/main/pyproject.toml) (one extra per
+bundle); the extras above are the curated sets spanning both repos.
+
+## No GPU? gap in 2 minutes
+
+The engine runs anywhere. Build, validate, and render a real workflow
+graph on a laptop — CPU-only, no API key, no simulator. It needs only the
+[two clones above](#get-started), side by side with `--recurse-submodules`:
+
+```bash
+uv sync                                        # engine only, any OS
+uv run python examples/hello_graph/hello.py    # → outputs/hello_graph/graph.png
+```
+
+<p align="center"><img src="docs/assets/hello_graph.png" width="560"
+   alt="rendered hello_graph workflow"></p>
+
+In those two commands, gap:
+
+- assembled a perceive-then-grasp workflow with `gap.builder` — the same
+  artifact (`workflow.json` + `scripts/`) the LLM pipeline emits;
+- ran it through the structural + skill-registry validation that gates
+  every generated graph;
+- rendered the typed graph to a PNG.
+
+When you get to a GPU, the [quickstart graph](#get-started) is this same
+kind of artifact, executing for real.
+
 ## Examples
+
+All ten examples, from a CPU-only hello-world to the release gate and real
+robots — the full gallery with time estimates and measured results is
+[examples/README.md](examples/README.md).
 
 | Example | What it shows | Needs |
 |---|---|---|
-| [build_a_graph](examples/build_a_graph/) | Author the pick-and-place graph in Python with `gap.builder` | none to build |
-| [generate_a_graph](examples/generate_a_graph/) | Instruction → validated workflow dir, CLI + Python, all providers | LLM key |
-| [libero_quickstart](examples/libero_quickstart/) | The end-to-end demo; **measured 9/10 grasp, 7/10 task success** over 10 seeded trials | `quickstart` |
-| [grocery_fulfillment](examples/grocery_fulfillment/) | The flagship acceptance benchmark; **10/10** on the dev gate, ≥90% release gate | `grocery` |
-| [steered_policy](examples/steered_policy/) | Hybrid graphs: perceive + hover, then hand control to a learned VLA policy | `quickstart` + `[policy]` |
-| [collect_and_train](examples/collect_and_train/) | Graph as scripted expert → HDF5/LeRobot dataset → train → policy node | `quickstart` + `[policy]` |
-| [benchmark](examples/benchmark/) | Benchmark configs: smoke, posvar grid, the acceptance gate | `grocery` |
-| [cable_ur](examples/cable_ur/) | Real UR + ZED, perception-only connector (motion structurally impossible) | `[real]` + ZED SDK |
-| [real_franka_pick_place](examples/real_franka_pick_place/) | Real Franka + Robotiq pick-place loop via robots_realtime — **read [docs/safety.md](docs/safety.md) first** | `[real]` + hardware |
+| **Start here** | | |
+| [hello_graph](examples/hello_graph/) | Build → validate → render your first graph — CPU only, no API key | `uv sync` (any OS) |
+| [libero_quickstart](examples/libero_quickstart/) | The end-to-end hero: real vision → OBB grasp → transport, ground-truth verified — **9/10 grasp · 7/10 task** | `quickstart` + GPU + LLM key |
+| **Author & generate graphs** | | |
+| [build_a_graph](examples/build_a_graph/) | The full authoring example: checkpoints, recovery, `--execute` | `uv sync` (CPU to build) |
+| [generate_a_graph](examples/generate_a_graph/) | Instruction → validated workflow dir; CLI + Python, all providers | `uv sync` + LLM key |
+| **Benchmarks & evaluation** | | |
+| [grocery_fulfillment](examples/grocery_fulfillment/) | The flagship acceptance family; graphs LLM-generated per task — **10/10 dev gate** | `grocery` + LLM key |
+| [benchmark](examples/benchmark/) | Grid configs: smoke → position-variance (posvar) grid → the **≥90%** release gate | `grocery` + LLM key |
+| **Learned policies** | | |
+| [steered_policy](examples/steered_policy/) | Perceive + hover, then hand control to a learned VLA (vision-language-action) policy | `quickstart` + `policy` + LLM key |
+| [collect_and_train](examples/collect_and_train/) | Graph as scripted expert → dataset → train → policy node | `quickstart` + `policy` + LLM key |
+| **Real robots** — read [docs/safety.md](docs/safety.md) first | | |
+| [cable_ur](examples/cable_ur/) | Perception-only UR + ZED connector (motion structurally impossible) | `real` + ZED SDK + UR arm |
+| [real_franka_pick_place](examples/real_franka_pick_place/) | Franka + Robotiq pick-place loop via robots_realtime | `real` + hardware |
 
 ## CLI
 
@@ -125,42 +245,23 @@ bundle); the extras above are the curated sets spanning both repos.
 | `gap generate "<instruction>" [--provider P] [--model M] [--out DIR]` | LLM pipeline: instruction → validated workflow dir |
 | `gap benchmark <config.yaml> [--gate] [--resume]` | Benchmark grids; `--gate` exits non-zero below threshold |
 | `gap viz [--root outputs] [--port 9432]` | Trial browser: graph swimlanes, per-node I/O, assets, videos |
-| `gap skills list \| check [--download] \| table \| new <name>` | Bundle catalog, validation, weight prefetch, scaffolding |
+| `gap skills list \| check [--download] \| table \| new <name> --kind {tool,skill}` | Bundle catalog, validation, weight prefetch, scaffolding |
 | `gap policy serve <preset>` | One-command policy serving (`pi05-libero`, `molmoact-libero`) |
 | `gap trace-diff <trial_a> <trial_b>` | Structural diff of two recorded traces |
 
-Every command that takes a skills path accepts `--skills PATH`, but none
-needs it: the open-robot-skills checkout is auto-discovered from `$GAP_SKILLS_PATH`
-or the side-by-side layout.
+`gap run`, `gap generate`, and `gap skills` accept `--skills PATH`, but
+none needs it: the open-robot-skills checkout is auto-discovered from
+`$GAP_SKILLS_PATH` or the side-by-side layout.
 
 ## Authoring graphs in Python
 
 LLM generation is one producer of graphs, not the only one. `gap.builder`
 emits the identical artifact (`workflow.json` + `scripts/` + `checkpoints/`)
-through the same validation:
-
-```python
-from gap.builder import Workflow, Subgraph, Ref
-
-grasp = Subgraph(name="grasp_sg", skill="grasping-direct-ik")
-grasp.add_input("target_obb", type_name="OrientedBoundingBox")
-grasp.add_node("candidates", type="tool", tool="geometry.top_down_grasp_candidates",
-               inputs={"obb": Ref("in.target_obb")})
-grasp.add_node("descend", type="tool", tool="robot.go_to_pose",
-               inputs={"pose": Ref("candidates.candidates.poses.0")})
-grasp.add_checkpoint("target_held",
-                     lambda world: world.body("alphabet soup").is_grasped(),
-                     rationale="gripper actually holds the can after close")
-# ... edges, exits, more subgraphs ...
-
-wf = Workflow(name="pick_into_basket")
-wf.add_subgraph(grasp)
-wf.save("my_graph/workflow.json")     # parse + structural validation
-```
-
-[examples/build_a_graph](examples/build_a_graph/) is the complete runnable
-version; [docs/runtime.md](docs/runtime.md) specifies the JSON schema and
-executor semantics.
+through the same validation — [examples/hello_graph](examples/hello_graph/)
+is the 2-minute version, [examples/build_a_graph](examples/build_a_graph/)
+the complete one (~40 lines of builder calls produce the full
+quickstart-style pick-and-place artifact); [docs/runtime.md](docs/runtime.md)
+specifies the JSON schema and executor semantics.
 
 ## LLM providers
 
@@ -195,9 +296,10 @@ see [examples/libero_quickstart](examples/libero_quickstart/README.md#vlm-provid
         │ tools/   sam3, grounding-dino, gemini-er,    │
         │          molmo, vlm, curobo, geometry        │
         │ skills/  perceiving-objects(-oneshot/        │
-        │          -multiview/-parts), grasping-*,     │
-        │          transporting-objects, tracking-     │
-        │          objects, running-policies           │
+        │          -multiview), perceiving-object-     │
+        │          parts, grasping-*, transporting-    │
+        │          objects, tracking-objects,          │
+        │          running-policies                    │
         └──────────────────────────────────────────────┘
 ```
 
@@ -205,10 +307,6 @@ see [examples/libero_quickstart](examples/libero_quickstart/README.md#vlm-provid
   bundles exposing typed functions); skills are *what the robot can do*
   (strategies that own subgraphs). Connector tools (`robot.*`/`sim.*`) are
   the embodiment surface, shipped by the engine.
-
-Docs: [runtime & schema](docs/runtime.md) · [skill authoring](docs/skills.md)
-· [safety](docs/safety.md) · [design doc](docs/design.md)
-· [contributing](CONTRIBUTING.md)
 
 ## Installation details
 
@@ -248,6 +346,12 @@ real Franka/UR. Cut for scope, returning after v1: execution-feedback graph
 repair, learned grasp planners (graspgen/m2t2), a remote model-serving tier,
 bimanual support, Isaac-based rehearsal, non-pick-place domains
 (articulated, contact-rich, long-horizon), self-hosted pointing VLMs.
+
+## Learn more
+
+- **Tutorial:** [the 15-minute tour](docs/quickstart.md) — hello_graph → quickstart → generate, with the trace open
+- **Reference:** [runtime & schema](docs/runtime.md) · [skill authoring](docs/skills.md) · [safety](docs/safety.md) · [design doc](docs/design.md)
+- **Contribute:** engine PRs via [CONTRIBUTING.md](CONTRIBUTING.md); skills are one directory + one PR in [open-robot-skills](https://github.com/graph-robots/open-robot-skills)
 
 ## License & attribution
 

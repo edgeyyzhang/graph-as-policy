@@ -1,5 +1,7 @@
 # benchmark — configs for `gap benchmark`
 
+> **What:** Grid harness configs: 1-cell smoke → posvar grid → the release gate · **Needs:** `grocery` (CUDA) + LLM key · **Time:** minutes → hours · **Measured:** release gate requires ≥90% (10 tasks × 50 trials)
+
 Benchmark configs from a 1-cell smoke to the release acceptance gate. The
 harness expands a config into a grid of cells (`modes × families ×
 variations × task_ids × seeds`), runs each cell (generate and/or execute),

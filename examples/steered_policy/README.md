@@ -1,5 +1,7 @@
 # Steered policy — hover, then hand over to the VLA
 
+> **What:** Hybrid graphs: perceive + hover above the target, then hand control to a VLA policy · **Needs:** `quickstart` + `policy` + LLM key · **Time:** ~min/trial
+
 Two hybrid graphs that *steer* a learned policy with geometric perception:
 OBB perception localizes the target (robust on perturbed layouts), a
 Cartesian approach pre-positions the end-effector safely **above** the

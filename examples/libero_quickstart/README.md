@@ -1,5 +1,7 @@
 # libero_quickstart — pick the soup can into the basket
 
+> **What:** The end-to-end hero: real vision → OBB grasp → transport, ground-truth verified · **Needs:** `quickstart` + GPU + LLM key · **Time:** ~25–55 s/trial · **Measured:** 9/10 grasp · 7/10 task (10 seeds)
+
 The end-to-end quickstart for gap: a static, fully-authored workflow graph
 that perceives a target object and a container with real vision models
 (Grounding DINO + SAM3 + a hosted VLM), derives a top-down grasp from the

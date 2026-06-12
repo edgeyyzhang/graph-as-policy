@@ -1,5 +1,7 @@
 # Collect demonstrations → train a policy → run it in a graph
 
+> **What:** Graph as scripted expert → HDF5/LeRobot dataset → train externally → policy back in a graph · **Needs:** `quickstart` + `policy` + LLM key · **Time:** collection: s/episode
+
 The full data loop: a verified gap graph acts as a **scripted expert**, its
 rollouts become a demonstration dataset, an external recipe trains a VLA
 policy on them, and the trained policy comes back into gap as a

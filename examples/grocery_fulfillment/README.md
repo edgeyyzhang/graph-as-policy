@@ -1,5 +1,7 @@
 # grocery_fulfillment — the acceptance benchmark
 
+> **What:** The flagship acceptance family: graphs LLM-generated per task, nothing hand-written · **Needs:** `grocery` (CUDA) + LLM key · **Time:** minutes (smoke) · **Measured:** 10/10 dev gate (2026-06-11)
+
 The flagship task family: pick a described grocery item and place it in the
 basket, under the variational-automation benchmark's baked pose /
 permutation / basket-swap variations. The graphs are **generated per task**
