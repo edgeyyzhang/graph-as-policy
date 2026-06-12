@@ -1,44 +1,42 @@
-"""Locate an open-robot-skills checkout without hardcoded relative paths.
+"""Locate a skill registry checkout without hardcoded relative paths.
 
-Every gap surface that accepts a skills path (``gap.execute``,
-``gap.agent.generate``, the CLI ``--skills`` flags, benchmark configs)
-defaults to :func:`find_skills_path`, so users never have to spell
-``../open-robot-skills`` in commands or configs. Resolution order:
+Historical single-registry surface. :func:`find_skills_path` resolves
+*one* checkout — the highest-precedence registry — and is kept as a
+back-compat shim over :func:`gap.skills.registries.resolve_registries`,
+which is the full multi-registry resolver (``--skills`` flags >
+``$GAP_SKILLS_PATH`` list > project ``[tool.gap]`` > user config >
+sibling auto-discovery). New code should use ``resolve_registries`` /
+``load_registry_set``; this module keeps the legacy semantics
+(explicit > env > sibling walk) bit-for-bit for existing callers.
 
-1. an explicit path argument (``--skills`` / ``skills=``);
-2. the ``GAP_SKILLS_PATH`` environment variable;
-3. a ``open-robot-skills`` directory found by walking up from the installed
-   ``gap`` package and from the current working directory — the
-   documented side-by-side checkout layout. A directory counts as a
-   checkout when it has both ``tools/`` and ``skills/`` roots containing
-   at least one ``SKILL.md`` bundle each.
-
-When nothing is found the result is ``None`` (or, with
-``required=True``, a :class:`FileNotFoundError` whose message lists
-exactly what was tried).
+A directory counts as a registry checkout when it has a ``tools/``
+and/or ``skills/`` bundle root with at least one ``SKILL.md`` bundle.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Literal, overload
 
 logger = logging.getLogger(__name__)
 
-#: Environment variable naming an open-robot-skills checkout root.
+#: Environment variable naming skill registry checkout root(s) —
+#: ``os.pathsep``-separated; a single path keeps its historical meaning.
 GAP_SKILLS_PATH_ENV = "GAP_SKILLS_PATH"
 
-#: Directory name of the sibling checkout the walk looks for.
+#: Directory name of the sibling checkout the auto-discovery walk looks for.
 _SIBLING_DIR_NAME = "open-robot-skills"
 
 
 def looks_like_skills_checkout(path: str | Path) -> bool:
-    """True iff *path* is a directory with both bundle roots populated.
+    """True iff *path* is a directory with at least one populated bundle root.
 
-    An open-robot-skills checkout has ``tools/`` and ``skills/`` directories, each
-    containing at least one bundle (a subdirectory with a ``SKILL.md``).
+    A skill registry has a ``tools/`` and/or a ``skills/`` directory, at
+    least one of which contains a bundle (a subdirectory with a
+    ``SKILL.md``). The canonical open-robot-skills checkout has both
+    roots; a third-party registry may ship only one.
     """
     p = Path(path)
     if not p.is_dir():
@@ -46,7 +44,7 @@ def looks_like_skills_checkout(path: str | Path) -> bool:
     for folder in ("tools", "skills"):
         root = p / folder
         if not root.is_dir():
-            return False
+            continue
         try:
             has_bundle = any(
                 (child / "SKILL.md").is_file()
@@ -54,10 +52,28 @@ def looks_like_skills_checkout(path: str | Path) -> bool:
                 if child.is_dir() and not child.name.startswith("_")
             )
         except OSError:
-            return False
-        if not has_bundle:
-            return False
-    return True
+            continue
+        if has_bundle:
+            return True
+    return False
+
+
+@overload
+def find_skills_path(
+    explicit: str | Path | None = ...,
+    *,
+    required: Literal[True],
+    search_from: Iterable[str | Path] | None = ...,
+) -> Path: ...
+
+
+@overload
+def find_skills_path(
+    explicit: str | Path | None = ...,
+    *,
+    required: bool = ...,
+    search_from: Iterable[str | Path] | None = ...,
+) -> Path | None: ...
 
 
 def find_skills_path(
@@ -66,7 +82,13 @@ def find_skills_path(
     required: bool = False,
     search_from: Iterable[str | Path] | None = None,
 ) -> Path | None:
-    """Resolve the open-robot-skills checkout to use.
+    """Resolve ONE skill registry checkout (the highest-precedence one).
+
+    Back-compat shim over :func:`gap.skills.registries.resolve_registries`
+    with the historical semantics: explicit argument > ``$GAP_SKILLS_PATH``
+    > sibling auto-discovery (project/user registry config is *not*
+    consulted — callers that should see configured registries use
+    ``resolve_registries`` directly).
 
     Args:
         explicit: An explicitly-provided path (CLI flag / function
@@ -85,56 +107,24 @@ def find_skills_path(
 
     Raises:
         FileNotFoundError: nothing found and ``required=True``.
-        ValueError: ``GAP_SKILLS_PATH`` is set but does not point at a
-            open-robot-skills checkout (an explicitly-set env var must be valid
-            — silently falling back would mask typos).
+        ValueError: ``GAP_SKILLS_PATH`` is set but one of its entries does
+            not point at a registry checkout (an explicitly-set env var
+            must be valid — silently falling back would mask typos).
     """
-    if explicit is not None:
-        return Path(explicit).expanduser().resolve()
+    from .registries import resolve_registries
 
-    tried: list[str] = ["explicit path argument (not given)"]
-
-    env = os.environ.get(GAP_SKILLS_PATH_ENV, "").strip()
-    if env:
-        p = Path(env).expanduser()
-        if looks_like_skills_checkout(p):
-            return p.resolve()
-        raise ValueError(
-            f"${GAP_SKILLS_PATH_ENV}={env!r} is not an open-robot-skills checkout "
-            f"(expected a directory with tools/ and skills/ bundle roots, "
-            f"each containing at least one SKILL.md bundle)"
-        )
-    tried.append(f"${GAP_SKILLS_PATH_ENV} (not set)")
-
-    if search_from is None:
-        search_from = (Path(__file__).resolve().parent, Path.cwd())
-
-    seen: set[Path] = set()
-    for start in search_from:
-        start = Path(start).resolve()
-        for root in (start, *start.parents):
-            if root in seen:
-                continue
-            seen.add(root)
-            # Running *inside* a checkout counts (e.g. `gap skills list`
-            # from the open-robot-skills repo root).
-            if looks_like_skills_checkout(root):
-                return root
-            sibling = root / _SIBLING_DIR_NAME
-            if looks_like_skills_checkout(sibling):
-                return sibling.resolve()
-        tried.append(
-            f"a '{_SIBLING_DIR_NAME}' directory in {start} or any of its parents"
-        )
-
-    message = (
-        "no open-robot-skills checkout found. Tried, in order: "
-        + "; ".join(f"({i}) {t}" for i, t in enumerate(tried, 1))
-        + ". Clone open-robot-skills next to the graph-as-policy checkout, or set "
-        f"${GAP_SKILLS_PATH_ENV}=/path/to/open-robot-skills, or pass an explicit "
-        "skills path."
+    registry_set = resolve_registries(
+        explicit,
+        required=required,
+        search_from=search_from,
+        include_config=False,
     )
-    if required:
-        raise FileNotFoundError(message)
-    logger.debug("%s", message)
-    return None
+    primary = registry_set.primary()
+    if primary is None:
+        return None
+    if len(registry_set) > 1:
+        logger.debug(
+            "find_skills_path: %d registries active; returning the "
+            "highest-precedence one (%s)", len(registry_set), primary.path,
+        )
+    return primary.path

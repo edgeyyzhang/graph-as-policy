@@ -33,12 +33,48 @@ graph = gap.agent.generate_sync(
     "pick up the alphabet soup can and place it in the basket",
     out_dir="my_graph",          # skills= omitted -> auto-discovered
 )
+print(graph)                     # the graph, as terminal text (below)
 print(graph.path)                # the written workflow folder
-print(graph.workflow["subgraphs"].keys())
 print(sorted(graph.code))        # every generated source file
 ```
 
-(`gap.agent.generate` is the async variant.)
+`print(graph)` renders the workflow as box-drawing text — the same output
+`gap generate` prints. On the checked-in
+[sample_generated_graph](../grocery_fulfillment/sample_generated_graph):
+
+```text
+task_00
+Pick the blue and yellow alphabet soup can and place it in the basket.
+
+START
+  │
+  ▼
+┌─ target_sg ───────────────────────────────────────── perceiving-objects ─┐
+│ observe ─▶ perceive ─▶ filter_obb                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+  │ found                                                    abort ▶ ✗ abort
+  ▼
+┌─ container_sg ────────────────────────────────────── perceiving-objects ─┐
+│ observe ─▶ perceive ─▶ filter_obb                                        │
+└──────────────────────────────────────────────────────────────────────────┘
+  │ found                                                    abort ▶ ✗ abort
+  ▼
+┌─ grasp_sg ─────────────────────────────────────── grasping-with-planner ─┐
+│ open ─▶ compute_grasp ─▶ approach ─▶ observe ─▶ build_world ─▶ plan      │
+│   ─▶ execute ─▶ close                                                    │
+└──────────────────────────────────────────────────────────────────────────┘
+  │ grasped                                                  abort ▶ ✗ abort
+  ▼
+┌─ transport_sg ──────────────────────────────────── transporting-objects ─┐
+│ compute_drop ─▶ move_above ─▶ release                                    │
+└──────────────────────────────────────────────────────────────────────────┘
+  │ placed ▶ ✓ done                                          abort ▶ ✗ abort
+
+✓ done (success)   ✗ abort (failure, recovery: open_gripper, go_home)
+```
+
+(`gap.viz.to_text(workflow)` renders any workflow dict or directory the
+same way; `gap.agent.generate` is the async variant.)
 [generate.py](generate.py) wraps this in a small CLI:
 
 ```bash

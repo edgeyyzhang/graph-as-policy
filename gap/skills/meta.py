@@ -64,6 +64,35 @@ class CanonicalScript:
 
 
 @dataclass
+class SkillRequires:
+    """Operational requirements a bundle declares for ``gap check``.
+
+    The atomic capability question is "can this bundle run *here*?" —
+    deps importable (probed automatically), plus whatever this block
+    declares. Keep it small: four keys, all optional. Authored in
+    SKILL.md frontmatter under ``gap.requires``::
+
+        gap:
+          requires: {gpu: true, env: [MY_API_KEY], env_any: [], weights: true}
+    """
+
+    gpu: bool = False
+    """Needs a local NVIDIA GPU (``gap check`` probes via nvidia-smi)."""
+
+    env: list[str] = field(default_factory=list)
+    """Environment variables that must ALL be set and non-empty."""
+
+    env_any: list[str] = field(default_factory=list)
+    """Environment variables of which AT LEAST ONE must be set."""
+
+    weights: bool = False
+    """Downloads model weights on first use. ``gap check`` reports the
+    cache state via the bundle's optional ``weights_cached() -> bool | None``
+    hook (filesystem checks only — never downloads); without the hook the
+    state is reported as unknown."""
+
+
+@dataclass
 class SkillMeta:
     """Structured metadata for a skill bundle.
 
@@ -149,6 +178,13 @@ class SkillMeta:
     """Tool bundles: ``{tool_name: one_line_summary}`` for each function the
     bundle's ``tools.py`` exposes via ``@tool``. Documentation only — the
     authoritative schemas come from the gap.tools registry."""
+
+    requires: SkillRequires | None = None
+    """Operational requirements consumed by ``gap check`` (GPU, env vars,
+    downloaded weights). ``None`` means the bundle declares nothing —
+    semantically the same as an empty block, but ``gap check`` and the
+    registry test suites can tell "undeclared" from an explicit
+    ``requires: {}``."""
 
     # Bundle metadata
     bundle_dir: Path | None = None

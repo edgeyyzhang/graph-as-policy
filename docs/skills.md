@@ -1,13 +1,41 @@
-# Authoring open-robot-skills bundles
+# Authoring skill-registry bundles
 
-How to write, package, test, and contribute a bundle to the
-[open-robot-skills](../../open-robot-skills) repo. Bundles use the
+How to write, package, test, and contribute a bundle to a **skill
+registry** — the canonical public one being
+[open-robot-skills](../../open-robot-skills). Bundles use the
 [Anthropic Agent Skills](https://agentskills.io/specification) directory
 format (`SKILL.md` + resources) and are discovered **by path** — never by
-pip entry-points. The checkout itself is auto-discovered
-(`gap.skills.find_skills_path`: explicit `--skills` flag >
-`GAP_SKILLS_PATH` > an `open-robot-skills` directory next to the graph-as-policy checkout),
-so commands normally need no path at all.
+pip entry-points.
+
+---
+
+## 0. Registries
+
+A registry is any local directory with a `tools/` and/or `skills/`
+bundle root. open-robot-skills is the example, not a special case:
+scaffold your own with `gap registry init <path>`, layer it with
+`gap registry add <name> <path>`, and inspect the active set with
+`gap registry list`. Multiple registries are active simultaneously,
+resolved in precedence order:
+
+1. explicit `--skills PATH` flags / `skills=` arguments (repeatable —
+   full override);
+2. `$GAP_SKILLS_PATH` — an OS-pathsep-separated list (a single path
+   keeps its historical meaning) — also a full override;
+3. the nearest `pyproject.toml` declaring
+   `[tool.gap].registries = ["./skills", "../open-robot-skills"]`
+   (paths relative to that file; walking up from the cwd);
+4. user config `~/.config/gap/registries.toml`, managed by
+   `gap registry add/remove`;
+5. an `open-robot-skills` checkout next to the gap checkout
+   (auto-discovered — the documented side-by-side layout).
+
+The merged catalog is the union; a bundle name claimed by a
+higher-precedence registry **shadows** same-named bundles below it
+(first wins, loud warning) — the supported way to override one public
+bundle with a lab fork. Within one registry a duplicate name is a hard
+error. Registries are local paths in this release; clone remote ones
+yourself before `gap registry add`.
 
 ---
 
@@ -92,9 +120,15 @@ under `gap:` is rejected.
 | `hard_rules` | prompt assembler | inline rules or anchored refs into the bundle's own `references/` (e.g. `perception_pipeline_invariants.md#emit-both-obb-and-mask`) |
 | `streaming` | validator (rule S4) | `true` iff the bundle's callable streams via `ctx.publish`; checked against `streaming: true` nodes |
 | `tools` | catalog docs | **tool bundles**: list of `- name: one-line summary` for each `@tool` in `tools.py` (documentation; authoritative schemas come from the registry) |
+| `requires` | `gap check` | operational requirements: `{gpu: true, env: [VARS…], env_any: [A, B], weights: true}` (all keys optional; unknown keys rejected). `requires: {}` = explicitly nothing. `gap check` derives per-bundle readiness — and per-skill runnability — from this. Mandatory for tool bundles in the canonical registry (test-enforced) |
 
 `params`/`outputs` are **not** frontmatter — they come from Python
 introspection of the bundle's callables and scripts.
+
+Bundles that download weights may also define a **filesystem-only**
+`weights_cached() -> bool | None` next to `prefetch()` in `tools.py` —
+`gap check` reports the cache state without downloading; absent hook →
+"unknown".
 
 ### 3.3 Example (skill bundle)
 
@@ -276,31 +310,55 @@ on a CPU-only machine (`pytest tests -q` deselects both).
 ## 8. Scaffolding a new bundle
 
 ```bash
-gap skills new my-model --kind tool       # checkout auto-discovered
-gap skills new doing-things --kind skill
+gap skills new my-model --kind tool       # targets the highest-precedence registry
+gap skills new doing-things --kind skill --registry my-lab-skills
 ```
 
 This creates the bundle directory with a TODO-annotated `SKILL.md` and
 either a `tools.py` stub (tool) or `scripts/example.py` + `prompts/` +
-`references/` (skill). `gap skills list` shows it immediately.
+`references/` (skill), **plus a unit-test skeleton**
+`tests/test_<name>.py` in the owning registry (a `tests/conftest.py`
+with the standard session fixtures is created when missing).
+`gap skills list` shows the bundle immediately;
+`gap skills test <name>` runs its tests. No registry configured? Create
+one first: `gap registry init <path> --add`.
 
-## 8.1 Verifying: `gap skills check` and `gap skills table`
+## 8.1 Verifying: `gap skills check`, `gap skills test`, `gap check`
 
 ```bash
 gap skills check          # per-bundle PASS/WARN/FAIL; non-zero exit on FAIL
+gap skills test my-model  # the bundle's unit tests, run from its registry
+gap skills test           # every active registry's full tests/ suite
+gap check                 # capability report: can each bundle run HERE?
 gap skills table --format markdown   # catalog table, paste-ready for READMEs
 ```
 
-`check` runs two layers per bundle: **format validation** (the rules live
-engine-side in `gap.skills.validate`, so third-party checkouts get the
-same checker the open-robot-skills test suite enforces — frontmatter shape per
-kind, every referenced `canonical_scripts`/`prompts`/`references`/
-`examples` path exists, `gap.allowed_tools` resolve against connector
-tools + all declared bundle tools, `produces_outputs`/`required_inputs`
-type names, and the one-pip-extra-per-bundle convention) and an **import
-probe** (each bundle registered individually; ImportErrors map to the
-`pip install "open-robot-skills[<bundle>]"` fix). `--download` additionally runs
-each bundle's optional `prefetch()` to fetch model weights.
+`gap skills check` runs two layers per bundle: **format validation** (the
+rules live engine-side in `gap.skills.validate`, so third-party
+registries get the same checker the open-robot-skills test suite
+enforces — frontmatter shape per kind, every referenced
+`canonical_scripts`/`prompts`/`references`/`examples` path exists,
+`gap.allowed_tools` resolve against connector tools + all declared bundle
+tools, `produces_outputs`/`required_inputs` type names, the
+one-pip-extra-per-bundle convention, and `gap.requires` consistency) and
+an **import probe** (each bundle registered individually; ImportErrors
+map to the owning registry's install line — `uv sync --extra <bundle>`
+or `pip install "<dist>[<bundle>]"`). `--download` additionally runs each
+bundle's optional `prefetch()` to fetch model weights.
+
+`gap skills test` invokes pytest with the owning registry's own config
+(cwd at the registry root, `sys.executable -m pytest`): exact file
+`tests/test_<name with - → _>.py` when present, `-k` fallback otherwise;
+pytest args pass through after `--`
+(`gap skills test sam3 -- -m gpu -x`). Registries with their own
+separate venv should run `uv run pytest` there instead.
+
+`gap check` answers the *operational* question — deps importable,
+declared `gap.requires` met (GPU via nvidia-smi, env vars), weights
+cached — and rolls it up per skill (a skill is blocked by exactly the
+not-ready bundles owning its `allowed_tools`; `robot.*`/`sim.*` are
+connector-satisfied). `gap skills check` = "is the bundle well-formed";
+`gap check` = "can it run here".
 
 ## 9. Contribution checklist
 
@@ -312,6 +370,10 @@ Before opening the PR (one bundle per PR):
 - [ ] Skills declare `gap.exit_conditions` (+ `produces_outputs` /
       `required_inputs` as applicable); tool bundles declare `gap.tools`
       with one line per exposed function.
+- [ ] `gap.requires` declared (`{}` when the bundle needs nothing);
+      gpu-tagged bundles say `gpu: true`; weight-downloading bundles
+      consider a `weights_cached()` hook. `gap check` shows the bundle
+      READY (or honestly NOT READY with the right hints).
 - [ ] Every path referenced in frontmatter
       (`canonical_scripts`/`prompts`/`references`/`examples`) exists.
 - [ ] `tools.py` imports clean without torch/transformers in `sys.modules`

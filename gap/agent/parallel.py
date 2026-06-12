@@ -112,8 +112,10 @@ class WorkerSetupConfig:
     """Default suite for work items that don't carry their own."""
 
     skills_path: str = ""
-    """open-robot-skills checkout the worker loads its skill/tool registries
-    from. Empty string → no bundles (connector tools only)."""
+    """Skill registry root(s) the worker loads its skill/tool registries
+    from — ``os.pathsep``-separated, precedence-ordered (picklable across
+    the mp.spawn boundary). Empty string → no bundles (connector tools
+    only)."""
 
     camera_names: list[str] = field(default_factory=list)
     """Camera override forwarded to the connector factory. Empty → env
@@ -377,9 +379,11 @@ def worker_setup(
     #    each connector's registry per trial).
     skill_registry = None
     if config.skills_path:
-        from gap.skills import load_skills
+        from gap.skills import load_registry_set
 
-        skill_registry = load_skills(config.skills_path)
+        skill_registry = load_registry_set(
+            config.skills_path.split(os.pathsep),
+        )
 
     factory = connector_factory
     if factory is None and config.connector_factory:

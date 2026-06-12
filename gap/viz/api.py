@@ -41,8 +41,8 @@ def configure(
         from gap.tools import default_tool_registry
         _tool_registry = default_tool_registry()
         if skills is not None:
-            from gap.skills import load_skills
-            load_skills(skills)
+            from gap.skills import load_registry_set
+            load_registry_set(skills)
             if hasattr(_tool_registry, "discover_pending"):
                 _tool_registry.discover_pending()
     except Exception:

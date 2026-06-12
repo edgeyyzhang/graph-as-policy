@@ -48,9 +48,9 @@ def main(argv: list[str] | None = None) -> int:
         out_dir=args.out,
     )
 
-    print(f"wrote {graph.path}")
-    print(f"  subgraphs: {', '.join(graph.workflow.get('subgraphs', {}))}")
-    print(f"  generated files: {len(graph.code)}")
+    print(f"wrote {graph.path} ({len(graph.code)} generated file(s))")
+    print()
+    print(graph)                     # the workflow as box-drawing text
     print("\nvalidate / run it with:")
     print(f"  gap run {graph.path} --validate-only")
     print(f"  MUJOCO_GL=egl gap run {graph.path} --sim libero_object_all_variance/0")

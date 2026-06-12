@@ -32,6 +32,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -433,7 +434,15 @@ async def _run_suite(
     sl = config.safety_limits
     setup_config = WorkerSetupConfig(
         suite_name=suite.suite_name,
-        skills_path=str(config.skills) if config.skills else "",
+        skills_path=(
+            os.pathsep.join(
+                str(p) for p in (
+                    config.skills if isinstance(config.skills, list)
+                    else [config.skills]
+                )
+            )
+            if config.skills else ""
+        ),
         camera_names=list(config.environment.cameras),
         record_video=config.trials.record_video,
         enable_tracing=config.trials.enable_tracing,

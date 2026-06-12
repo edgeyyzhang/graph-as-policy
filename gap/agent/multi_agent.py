@@ -306,8 +306,8 @@ async def run_codegen(
         )
 
         wf_dir = output_dir / f"task_{task_id:02d}"
-        from gap.skills import load_skills
-        skills_registry = load_skills(config.skills) if config.skills else None
+        from gap.skills import load_registry_set
+        skills_registry = load_registry_set(config.skills) if config.skills else None
         _write_workflow_folder(
             wf_dir, workflow_json, scripts, skills_registry,
             checkpoint_modules=checkpoint_modules,
@@ -383,10 +383,11 @@ def _run_graph_validation(wf_dir: Path, config: PipelineConfig) -> list:
         wf = load_workflow(wf_dir / "workflow.json")
         skill_registry = None
         tool_registry = None
-        try:
-            skill_registry, tool_registry = load_codegen_registries(config.skills)
-        except Exception:
-            logger.warning("could not build registries for validation", exc_info=True)
+        if config.skills:
+            try:
+                skill_registry, tool_registry = load_codegen_registries(config.skills)
+            except Exception:
+                logger.warning("could not build registries for validation", exc_info=True)
 
         issues = validate_workflow(
             wf,

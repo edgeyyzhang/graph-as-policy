@@ -1,0 +1,10 @@
+{
+  "name": "gap",
+  "displayName": "gap — graph as policy",
+  "description": "Search robot skill registries, check robot/tool capabilities, and program, run, and debug verified robot task graphs (sim-first, safety-gated real) with the gap engine.",
+  "author": { "name": "graph-as-policy authors", "url": "https://github.com/graph-robots" },
+  "homepage": "https://github.com/graph-robots/graph-as-policy",
+  "repository": "https://github.com/graph-robots/graph-as-policy",
+  "license": "MIT",
+  "keywords": ["robotics", "robot-manipulation", "robot-skills", "skill-registry", "LIBERO", "simulation", "task-graphs", "open-robot-skills"]
+}

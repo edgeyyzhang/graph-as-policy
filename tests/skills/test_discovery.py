@@ -35,13 +35,21 @@ def _no_env(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_checkout_shape_requires_both_roots_with_bundles(tmp_path: Path):
+def test_checkout_shape_needs_a_populated_bundle_root(tmp_path: Path):
     assert not looks_like_skills_checkout(tmp_path)
 
     co = _make_checkout(tmp_path / "open-robot-skills")
     assert looks_like_skills_checkout(co)
 
-    # tools/ without any SKILL.md bundle does not count.
+    # A single populated root is enough — third-party registries may ship
+    # only tools/ or only skills/.
+    solo = tmp_path / "skills-only"
+    d = solo / "skills" / "fixture-skill"
+    d.mkdir(parents=True)
+    (d / "SKILL.md").write_text("---\nname: x\ndescription: y\n---\n")
+    assert looks_like_skills_checkout(solo)
+
+    # Bundle roots without any SKILL.md bundle do not count.
     empty = tmp_path / "empty"
     (empty / "tools" / "thing").mkdir(parents=True)
     (empty / "skills" / "thing").mkdir(parents=True)

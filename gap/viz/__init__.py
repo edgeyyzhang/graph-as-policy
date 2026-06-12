@@ -1,19 +1,22 @@
 """gap.viz — web-based trace visualization + static graph rendering.
 
-Two entry points:
+Three entry points:
 
 - :func:`serve` — start the interactive web viewer over a trace/output
   directory (FastAPI + the bundled React frontend).
 - :func:`render` — render a v3 ``workflow.json`` to a paper-ready
   matplotlib PDF/PNG (lazy re-export from :mod:`gap.viz.render`; importing
   ``gap.viz`` does not pull in matplotlib).
+- :func:`to_text` — render a v3 ``workflow.json`` as Unicode box-drawing
+  terminal text (pure stdlib; what ``print(graph)`` and ``gap generate``
+  show).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-__all__ = ["serve", "render", "create_app"]
+__all__ = ["serve", "render", "to_text", "create_app"]
 
 
 def serve(
@@ -66,4 +69,8 @@ def __getattr__(name: str):
         from .render import render as _render
         globals()["render"] = _render
         return _render
+    if name == "to_text":
+        from .text import to_text as _to_text
+        globals()["to_text"] = _to_text
+        return _to_text
     raise AttributeError(f"module 'gap.viz' has no attribute {name!r}")

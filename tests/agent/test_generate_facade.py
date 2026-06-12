@@ -87,3 +87,42 @@ class TestGenerateFacade:
                 skills=skills_root,
                 out_dir=tmp_path / "out",
             )
+
+    def test_str_renders_workflow(self, generated):
+        graph, _, _ = generated
+        from gap.viz.text import to_text
+
+        rendered = str(graph)
+        assert rendered == to_text(graph.workflow)
+        assert "┌─" in rendered
+        assert "\x1b" not in rendered  # plain text, never ANSI
+
+
+def test_cli_generate_prints_graph(monkeypatch, tmp_path, capsys):
+    """`gap generate` prints the box-drawing rendering after the OK line."""
+    import argparse
+
+    from gap.cli import generate as cli_generate
+
+    wf = {
+        "version": 3,
+        "meta": {"name": "stub"},
+        "nodes": {
+            "act": {"type": "tool", "tool": "robot.move_to_pose"},
+            "done": {"type": "end", "status": "success"},
+        },
+        "edges": [["START", "act"], ["act", "done"]],
+        "conditional_edges": {},
+    }
+    stub = agent.GeneratedGraph(path=tmp_path / "task_00", workflow=wf, code={})
+    monkeypatch.setattr(agent, "generate_sync", lambda *a, **k: stub)
+
+    args = argparse.Namespace(
+        instruction="pick it up", skills=tmp_path, provider=None, model=None,
+        out=None, config=None, verbose=False,
+    )
+    assert cli_generate._handle(args) == 0
+    out = capsys.readouterr().out
+    assert "OK: wrote" in out
+    assert "┌─ act " in out
+    assert "\x1b" not in out  # capsys is not a TTY → no color

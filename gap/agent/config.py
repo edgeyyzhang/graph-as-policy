@@ -133,8 +133,9 @@ class PipelineConfig:
     composition: CompositionConfig = field(default_factory=CompositionConfig)
     max_retries: int = 3
 
-    skills: Path | None = None
-    """Path to an open-robot-skills checkout (the bundle discovery root). The
+    skills: Path | list[Path] | None = None
+    """Skill registry root(s) — one path or a precedence-ordered list
+    (bundle discovery roots; see :mod:`gap.skills.registries`). The
     codegen pipeline builds its skill + tool registries from it."""
 
     # ``policies:`` — name → {start_cmd | url, env} entries used by the
@@ -252,26 +253,34 @@ class PipelineConfig:
                 f"{type(policy_manager_raw).__name__}"
             )
 
-        # open-robot-skills checkout. ${VAR} env interpolation; relative paths
-        # resolve against the YAML file's directory. When the key is
-        # omitted entirely, the checkout is auto-discovered
-        # ($GAP_SKILLS_PATH or an open-robot-skills directory next to the gap
-        # checkout) — checked-in configs don't need to hardcode it.
-        skills: Path | None = None
-        skills_raw = raw.get("skills")
-        if skills_raw:
-            p = Path(os.path.expandvars(str(skills_raw))).expanduser()
+        # Skill registry root(s) — a single path or a precedence-ordered
+        # list. ${VAR} env interpolation; relative paths resolve against
+        # the YAML file's directory. When the key is omitted entirely,
+        # the active registries are resolved ($GAP_SKILLS_PATH list >
+        # project [tool.gap] > user config > an open-robot-skills
+        # directory next to the gap checkout) — checked-in configs don't
+        # need to hardcode it.
+        def _skills_entry(entry: object) -> Path:
+            p = Path(os.path.expandvars(str(entry))).expanduser()
             if not p.is_absolute():
                 p = (path.parent / p).resolve()
             if not p.is_dir():
                 raise ValueError(
                     f"'skills:' does not exist or is not a directory: {p}"
                 )
-            skills = p
-        else:
-            from gap.skills import find_skills_path
+            return p
 
-            skills = find_skills_path()
+        skills: Path | list[Path] | None = None
+        skills_raw = raw.get("skills")
+        if isinstance(skills_raw, list):
+            skills = [_skills_entry(entry) for entry in skills_raw]
+        elif skills_raw:
+            skills = _skills_entry(skills_raw)
+        else:
+            from gap.skills import resolve_registries
+
+            registry_set = resolve_registries()
+            skills = registry_set.paths() if registry_set else None
 
         return cls(
             task=raw.get("task", ""),

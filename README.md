@@ -243,15 +243,61 @@ robots — the full gallery with time estimates and measured results is
 |---|---|
 | `gap run <graph> [--sim SUITE/TASK \| --real {franka,ur_zed}] [--validate-only]` | Execute (or just validate) a graph; tracing on by default → `outputs/` |
 | `gap generate "<instruction>" [--provider P] [--model M] [--out DIR]` | LLM pipeline: instruction → validated workflow dir |
+| `gap check [--format json] [--strict]` | Capability report: which tool bundles can run *here* (deps, GPU, keys, weights) and which skills are therefore runnable, with fix hints |
+| `gap registry init \| list \| add <name> <path> \| remove <name>` | Manage skill registries (local bundle checkouts, layered by precedence) |
+| `gap tools list [--tag T] \| show <name>` | The flat tool catalog with live input/output schemas |
+| `gap skills list \| check [--download] \| table \| new <name> --kind {tool,skill} \| test [bundle…]` | Bundle catalog, validation, weight prefetch, scaffolding (with unit-test skeletons), per-bundle test runs |
 | `gap benchmark <config.yaml> [--gate] [--resume]` | Benchmark grids; `--gate` exits non-zero below threshold |
 | `gap viz [--root outputs] [--port 9432]` | Trial browser: graph swimlanes, per-node I/O, assets, videos |
-| `gap skills list \| check [--download] \| table \| new <name> --kind {tool,skill}` | Bundle catalog, validation, weight prefetch, scaffolding |
 | `gap policy serve <preset>` | One-command policy serving (`pi05-libero`, `molmoact-libero`) |
 | `gap trace-diff <trial_a> <trial_b>` | Structural diff of two recorded traces |
 
-`gap run`, `gap generate`, and `gap skills` accept `--skills PATH`, but
-none needs it: the open-robot-skills checkout is auto-discovered from
-`$GAP_SKILLS_PATH` or the side-by-side layout.
+`gap run`, `gap generate`, and `gap skills` accept `--skills PATH`
+(repeatable), but none needs it: registries resolve automatically — see
+the next section.
+
+## Skill registries
+
+Bundles live in **registries** — local directories with `tools/` and/or
+`skills/` bundle roots.
+[open-robot-skills](https://github.com/graph-robots/open-robot-skills) is
+the canonical public registry; gap treats it as exactly that, an example.
+Any number of registries are active at once, merged by precedence
+(first wins; a lab registry can shadow a single public bundle instead of
+forking the whole repo):
+
+1. `--skills PATH` flags (repeatable — full override)
+2. `$GAP_SKILLS_PATH` — now an OS-pathsep-separated **list**; a single
+   path behaves exactly as before
+3. the nearest `pyproject.toml` with `[tool.gap].registries = ["./skills", …]`
+4. `~/.config/gap/registries.toml` (managed by `gap registry add/remove`)
+5. an `open-robot-skills` checkout next to this one (auto-discovered)
+
+```bash
+gap registry init ~/my-lab-skills --add      # scaffold + activate a new registry
+gap skills new wiping-tables --kind skill --registry my-lab-skills
+gap skills test wiping-tables                # its scaffolded unit test
+gap check                                    # what can run here, with fix hints
+```
+
+## Use with Claude Code & AI agents
+
+gap ships an agent skill ([agent/](agent/)) that teaches AI coding
+agents the workflows above:
+
+```bash
+claude plugin marketplace add graph-robots/graph-as-policy
+claude plugin install gap@gap                  # the engine skill
+claude plugin install open-robot-skills@gap    # optional: the robot bundle contracts
+```
+
+Then ask things like: *"what can this robot do right now?"* (registry +
+capability checks), *"run the quickstart graph in sim"*, *"generate a
+graph that packs the groceries"*, *"add a tested skill bundle that wipes
+the table to my lab registry"*, or *"why did this trial fail?"* (trace
+debugging). Real-robot commands stay gated on explicit human
+confirmation. Other agents (Cursor, Codex, …) and the no-install path:
+[agent/INSTALL.md](agent/INSTALL.md).
 
 ## Authoring graphs in Python
 

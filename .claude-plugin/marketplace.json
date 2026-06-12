@@ -1,0 +1,29 @@
+{
+  "name": "gap",
+  "owner": { "name": "graph-as-policy authors", "url": "https://github.com/graph-robots" },
+  "metadata": {
+    "description": "Agent skills for gap (graph as policy): drive the robot-graph engine from Claude Code — search skill registries, check capabilities, and run, author, and test verified robot task graphs.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "gap",
+      "source": "./agent",
+      "description": "Operate the gap robot-graph engine: search robot skill registries (open-robot-skills and your own), check tool/model/skill capabilities (gap check), run graphs in LIBERO sim, generate graphs from language, author skill bundles and registries with scaffolded unit tests, debug traces, and execute safety-gated real-robot tasks.",
+      "author": { "name": "graph-as-policy authors" },
+      "homepage": "https://github.com/graph-robots/graph-as-policy",
+      "repository": "https://github.com/graph-robots/graph-as-policy",
+      "license": "MIT",
+      "category": "robotics",
+      "keywords": ["robotics", "robot-manipulation", "robot-skills", "skill-registry", "LIBERO", "simulation", "task-graphs"]
+    },
+    {
+      "name": "open-robot-skills",
+      "source": { "source": "github", "repo": "graph-robots/open-robot-skills" },
+      "description": "Optional: the robot skill/tool bundle contracts from the canonical open-robot-skills registry, loadable as agent skills. Same content as that repo's own marketplace — install from one route, not both.",
+      "skills": ["./tools"],
+      "license": "MIT",
+      "category": "robotics"
+    }
+  ]
+}

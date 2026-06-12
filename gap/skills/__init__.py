@@ -29,7 +29,14 @@ from ._meta_from_skill_md import parse_skill_md
 from ._prompt_loader import load_prompt
 from ._registry import ScriptInfo, SkillInfo, SkillsRegistry, load_skills
 from .discovery import find_skills_path, looks_like_skills_checkout
-from .meta import CanonicalScript, Param, Skill, SkillMeta
+from .meta import CanonicalScript, Param, Skill, SkillMeta, SkillRequires
+from .registries import (
+    RegistrySet,
+    RegistrySpec,
+    as_registry_paths,
+    load_registry_set,
+    resolve_registries,
+)
 
 try:
     # gap.tools is ported in parallel; guard so the loader surface works
@@ -41,15 +48,21 @@ except ImportError:  # pragma: no cover
 __all__ = [
     "CanonicalScript",
     "Param",
+    "RegistrySet",
+    "RegistrySpec",
     "ScriptInfo",
     "Skill",
     "SkillInfo",
     "SkillMeta",
+    "SkillRequires",
     "SkillsRegistry",
+    "as_registry_paths",
     "find_skills_path",
     "load_prompt",
+    "load_registry_set",
     "load_skills",
     "looks_like_skills_checkout",
     "parse_skill_md",
+    "resolve_registries",
     "tool",
 ]

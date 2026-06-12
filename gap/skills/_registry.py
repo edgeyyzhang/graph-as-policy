@@ -168,6 +168,11 @@ class SkillInfo:
     namespace: str = "skills"
     """Synthetic-package segment this bundle was registered under
     (``gap_skills.<namespace>.<name>.*``). Mirrors the kind folder."""
+    registry: str = ""
+    """Name of the skill registry this bundle was loaded from (e.g.
+    ``"open-robot-skills"`` — see :mod:`gap.skills.registries`). Empty when
+    the bundle was loaded directly via :func:`load_skills` without registry
+    attribution."""
 
 
 class SkillsRegistry:
@@ -194,6 +199,7 @@ class SkillsRegistry:
         kind: Literal["tool", "skill"] = "skill",
         only: list[str] | None = None,
         disable: list[str] | None = None,
+        registry: str = "",
     ) -> None:
         """Auto-discover all bundles in *bundles_dir*.
 
@@ -203,19 +209,27 @@ class SkillsRegistry:
 
         Args:
             bundles_dir: Bundle root containing per-bundle subdirectories
-                (``<open-robot-skills>/tools`` or ``<open-robot-skills>/skills``).
+                (``<registry>/tools`` or ``<registry>/skills``).
             kind: Bundle kind conveyed by the folder; also the synthetic
                 package segment (bundles register as
                 ``gap_skills.<tools|skills>.<bundle_name>.*``).
             only: Optional allowlist of bundle names; all others skipped.
             disable: Optional blocklist of bundle names.
+            registry: Registry-name attribution for the discovered bundles
+                (see :mod:`gap.skills.registries`). Also drives collision
+                semantics: a name collision *within* one registry is a hard
+                error, while a collision with a bundle from a different
+                (higher-precedence) registry shadows — first wins, with a
+                warning — and the shadowed bundle is skipped *before* any
+                of its modules import.
 
         Raises:
-            ValueError: if a bundle name is already registered (collision
-                across roots), or a bundle violates the SKILL.md spec
-                (name/dirname mismatch, over-long description, legacy
-                frontmatter). Per-bundle *import* failures are logged and
-                skipped — one bad bundle does not block the rest.
+            ValueError: if a bundle name is already registered by the same
+                registry (collision across its roots), or a bundle violates
+                the SKILL.md spec (name/dirname mismatch, over-long
+                description, legacy frontmatter). Per-bundle *import*
+                failures are logged and skipped — one bad bundle does not
+                block the rest.
         """
         bundles_dir = Path(bundles_dir)
         if not bundles_dir.is_dir():
@@ -239,15 +253,24 @@ class SkillsRegistry:
                 continue
             if entry.name in self._skills:
                 existing = self._skills[entry.name]
-                raise ValueError(
-                    f"skill bundle name collision: {entry.name!r} is "
-                    f"already registered from {existing.bundle_dir} "
-                    f"(kind={existing.kind!r}); cannot also register from "
-                    f"{entry} (kind={kind!r}). Use the `disable:` or `only:` "
-                    f"knobs to resolve, or rename one of the bundles."
+                if existing.registry == registry:
+                    raise ValueError(
+                        f"skill bundle name collision: {entry.name!r} is "
+                        f"already registered from {existing.bundle_dir} "
+                        f"(kind={existing.kind!r}); cannot also register from "
+                        f"{entry} (kind={kind!r}). Use the `disable:` or `only:` "
+                        f"knobs to resolve, or rename one of the bundles."
+                    )
+                logger.warning(
+                    "bundle %r from registry %r (%s) is shadowed by the "
+                    "same-named bundle from registry %r (%s) — registry "
+                    "precedence order wins",
+                    entry.name, registry or "<unnamed>", entry,
+                    existing.registry or "<unnamed>", existing.bundle_dir,
                 )
+                continue
             try:
-                self.register_bundle(entry.name, entry, kind=kind)
+                self.register_bundle(entry.name, entry, kind=kind, registry=registry)
             except ValueError:
                 # Spec violations are hard errors — a malformed bundle must
                 # not be silently dropped from the catalog.
@@ -261,6 +284,7 @@ class SkillsRegistry:
         bundle_dir: Path,
         *,
         kind: Literal["tool", "skill"] = "skill",
+        registry: str = "",
     ) -> None:
         """Register a single bundle by name.
 
@@ -280,14 +304,28 @@ class SkillsRegistry:
 
         namespace = dict(_KIND_DIRS)[kind]
 
+        # The synthetic namespace is process-global and keyed by bundle
+        # name only. If a same-named bundle from a *different* directory
+        # was imported earlier in this process (another SkillsRegistry,
+        # different registry precedence), its modules win silently — warn
+        # so precedence changes are made in a fresh process.
+        dotted = f"{_SYNTHETIC_ROOT}.{namespace}.{name}"
+        prior = sys.modules.get(dotted)
+        prior_path = getattr(prior, "__path__", None) if prior is not None else None
+        if prior_path and Path(prior_path[0]).resolve() != Path(bundle_dir).resolve():
+            logger.warning(
+                "synthetic package %s was already imported from %s; "
+                "re-registering it from %s reuses the previously loaded "
+                "modules — restart the process to change registry precedence",
+                dotted, prior_path[0], bundle_dir,
+            )
+
         # Pre-install the synthetic packages so canonical scripts that call
         # ``load_prompt(__package__, ...)`` resolve their bundle directory
         # via importlib's normal walk-up.
         _ensure_synthetic_package(_SYNTHETIC_ROOT, None)
         _ensure_synthetic_package(f"{_SYNTHETIC_ROOT}.{namespace}", None)
-        _ensure_synthetic_package(
-            f"{_SYNTHETIC_ROOT}.{namespace}.{name}", bundle_dir,
-        )
+        _ensure_synthetic_package(dotted, bundle_dir)
 
         info = SkillInfo(
             name=name,
@@ -296,6 +334,7 @@ class SkillsRegistry:
             meta=meta,
             schema=UnitSchema(name=name, description=meta.description),
             namespace=namespace,
+            registry=registry,
         )
 
         self._load_canonical_scripts(info)

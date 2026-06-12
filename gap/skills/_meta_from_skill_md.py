@@ -43,6 +43,7 @@ from .meta import (
     ExampleDoc,
     ReferenceDoc,
     SkillMeta,
+    SkillRequires,
 )
 
 #: Agent Skills spec: lowercase letters/digits with single hyphens, ≤64 chars.
@@ -56,6 +57,7 @@ _GAP_ONLY_KEYS = frozenset({
     "allowed_tools", "allowed-tools", "exit_conditions", "produces_outputs",
     "required_inputs", "canonical_scripts", "prompts", "references",
     "examples", "errors", "tips", "hard_rules", "streaming", "tools",
+    "requires",
 })
 _REMOVED_KEYS = frozenset({"runtime", "shape", "composes", "category", "tags", "contract"})
 
@@ -170,6 +172,7 @@ def _meta_from_dict(data: dict, *, body: str, bundle_dir: Path) -> SkillMeta:
         references=references,
         streaming=bool(gap_ext.get("streaming", False)),
         tools=_tools_map(gap_ext.get("tools")),
+        requires=_requires(gap_ext["requires"]) if "requires" in gap_ext else None,
         bundle_dir=bundle_dir,
         body=body,
     )
@@ -190,6 +193,43 @@ def _reject_misplaced_keys(data: dict, bundle_dir: Path) -> None:
             f"SKILL.md at {bundle_dir} has gap extension keys {misplaced} at "
             f"the top level; nest them under the `gap:` key"
         )
+
+
+_REQUIRES_KEYS = frozenset({"gpu", "env", "env_any", "weights"})
+
+
+def _requires(v: Any) -> SkillRequires:
+    """``gap.requires`` — operational requirements for ``gap check``.
+
+    A bare ``requires:`` (YAML null) or ``requires: {}`` both mean "the
+    bundle explicitly declares no special requirements". Unknown subkeys
+    are rejected — a typo'd key would otherwise silently disable a probe.
+    """
+    if v is None:
+        return SkillRequires()
+    if not isinstance(v, dict):
+        raise ValueError("gap.requires must be a mapping")
+    unknown = sorted(set(v) - _REQUIRES_KEYS)
+    if unknown:
+        raise ValueError(
+            f"gap.requires has unknown keys {unknown} "
+            f"(allowed: {sorted(_REQUIRES_KEYS)})"
+        )
+    env = _str_list(v.get("env"))
+    env_any = _str_list(v.get("env_any"))
+    for label, values in (("env", env), ("env_any", env_any)):
+        for entry in values:
+            if not entry.strip():
+                raise ValueError(
+                    f"gap.requires.{label} entries must be non-empty "
+                    f"environment variable names"
+                )
+    return SkillRequires(
+        gpu=bool(v.get("gpu", False)),
+        env=env,
+        env_any=env_any,
+        weights=bool(v.get("weights", False)),
+    )
 
 
 def _str_list(v: Any) -> list[str]:

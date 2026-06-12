@@ -28,7 +28,6 @@ Usage::
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
@@ -38,6 +37,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import networkx as nx  # noqa: E402
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch  # noqa: E402
+
+from .common import FAIL_LABELS, load_graph  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +60,6 @@ COND_OK_COLOR = "#2e7d32"    # success / happy-path transitions (green)
 COND_FAIL_COLOR = "#c0392b"  # failure / abort transitions (red)
 DATA_COLOR = "#b8b8c4"
 FONT = "DejaVu Sans"
-
-# Router values that denote a failure transition (in addition to any edge
-# whose destination is an `end` node with status "failure").
-FAIL_LABELS = {"failed", "fail", "not_found", "blocked", "aborted", "abort",
-               "error", "timeout", "unreachable", "missing", "invalid"}
 
 # geometry (data units)
 NODE_W, NODE_H = 1.62, 0.54
@@ -270,10 +266,7 @@ def render(
     Returns:
         The primary output path.
     """
-    if isinstance(graph, str | Path):
-        wf = _load(Path(graph))
-    else:
-        wf = graph
+    wf = load_graph(graph)
     out_path = Path(out)
     _render(wf, out_path, data_edges=data_edges, legend=legend,
             title=title, also_png=also_png)
@@ -552,9 +545,3 @@ def _legend(ax):
     ax.legend(handles=handles, loc="lower right", fontsize=6.5, frameon=False,
               ncol=len(handles), handlelength=1.3, columnspacing=1.0,
               bbox_to_anchor=(1.0, 1.0))
-
-
-def _load(path: Path) -> dict:
-    if path.is_dir():
-        path = path / "workflow.json"
-    return json.loads(path.read_text())

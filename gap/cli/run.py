@@ -38,10 +38,12 @@ def register(subparsers: argparse._SubParsersAction) -> None:
              "second terminal",
     )
     sp.add_argument(
-        "--skills", default=None,
-        help="Path to an open-robot-skills checkout (bundle discovery root). "
-             "Default: auto-discovered — $GAP_SKILLS_PATH or an open-robot-skills "
-             "checkout next to the graph-as-policy checkout",
+        "--skills", action="append", default=None, metavar="PATH",
+        help="Skill registry root(s); repeatable, precedence-ordered. "
+             "Default: the resolved registry set — $GAP_SKILLS_PATH, "
+             "project [tool.gap], user config, or an open-robot-skills "
+             "checkout next to the graph-as-policy checkout "
+             "(see `gap registry list`)",
     )
     sp.add_argument(
         "--validate-only", action="store_true",
@@ -86,7 +88,7 @@ def _parse_inputs(pairs: list[str]) -> dict:
     return out
 
 
-def _validate_only(graph: str, skills: str | None) -> int:
+def _validate_only(graph: str, skills: list[str] | None) -> int:
     from pathlib import Path
 
     from gap.runtime.validate import validate_workflow
@@ -101,15 +103,10 @@ def _validate_only(graph: str, skills: str | None) -> int:
         print(f"FAIL: {exc}")
         return 1
 
-    skill_registry = None
-    if skills is None:
-        from gap.skills import find_skills_path
+    from gap.skills import load_registry_set, resolve_registries
 
-        skills = find_skills_path()
-    if skills:
-        from gap.skills import load_skills
-
-        skill_registry = load_skills(skills)
+    registry_set = resolve_registries(skills)
+    skill_registry = load_registry_set(registry_set) if registry_set else None
 
     issues = validate_workflow(wf, skill_registry=skill_registry)
     for issue in issues:

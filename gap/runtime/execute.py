@@ -29,6 +29,7 @@ import json
 import logging
 import tempfile
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -62,7 +63,7 @@ def execute(
     graph: Any,
     connector: Any = None,
     *,
-    skills: str | Path | None = None,
+    skills: str | Path | Sequence[str | Path] | None = None,
     inputs: dict[str, Any] | None = None,
     trace_dir: str | Path | None = None,
     checkpoints: str = "warn",
@@ -77,15 +78,17 @@ def execute(
             builders are materialized to a temp directory.
         connector: Duck-typed connector (see module docstring); ``None``
             runs tools-only.
-        skills: Optional open-robot-skills checkout path. When omitted, the
-            checkout is auto-discovered via
-            :func:`gap.skills.find_skills_path` (``$GAP_SKILLS_PATH`` or
-            a ``open-robot-skills`` directory next to the graph-as-policy checkout); when
-            none is found, execution proceeds without a skill registry.
-            Loaded via :func:`gap.skills.load_skills`; the registry is
-            passed to the executor as ``skill_registry`` and the bundles'
-            ``@tool`` registrations are drained into the active tool
-            registry.
+        skills: Optional skill registry root(s) — one path or a
+            precedence-ordered sequence. When omitted, the active
+            registries are resolved via
+            :func:`gap.skills.resolve_registries` (``$GAP_SKILLS_PATH``
+            list > project ``[tool.gap]`` > user config > the
+            open-robot-skills checkout next to the gap checkout); when
+            none are found, execution proceeds without a skill registry.
+            Loaded via :func:`gap.skills.load_registry_set`; the merged
+            registry is passed to the executor as ``skill_registry`` and
+            the bundles' ``@tool`` registrations are drained into the
+            active tool registry.
         inputs: Optional initial inputs, addressable at the top level as
             ``{"$ref": "in.<name>"}`` and as base producers for subgraph
             input binding.
@@ -114,26 +117,20 @@ def execute(
     observation_poll_fn = getattr(connector, "get_observation", None)
     world_snapshot_fn = getattr(connector, "world_snapshot", None)
 
-    if skills is None:
-        # Default: discover the side-by-side checkout / $GAP_SKILLS_PATH.
-        # Discovery failure is fine here — graphs that use no bundle
-        # scripts or tools execute against the connector registry alone.
-        from gap.skills import find_skills_path
+    # Resolve the active registry set (explicit arg > $GAP_SKILLS_PATH >
+    # project [tool.gap] > user config > auto-discovered sibling).
+    # Resolution failure is fine here — graphs that use no bundle scripts
+    # or tools execute against the connector registry alone.
+    from gap.skills import load_registry_set, resolve_registries
 
-        skills = find_skills_path()
-        if skills is not None:
-            logger.debug("auto-discovered open-robot-skills checkout: %s", skills)
-
+    registry_set = resolve_registries(skills)
     skill_registry = None
-    if skills is not None:
-        try:
-            from gap.skills import load_skills
-        except ImportError as e:  # pragma: no cover - skills lands in parallel
-            raise ImportError(
-                f"skills={skills!r} was given but gap.skills is "
-                f"unavailable: {e}"
-            ) from e
-        skill_registry = load_skills(skills)
+    if registry_set:
+        logger.debug(
+            "active skill registries: %s",
+            ", ".join(f"{s.name} ({s.path})" for s in registry_set),
+        )
+        skill_registry = load_registry_set(registry_set)
         # Bundle tools.py imports pushed @tool registrations onto the
         # pending list; drain them into the active registry. The module
         # catalog keeps them available for later execute() calls whose

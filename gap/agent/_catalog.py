@@ -27,11 +27,12 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Sequence
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from gap.skills import SkillsRegistry, load_skills
+from gap.skills import SkillsRegistry
 from gap.tools import ToolDescriptor, ToolRegistry
 from gap.tools import _registry as _tools_registry_module
 
@@ -102,12 +103,14 @@ def build_codegen_tool_registry(
 
 
 def load_codegen_registries(
-    skills_path: str | Path,
+    skills_path: str | Path | Sequence[str | Path],
     *,
     only: list[str] | None = None,
     disable: list[str] | None = None,
 ) -> tuple[SkillsRegistry, ToolRegistry]:
-    """Load the open-robot-skills checkout and build the matching tool catalog."""
-    skills = load_skills(skills_path, only=only, disable=disable)
+    """Load the skill registry root(s) and build the matching tool catalog."""
+    from gap.skills import load_registry_set
+
+    skills = load_registry_set(skills_path, only=only, disable=disable)
     tools = build_codegen_tool_registry(skills)
     return skills, tools

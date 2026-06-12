@@ -1,19 +1,30 @@
-"""``gap skills`` subcommands — list / check / table / new for open-robot-skills bundles."""
+"""``gap skills`` subcommands — list / check / table / new / test for skill bundles.
+
+All subcommands are registry-aware: they operate over the resolved set of
+skill registries (``--skills`` flags > ``$GAP_SKILLS_PATH`` > project
+``[tool.gap]`` > user config > the auto-discovered open-robot-skills
+sibling — see :mod:`gap.skills.registries`), and accept ``--registry NAME``
+to restrict to one of them.
+"""
 
 from __future__ import annotations
 
 import argparse
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gap.skills.registries import RegistrySpec
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
     sp = subparsers.add_parser(
         "skills",
-        help="Inspect, verify, and scaffold open-robot-skills bundles",
+        help="Inspect, verify, scaffold, and test skill bundles",
     )
     sub = sp.add_subparsers(dest="skills_command")
 
-    lp = sub.add_parser("list", help="List discovered bundles")
-    _add_skills_path(lp)
+    lp = sub.add_parser("list", help="List discovered bundles across registries")
+    _add_registry_args(lp)
     lp.set_defaults(func=_handle_list)
 
     cp = sub.add_parser(
@@ -21,7 +32,7 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="Validate every bundle: SKILL.md format + import probe "
              "(PASS/WARN/FAIL per bundle; non-zero exit on FAIL)",
     )
-    _add_skills_path(cp)
+    _add_registry_args(cp)
     cp.add_argument(
         "--download", action="store_true",
         help="After the checks, run each bundle's optional prefetch() "
@@ -33,7 +44,7 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         "table",
         help="Dump a catalog table of all discovered bundles",
     )
-    _add_skills_path(tp)
+    _add_registry_args(tp)
     tp.add_argument(
         "--format", default="pretty", choices=["pretty", "markdown", "json"],
         help="Output format (default: pretty terminal table; markdown is "
@@ -46,14 +57,28 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     )
     tp.set_defaults(func=_handle_table)
 
-    np_ = sub.add_parser("new", help="Scaffold a new bundle from a template")
+    np_ = sub.add_parser("new", help="Scaffold a new bundle (with a unit test)")
     np_.add_argument("name", help="Bundle name (== directory name)")
     np_.add_argument(
         "--kind", required=True, choices=["tool", "skill"],
         help="Bundle kind: tools/<name> or skills/<name>",
     )
-    _add_skills_path(np_)
+    _add_registry_args(np_)
     np_.set_defaults(func=_handle_new)
+
+    pt = sub.add_parser(
+        "test",
+        help="Run bundle unit tests from the owning registry's tests/ dir "
+             "(no bundle names = every registry's full suite). Put flags "
+             "first; pass pytest args after `--`, e.g. "
+             "`gap skills test sam3 -- -m gpu -x`",
+    )
+    pt.add_argument(
+        "bundles", nargs="*",
+        help="Bundle names to test (default: everything)",
+    )
+    _add_registry_args(pt)
+    pt.set_defaults(func=_handle_test)
 
     # NOTE: no sp.set_defaults(func=...) here — argparse applies parent
     # defaults to the namespace before the sub-subparser runs, which would
@@ -61,20 +86,28 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     # falls through to the top-level help in main().
 
 
-def _add_skills_path(parser: argparse.ArgumentParser) -> None:
+def _add_registry_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "--skills", default=None,
-        help="open-robot-skills checkout root (default: auto-discovered — "
-             "$GAP_SKILLS_PATH, the current directory, or an open-robot-skills "
-             "checkout next to the graph-as-policy checkout)",
+        "--skills", action="append", default=None, metavar="PATH",
+        help="Registry checkout root(s); repeatable. Overrides "
+             "$GAP_SKILLS_PATH and configured registries (default: the "
+             "resolved registry set — see `gap registry list`)",
+    )
+    parser.add_argument(
+        "--registry", default=None, metavar="NAME",
+        help="Restrict to one active registry by name",
     )
 
 
-def _skills_root(args: argparse.Namespace):
-    """Resolve the checkout (explicit flag > $GAP_SKILLS_PATH > discovery)."""
-    from gap.skills import find_skills_path
+def _registry_set(args: argparse.Namespace, *, required: bool = True):
+    """Resolve the active registries (flag > env > project > user > auto)."""
+    from gap.skills import resolve_registries
+    from gap.skills.registries import RegistrySet
 
-    return find_skills_path(args.skills, required=True)
+    registry_set = resolve_registries(args.skills, required=required)
+    if getattr(args, "registry", None):
+        registry_set = RegistrySet([registry_set.get(args.registry)])
+    return registry_set
 
 
 # ---------------------------------------------------------------------------
@@ -83,29 +116,42 @@ def _skills_root(args: argparse.Namespace):
 
 
 def _handle_list(args: argparse.Namespace) -> int:
-    from gap.skills import load_skills
+    from gap.skills.validate import validate_checkout
 
     try:
-        root = _skills_root(args)
+        registry_set = _registry_set(args)
     except (FileNotFoundError, ValueError) as exc:
         print(f"error: {exc}")
         return 2
-    registry = load_skills(root)
-    infos = registry.list_skills()
-    if not infos:
-        print(f"no bundles found under {root}/tools or {root}/skills")
-        return 1
+    except KeyError as exc:
+        print(f"error: {exc.args[0]}")
+        return 2
 
     rows = []
-    for info in sorted(infos, key=lambda i: (i.kind, i.name)):
-        desc = info.meta.description.strip().splitlines()[0] if info.meta.description else ""
-        tools = ", ".join(sorted(info.meta.tools)) if info.meta.tools else "-"
-        rows.append((info.kind, info.name, desc, tools))
+    claimed: set[str] = set()
+    for spec in registry_set:
+        for report in validate_checkout(spec.path):
+            shadowed = report.name in claimed
+            claimed.add(report.name)
+            meta = report.meta
+            desc = (
+                meta.description.strip().splitlines()[0] if meta and meta.description
+                else "(SKILL.md rejected)"
+            )
+            tools = ", ".join(sorted(meta.tools)) if meta and meta.tools else "-"
+            name = report.name + (" (shadowed)" if shadowed else "")
+            rows.append((report.kind, name, spec.name, desc, tools))
 
-    headers = ("KIND", "NAME", "DESCRIPTION", "TOOLS")
+    if not rows:
+        roots = ", ".join(str(p) for p in registry_set.paths())
+        print(f"no bundles found under {roots}")
+        return 1
+
+    rows.sort(key=lambda r: (r[0], r[1]))
+    headers = ("KIND", "NAME", "REGISTRY", "DESCRIPTION", "TOOLS")
     widths = [
-        max(len(headers[c]), *(len(r[c]) for r in rows)) for c in range(3)
-    ] + [len(headers[3])]
+        max(len(headers[c]), *(len(r[c]) for r in rows)) for c in range(4)
+    ] + [len(headers[4])]
     fmt = "  ".join(f"{{:<{w}}}" for w in widths)
     print(fmt.format(*headers))
     for row in rows:
@@ -119,7 +165,7 @@ def _handle_list(args: argparse.Namespace) -> int:
 
 
 def _handle_check(args: argparse.Namespace) -> int:
-    """Per-bundle format validation + import probe.
+    """Per-bundle format validation + import probe, per registry.
 
     Two layers, merged into one PASS/WARN/FAIL line per bundle:
 
@@ -130,63 +176,83 @@ def _handle_check(args: argparse.Namespace) -> int:
        suite enforces).
     2. **Import probe**: each bundle is registered individually so one
        broken bundle doesn't mask the rest; ImportError hints are mapped
-       to the checkout's pip extras (extra name == bundle name).
+       to the owning registry's install story (uv sync / pip extra).
 
     Exit status is non-zero iff any bundle FAILs.
     """
-    from gap.skills import SkillsRegistry
+    from gap.skills.capability import dep_fix_hint, probe_bundle_import
+    from gap.skills.registries import registry_dist_name
     from gap.skills.validate import BundleIssue, load_checkout_extras, validate_checkout
 
     try:
-        root = _skills_root(args)
+        registry_set = _registry_set(args)
     except (FileNotFoundError, ValueError) as exc:
         print(f"error: {exc}")
         return 2
-    extras = load_checkout_extras(root) or {}
+    except KeyError as exc:
+        print(f"error: {exc.args[0]}")
+        return 2
 
-    reports = validate_checkout(root)
-    if not reports:
-        print(f"no bundles found under {root}/tools or {root}/skills")
+    multi = len(registry_set) > 1
+    failures = 0
+    totals = {"PASS": 0, "WARN": 0, "FAIL": 0}
+    all_reports = []  # (spec, report, info-or-None)
+    found_any = False
+
+    for spec in registry_set:
+        extras = load_checkout_extras(spec.path) or {}
+        dist_name = spec.dist_name or registry_dist_name(spec.path)
+        reports = validate_checkout(spec.path)
+        if not reports:
+            if multi:
+                print(f"[registry {spec.name}] no bundles found under {spec.path}")
+            continue
+        found_any = True
+        if multi:
+            print(f"== registry {spec.name} ({spec.path}) ==")
+
+        for report in reports:
+            hint = dep_fix_hint(
+                spec.path, dist_name=dist_name, bundle=report.name,
+                has_extra=report.name in extras,
+            )
+            probe, info = probe_bundle_import(
+                report.name, report.bundle_dir, kind=report.kind, fix_hint=hint,
+            )
+            if not probe.ok:
+                message = f"import probe failed: {probe.detail}"
+                if probe.fix_hint:
+                    message += f" — {probe.fix_hint}"
+                report.issues.append(BundleIssue("error", message))
+            all_reports.append((spec, report, info))
+
+            status = report.status
+            totals[status] += 1
+            if status == "FAIL":
+                failures += 1
+            print(f"[{report.kind}] {report.name}: {status}")
+            for issue in report.issues:
+                print(f"    {issue}")
+        if multi:
+            print()
+
+    if not found_any:
+        roots = ", ".join(str(p) for p in registry_set.paths())
+        print(f"no bundles found under {roots}")
         return 1
 
-    # Layer 2: import probe per bundle, folded into the same report.
-    infos: dict[str, object] = {}
-    for report in reports:
-        reg = SkillsRegistry()
-        try:
-            reg.register_bundle(report.name, report.bundle_dir, kind=report.kind)
-        except ImportError as exc:
-            missing = getattr(exc, "name", None) or str(exc)
-            hint = ""
-            if report.name in extras:
-                hint = f" — pip install 'open-robot-skills[{report.name}]'"
-            report.issues.append(BundleIssue(
-                "error", f"import probe failed: missing {missing}{hint}",
-            ))
-        except Exception as exc:
-            report.issues.append(BundleIssue("error", f"import probe failed: {exc}"))
-        else:
-            infos[report.name] = reg.get(report.name)
-
-    failures = 0
-    for report in reports:
-        status = report.status
-        if status == "FAIL":
-            failures += 1
-        print(f"[{report.kind}] {report.name}: {status}")
-        for issue in report.issues:
-            print(f"    {issue}")
-
-    n_pass = sum(1 for r in reports if r.status == "PASS")
-    n_warn = sum(1 for r in reports if r.status == "WARN")
-    print(f"\n{len(reports)} bundle(s): {n_pass} PASS, {n_warn} WARN, {failures} FAIL")
+    n = sum(totals.values())
+    print(f"\n{n} bundle(s): {totals['PASS']} PASS, {totals['WARN']} WARN, "
+          f"{totals['FAIL']} FAIL")
 
     if args.download:
         print()
-        for report in reports:
-            info = infos.get(report.name)
+        for spec, report, info in all_reports:
+            prefix = f"[{report.kind}] {report.name}"
+            if multi:
+                prefix = f"[{spec.name}] {prefix}"
             if info is None:
-                print(f"[{report.kind}] {report.name}: skipped prefetch (import failed)")
+                print(f"{prefix}: skipped prefetch (import failed)")
                 continue
             prefetch = None
             for module in (info.tools_module, info.module):
@@ -195,14 +261,14 @@ def _handle_check(args: argparse.Namespace) -> int:
                     prefetch = fn
                     break
             if prefetch is None:
-                print(f"[{report.kind}] {report.name}: declares no weights (no prefetch())")
+                print(f"{prefix}: declares no weights (no prefetch())")
                 continue
             try:
                 prefetch()
-                print(f"[{report.kind}] {report.name}: prefetch OK")
+                print(f"{prefix}: prefetch OK")
             except Exception as exc:
                 failures += 1
-                print(f"[{report.kind}] {report.name}: prefetch FAILED: {exc}")
+                print(f"{prefix}: prefetch FAILED: {exc}")
 
     return 1 if failures else 0
 
@@ -221,48 +287,32 @@ def _first_sentence(description: str) -> str:
     return text[: m.start()] if m else text
 
 
-def _table_rows(root) -> list[dict]:
+def _table_rows(spec) -> list[dict]:
     """Catalog rows from static SKILL.md parsing (no bundle imports)."""
+    from gap.skills.registries import registry_dist_name
     from gap.skills.validate import load_checkout_extras, validate_checkout
 
-    extras = load_checkout_extras(root) or {}
+    extras = load_checkout_extras(spec.path) or {}
+    dist = spec.dist_name or registry_dist_name(spec.path) or ""
     rows = []
-    for report in validate_checkout(root):
+    for report in validate_checkout(spec.path):
         meta = report.meta
         rows.append({
             "name": report.name,
             "kind": report.kind,
+            "registry": spec.name,
             "description": _first_sentence(meta.description) if meta else "(SKILL.md rejected)",
             "tools": sorted(meta.tools) if meta else [],
-            "extra": f"open-robot-skills[{report.name}]" if report.name in extras else "",
+            "extra": f"{dist}[{report.name}]" if dist and report.name in extras else "",
         })
     rows.sort(key=lambda r: (r["kind"], r["name"]))
     return rows
 
 
-def _handle_table(args: argparse.Namespace) -> int:
-    try:
-        root = _skills_root(args)
-    except (FileNotFoundError, ValueError) as exc:
-        print(f"error: {exc}")
-        return 2
-    rows = _table_rows(root)
-    kind = getattr(args, "kind", None)
-    if kind:
-        rows = [r for r in rows if r["kind"] == kind]
-    if not rows:
-        print(f"no bundles found under {root}/tools or {root}/skills")
-        return 1
-
-    if args.format == "json":
-        import json
-
-        print(json.dumps(rows, indent=2))
-        return 0
-
+def _print_markdown_table(rows: list[dict], kind: str | None) -> None:
     cells = [
         (
-            r["name"],
+            f"[{r['name']}]({'tools' if r['kind'] == 'tool' else 'skills'}/{r['name']}/)",
             r["kind"],
             r["description"],
             ", ".join(f"`{t}`" for t in r["tools"]) if r["tools"] else "—",
@@ -270,27 +320,73 @@ def _handle_table(args: argparse.Namespace) -> int:
         )
         for r in rows
     ]
-    headers = ("Bundle", "Kind", "Description", "Tools", "Extra")
+    headers: tuple[str, ...] = ("Bundle", "Kind", "Description", "Tools", "Extra")
+    if kind:  # one table per kind: the Kind column is redundant
+        headers = tuple(h for h in headers if h != "Kind")
+        cells = [(n, d, t, e) for n, _, d, t, e in cells]
+    print("| " + " | ".join(headers) + " |")
+    print("|" + "|".join("---" for _ in headers) + "|")
+    for row in cells:
+        print("| " + " | ".join(row) + " |")
+
+
+def _handle_table(args: argparse.Namespace) -> int:
+    try:
+        registry_set = _registry_set(args)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"error: {exc}")
+        return 2
+    except KeyError as exc:
+        print(f"error: {exc.args[0]}")
+        return 2
+
+    per_registry = [(spec, _table_rows(spec)) for spec in registry_set]
+    kind = getattr(args, "kind", None)
+    if kind:
+        per_registry = [
+            (spec, [r for r in rows if r["kind"] == kind])
+            for spec, rows in per_registry
+        ]
+    all_rows = [r for _, rows in per_registry for r in rows]
+    if not all_rows:
+        roots = ", ".join(str(p) for p in registry_set.paths())
+        print(f"no bundles found under {roots}")
+        return 1
+
+    multi = len(registry_set) > 1
+
+    if args.format == "json":
+        import json
+
+        print(json.dumps(all_rows, indent=2))
+        return 0
 
     if args.format == "markdown":
-        # Bundle names link to their directory (paste-ready for the
-        # open-robot-skills README at the checkout root).
-        cells = [
-            (f"[{name}]({'tools' if k == 'tool' else 'skills'}/{name}/)",
-             k, desc, tools, extra)
-            for name, k, desc, tools, extra in cells
-        ]
-        if kind:  # one table per kind: the Kind column is redundant
-            headers = tuple(h for h in headers if h != "Kind")
-            cells = [(n, d, t, e) for n, _, d, t, e in cells]
-        print("| " + " | ".join(headers) + " |")
-        print("|" + "|".join("---" for _ in headers) + "|")
-        for row in cells:
-            print("| " + " | ".join(row) + " |")
+        # Bundle names link to their directory — paste-ready for a README
+        # at the registry root, so multi-registry output emits one table
+        # per registry.
+        for i, (spec, rows) in enumerate(per_registry):
+            if not rows:
+                continue
+            if multi:
+                if i:
+                    print()
+                print(f"### {spec.name}\n")
+            _print_markdown_table(rows, kind)
         return 0
 
     # pretty terminal table (backtick markup dropped)
-    cells = [tuple(c.replace("`", "") for c in row) for row in cells]
+    headers: tuple[str, ...] = (
+        "Bundle", "Kind", "Registry", "Description", "Tools", "Extra",
+    )
+    cells = [
+        (
+            r["name"], r["kind"], r["registry"], r["description"],
+            ", ".join(r["tools"]) if r["tools"] else "—",
+            r["extra"] or "—",
+        )
+        for r in all_rows
+    ]
     widths = [
         max(len(headers[c]), *(len(row[c]) for row in cells))
         for c in range(len(headers))
@@ -315,6 +411,8 @@ description: TODO one-line description of what this tool bundle computes.
 compatibility: requires gap>=0.1
 metadata: {{category: TODO, tags: []}}
 gap:
+  # Operational requirements consumed by `gap check` — uncomment what applies:
+  # requires: {{gpu: true, env: [MY_API_KEY], env_any: [], weights: true}}
   tools:
     - {name}.run: TODO summary of the tool function.
 ---
@@ -340,6 +438,23 @@ def run(text: str) -> str:
     raise NotImplementedError
 '''
 
+_TOOL_TEST_PY = '''\
+"""Unit tests for the {name} tool bundle (CPU-only; gpu/llm tests get markers)."""
+
+
+def test_{uname}_tool_registered(tool_registry):
+    assert "{name}.run" in tool_registry
+    desc = tool_registry.get("{name}.run")
+    assert desc.summary
+    assert desc.schema.inputs  # the typed signature introspected cleanly
+
+
+# Enable once run() is implemented:
+# def test_{uname}_invoke(tool_registry):
+#     out = tool_registry.invoke("{name}.run", None, text="hello")
+#     assert out == "hello"
+'''
+
 _SKILL_SKILL_MD = """\
 ---
 name: {name}
@@ -348,6 +463,8 @@ description: TODO one-line description of this manipulation strategy.
 compatibility: requires gap>=0.1
 metadata: {{category: TODO, tags: []}}
 gap:
+  # Operational requirements consumed by `gap check` — uncomment what applies:
+  # requires: {{gpu: true, env: [MY_API_KEY], env_any: [], weights: true}}
   allowed_tools: []
   exit_conditions:
     done: TODO meaning of success.
@@ -382,33 +499,61 @@ def run(ctx, *, example_input: str = "") -> Output:
     return {{"result": example_input}}
 '''
 
+_SKILL_TEST_PY = '''\
+"""Unit tests for the {name} skill bundle (CPU-only via FakeContext)."""
+
+from gap.testing import FakeContext
+
+
+def test_{uname}_example_script_runs(skills_registry):
+    info = skills_registry.get("{name}")
+    script = info.canonical_scripts["example"].module
+
+    ctx = FakeContext({{
+        # Can the script's tool calls here, e.g.:
+        # "robot.get_observation": {{"cameras": []}},
+    }})
+    out = script.run(ctx, example_input="hi")
+    assert set(out) == {{"result"}}
+    assert out["result"] == "hi"
+'''
+
 
 def _handle_new(args: argparse.Namespace) -> int:
-    from pathlib import Path
-
-    from gap.skills import find_skills_path
-
     try:
-        root = find_skills_path(args.skills)
-    except ValueError as exc:
+        registry_set = _registry_set(args, required=False)
+    except (FileNotFoundError, ValueError) as exc:
         print(f"error: {exc}")
         return 2
-    if root is None:
-        # Bootstrapping a brand-new checkout: nothing discoverable yet, so
-        # scaffold into the current directory.
-        root = Path.cwd()
-        print(f"no open-robot-skills checkout discovered; scaffolding into {root}")
+    except KeyError as exc:
+        print(f"error: {exc.args[0]}")
+        return 2
+
+    spec = registry_set.primary()
+    if spec is None:
+        print(
+            "no skill registry found to scaffold into.\n"
+            "  create one:        gap registry init <path> --add\n"
+            "  or pass a target:  gap skills new ... --skills <path>"
+        )
+        return 2
+    root = spec.path
+
     folder = "tools" if args.kind == "tool" else "skills"
     bundle_dir = root / folder / args.name
     if bundle_dir.exists():
         print(f"refusing to overwrite existing bundle: {bundle_dir}")
         return 1
     bundle_dir.mkdir(parents=True)
+    uname = args.name.replace("-", "_")
+    scaffolded = ["SKILL.md"]
     if args.kind == "tool":
         (bundle_dir / "SKILL.md").write_text(
             _TOOL_SKILL_MD.format(name=args.name)
         )
         (bundle_dir / "tools.py").write_text(_TOOL_TOOLS_PY.format(name=args.name))
+        scaffolded.append("tools.py")
+        test_body = _TOOL_TEST_PY.format(name=args.name, uname=uname)
     else:
         (bundle_dir / "SKILL.md").write_text(_SKILL_SKILL_MD.format(name=args.name))
         scripts = bundle_dir / "scripts"
@@ -416,5 +561,141 @@ def _handle_new(args: argparse.Namespace) -> int:
         (scripts / "example.py").write_text(_SKILL_SCRIPT_PY.format(name=args.name))
         (bundle_dir / "prompts").mkdir()
         (bundle_dir / "references").mkdir()
+        scaffolded += ["scripts/example.py", "prompts/", "references/"]
+        test_body = _SKILL_TEST_PY.format(name=args.name, uname=uname)
+
+    # Unit-test scaffold in the owning registry's tests/ dir.
+    tests_dir = root / "tests"
+    tests_dir.mkdir(exist_ok=True)
+    conftest = tests_dir / "conftest.py"
+    if not conftest.is_file():
+        from .registry import _INIT_CONFTEST
+
+        conftest.write_text(_INIT_CONFTEST)
+    test_path = tests_dir / f"test_{uname}.py"
+    if test_path.exists():
+        print(f"note: {test_path} already exists — leaving it untouched")
+    else:
+        test_path.write_text(test_body)
+        scaffolded.append(f"tests/test_{uname}.py")
+
     print(f"scaffolded {args.kind} bundle at {bundle_dir}")
+    print(f"  {'  '.join(scaffolded)}")
+    print(
+        "next:\n"
+        f"  1. declare a {args.name!r} extra in {root}/pyproject.toml "
+        f"([] when it has no deps)\n"
+        f"  2. gap skills check --skills {root}\n"
+        f"  3. gap skills test {args.name}"
+    )
     return 0
+
+
+# ---------------------------------------------------------------------------
+# test
+# ---------------------------------------------------------------------------
+
+
+def _handle_test(args: argparse.Namespace) -> int:
+    """Run bundle tests with each owning registry's own pytest config.
+
+    Invocations run as ``sys.executable -m pytest`` with cwd at the
+    registry root, so the registry's ``[tool.pytest.ini_options]``
+    (gpu/llm marker deselects, testpaths) governs — exactly like running
+    pytest there by hand. A registry with its own separate venv should be
+    tested with ``uv run pytest`` in that registry instead.
+    """
+    import subprocess
+    import sys
+
+    from gap.skills.validate import validate_checkout
+
+    try:
+        registry_set = _registry_set(args)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"error: {exc}")
+        return 2
+    except KeyError as exc:
+        print(f"error: {exc.args[0]}")
+        return 2
+
+    # `gap skills test sam3 -- -m gpu -x`: argparse folds the post--
+    # tokens into the positional list; everything from the first
+    # dash-prefixed token on is pytest passthrough.
+    raw = list(args.bundles or [])
+    bundles: list[str] = []
+    passthrough: list[str] = []
+    for i, token in enumerate(raw):
+        if token.startswith("-"):
+            passthrough = raw[i:]
+            break
+        bundles.append(token)
+
+    owners: dict[str, RegistrySpec] = {}
+    for spec in registry_set:
+        for report in validate_checkout(spec.path):
+            owners.setdefault(report.name, spec)
+
+    unknown = [b for b in bundles if b not in owners]
+    if unknown:
+        known = ", ".join(sorted(owners)) or "<none>"
+        print(f"error: unknown bundle(s) {', '.join(unknown)} (known: {known})")
+        return 2
+
+    # Group work per registry, preserving registry precedence order.
+    groups: list[tuple[RegistrySpec, list[str] | None]] = []
+    if bundles:
+        for spec in registry_set:
+            mine = [b for b in bundles if owners[b] is spec]
+            if mine:
+                groups.append((spec, mine))
+    else:
+        groups = [(spec, None) for spec in registry_set]
+
+    failures = 0
+    for spec, spec_bundles in groups:
+        tests_dir = spec.path / "tests"
+        if not tests_dir.is_dir():
+            if spec_bundles:
+                print(f"error: registry {spec.name} has no tests/ directory "
+                      f"(requested: {', '.join(spec_bundles)})")
+                failures += 1
+            else:
+                print(f"skipping {spec.name}: no tests/ directory")
+            continue
+
+        invocations: list[list[str]] = []
+        if spec_bundles is None:
+            invocations.append(["tests"])
+        else:
+            file_targets: list[str] = []
+            k_names: list[str] = []
+            for bundle in spec_bundles:
+                underscored = bundle.replace("-", "_")
+                test_file = tests_dir / f"test_{underscored}.py"
+                if test_file.is_file():
+                    file_targets.append(f"tests/test_{underscored}.py")
+                else:
+                    print(f"note: no tests/test_{underscored}.py in "
+                          f"{spec.name} — falling back to -k {underscored!r}")
+                    k_names.append(underscored)
+            if file_targets:
+                invocations.append(file_targets)
+            if k_names:
+                invocations.append(["tests", "-k", " or ".join(k_names)])
+
+        for targets in invocations:
+            cmd = [sys.executable, "-m", "pytest", *targets, *passthrough]
+            print(f"running: pytest {' '.join(targets + passthrough)}  "
+                  f"(in {spec.path})")
+            proc = subprocess.run(cmd, cwd=spec.path)
+            if proc.returncode == 5:  # pytest: no tests collected
+                if spec_bundles:
+                    print(f"error: no tests matched in {spec.name}")
+                    failures += 1
+                else:
+                    print(f"note: no tests collected in {spec.name}")
+            elif proc.returncode != 0:
+                failures += 1
+
+    return 1 if failures else 0

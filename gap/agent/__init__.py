@@ -7,6 +7,7 @@ Compile a language instruction into a typed, verified workflow graph::
     graph = gap.agent.generate_sync(
         "pick up the alphabet soup and put it in the basket",
     )                            # open-robot-skills checkout auto-discovered
+    print(graph)                 # the compiled graph as terminal text
     result = gap.execute(graph.path, connector)
 
 The pipeline runs a coordinator (topology), one subgraph_agent per
@@ -22,6 +23,7 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -57,11 +59,17 @@ class GeneratedGraph:
     """Every generated source file keyed by workflow-relative path —
     inline scripts plus checkpoint sidecars."""
 
+    def __str__(self) -> str:
+        """The graph as box-drawing terminal text (:func:`gap.viz.to_text`)."""
+        from gap.viz.text import to_text
+
+        return to_text(self.workflow)
+
 
 async def generate(
     instruction: str,
     *,
-    skills: str | Path | None = None,
+    skills: str | Path | Sequence[str | Path] | None = None,
     model: str | None = None,
     provider: str | None = None,
     out_dir: str | Path | None = None,
@@ -71,12 +79,13 @@ async def generate(
 
     Args:
         instruction: The task in natural language.
-        skills: Path to an open-robot-skills checkout (bundle discovery root).
-            When omitted, the checkout is auto-discovered
-            (``$GAP_SKILLS_PATH`` or a ``open-robot-skills`` directory next to
-            the gap checkout); generation requires one, so discovery
-            failure raises :class:`FileNotFoundError` listing what was
-            tried.
+        skills: Skill registry root(s) — one path or a precedence-ordered
+            sequence (bundle discovery roots). When omitted, the active
+            registries are resolved (``$GAP_SKILLS_PATH`` list > project
+            ``[tool.gap]`` > user config > the open-robot-skills checkout
+            next to the gap checkout); generation requires at least one,
+            so resolution failure raises :class:`FileNotFoundError`
+            listing what was tried.
         model: Optional LLM model override (default: provider default,
             ``claude-opus-4-8`` on anthropic).
         provider: Optional LLM provider override
@@ -108,11 +117,13 @@ async def generate(
         cfg = config
 
     if skills is not None:
-        cfg.skills = Path(skills).resolve()
-    elif cfg.skills is None:
-        from gap.skills import find_skills_path
+        from gap.skills import as_registry_paths
 
-        cfg.skills = find_skills_path(required=True)
+        cfg.skills = as_registry_paths(skills)
+    elif cfg.skills is None:
+        from gap.skills import resolve_registries
+
+        cfg.skills = resolve_registries(required=True).paths()
     llm = cfg.llm
     if provider is not None:
         llm = replace(llm, provider=provider)
@@ -150,7 +161,7 @@ async def generate(
 def generate_sync(
     instruction: str,
     *,
-    skills: str | Path | None = None,
+    skills: str | Path | Sequence[str | Path] | None = None,
     model: str | None = None,
     provider: str | None = None,
     out_dir: str | Path | None = None,

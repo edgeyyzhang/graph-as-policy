@@ -278,6 +278,29 @@ def validate_bundle_meta(
             f"none)"
         )
 
+    # --- gap.requires consistency ---------------------------------------------
+    req = meta.requires
+    gpu_tagged = "gpu" in meta.tags
+    if req is not None and req.gpu and not gpu_tagged:
+        warning(
+            "gap.requires.gpu is true but metadata.tags lacks 'gpu' — add "
+            "the tag so catalogs reflect the hardware need"
+        )
+    if gpu_tagged and (req is None or not req.gpu):
+        warning(
+            "metadata.tags includes 'gpu' but gap.requires does not declare "
+            "gpu: true — `gap check` will not probe for a GPU"
+        )
+    if req is not None and req.weights:
+        has_module = (bundle_dir / "tools.py").is_file() or (
+            bundle_dir / "skill.py"
+        ).is_file()
+        if not has_module:
+            warning(
+                "gap.requires.weights is true but the bundle has no "
+                "tools.py/skill.py to host weights_cached()/prefetch()"
+            )
+
     return issues
 
 

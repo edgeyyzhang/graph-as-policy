@@ -15,10 +15,12 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help='The task, e.g. "pick up the alphabet soup and put it in the basket"',
     )
     sp.add_argument(
-        "--skills", default=None,
-        help="Path to an open-robot-skills checkout (bundle discovery root). "
-             "Default: auto-discovered — $GAP_SKILLS_PATH or an open-robot-skills "
-             "checkout next to the graph-as-policy checkout; --config skills: also works",
+        "--skills", action="append", default=None, metavar="PATH",
+        help="Skill registry root(s); repeatable, precedence-ordered. "
+             "Default: the resolved registry set — $GAP_SKILLS_PATH, "
+             "project [tool.gap], user config, or an open-robot-skills "
+             "checkout next to the graph-as-policy checkout; "
+             "--config skills: also works",
     )
     sp.add_argument(
         "--provider", default=None, choices=["anthropic", "openai", "vertex"],
@@ -45,6 +47,8 @@ def register(subparsers: argparse._SubParsersAction) -> None:
 
 def _handle(args: argparse.Namespace) -> int:
     import logging
+    import os
+    import sys
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -52,7 +56,8 @@ def _handle(args: argparse.Namespace) -> int:
     )
 
     from gap.agent import PipelineConfig, generate_sync
-    from gap.skills import find_skills_path
+    from gap.skills import resolve_registries
+    from gap.viz.text import to_text
 
     config = None
     skills = args.skills
@@ -62,7 +67,7 @@ def _handle(args: argparse.Namespace) -> int:
             skills = config.skills
     if skills is None:
         try:
-            skills = find_skills_path(required=True)
+            skills = resolve_registries(required=True).paths()
         except (FileNotFoundError, ValueError) as exc:
             print(f"error: {exc}")
             return 2
@@ -82,5 +87,9 @@ def _handle(args: argparse.Namespace) -> int:
 
     n_subgraphs = len(graph.workflow.get("subgraphs", {}))
     print(f"OK: wrote {graph.path} ({n_subgraphs} subgraph(s), {len(graph.code)} generated file(s))")
+    print()
+    print(to_text(graph.workflow,
+                  color=sys.stdout.isatty() and not os.environ.get("NO_COLOR")))
+    print()
     print(f"run it with: gap run {graph.path}")
     return 0
