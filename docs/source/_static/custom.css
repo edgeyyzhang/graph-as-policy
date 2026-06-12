@@ -1,0 +1,47 @@
+/* gap docs — brand accents on top of pydata-sphinx-theme. */
+
+html {
+  --pst-font-size-base: 1rem;
+}
+
+/* Deep-teal primary, distinct from SkyPilot blue. */
+html[data-theme="light"] {
+  --pst-color-primary: #0f766e;
+  --pst-color-primary-highlight: #0d9488;
+  --pst-color-secondary: #b45309;
+  --pst-color-inline-code-links: #0f766e;
+}
+
+html[data-theme="dark"] {
+  --pst-color-primary: #2dd4bf;
+  --pst-color-primary-highlight: #5eead4;
+  --pst-color-secondary: #fbbf24;
+  --pst-color-inline-code-links: #2dd4bf;
+}
+
+/* Wordmark: keep the lowercase "gap" logo text tight and bold. */
+.navbar-brand .logo__title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-family: var(--pst-font-family-monospace);
+}
+
+/* Landing-page cards: equal height, subtle hover lift. */
+.sd-card {
+  height: 100%;
+  transition: transform 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
+}
+.sd-card:hover {
+  transform: translateY(-2px);
+}
+
+/* Side-by-side hero media on the landing page. */
+.bd-article img {
+  border-radius: 6px;
+}
+
+/* Tables: tighten cell padding for the wide reference tables. */
+table.table td,
+table.table th {
+  padding: 0.35rem 0.6rem;
+}
