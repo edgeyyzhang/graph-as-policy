@@ -323,7 +323,7 @@ specifies the JSON schema and executor semantics.
 |---|---|
 | `anthropic` (default) | `export ANTHROPIC_API_KEY=...` |
 | `openai` (incl. OpenRouter / vLLM) | `export OPENAI_API_KEY=...`; custom endpoints via config YAML |
-| `vertex` | `gcloud auth application-default login` + `export GOOGLE_CLOUD_PROJECT=...`; pass `--provider vertex --model <m>` (no provider default) and run with the extra: `uv run --extra vertex gap generate ...`; claude-* and gemini-* both route |
+| `vertex` | `gcloud auth application-default login` + `export GOOGLE_CLOUD_PROJECT=...`; pick it per call (`--provider vertex --model <m>`) or once per shell (`export GAP_LLM_PROVIDER=vertex GAP_LLM_MODEL=<m>`); run with the SDK: `uv run --extra vertex gap generate ...`; claude-* and gemini-* both route |
 
 `--provider/--model` per call, or pin everything in a config YAML. The same
 provider layer drives the `vlm` perception bundle (`GAP_VLM_PROVIDER`, …) —

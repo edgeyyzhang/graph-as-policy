@@ -521,3 +521,44 @@ def test_vertex_region_resolution(monkeypatch):
     assert _vertex_region(
         LlmConfig(provider="vertex", region="europe-west4")
     ) == "europe-west4"
+
+
+def test_provider_and_model_env_defaults(monkeypatch):
+    from gap.agent.llm import LlmConfig, default_model, default_provider
+
+    monkeypatch.delenv("GAP_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("GAP_LLM_MODEL", raising=False)
+    assert default_provider() == "anthropic"
+    assert default_model() is None
+    assert LlmConfig().provider == "anthropic"
+
+    # A shell can pin its provider/model once; bare LlmConfig() honors it...
+    monkeypatch.setenv("GAP_LLM_PROVIDER", "Vertex")
+    monkeypatch.setenv("GAP_LLM_MODEL", "gemini-test")
+    cfg = LlmConfig()
+    assert cfg.provider == "vertex"
+    assert cfg.model == "gemini-test"
+
+    # ...explicit values still win.
+    explicit = LlmConfig(provider="openai", model="m")
+    assert explicit.provider == "openai" and explicit.model == "m"
+
+
+def test_from_yaml_llm_env_defaults(monkeypatch, tmp_path):
+    from gap.agent.config import PipelineConfig
+
+    monkeypatch.setenv("GAP_LLM_PROVIDER", "vertex")
+    monkeypatch.setenv("GAP_LLM_MODEL", "gemini-test")
+    yaml_path = tmp_path / "cfg.yaml"
+
+    # YAML omitting llm: -> env defaults flow through from_yaml.
+    yaml_path.write_text("task: t\n")
+    cfg = PipelineConfig.from_yaml(yaml_path)
+    assert cfg.llm.provider == "vertex"
+    assert cfg.llm.model == "gemini-test"
+
+    # YAML pinning the provider wins over the env.
+    yaml_path.write_text("llm:\n  provider: anthropic\n  model: claude-x\n")
+    cfg = PipelineConfig.from_yaml(yaml_path)
+    assert cfg.llm.provider == "anthropic"
+    assert cfg.llm.model == "claude-x"

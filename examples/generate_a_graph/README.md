@@ -118,7 +118,7 @@ Or in Python: `gap.execute(graph.path, gap.connector.sim("libero", task=...))`.
 |---|---|
 | `anthropic` (default) | `export ANTHROPIC_API_KEY=...`; `--model claude-opus-4-8` is the default |
 | `openai` (incl. OpenRouter / vLLM) | `export OPENAI_API_KEY=...`; custom endpoints via a `--config` YAML with `llm: {provider: openai, endpoint: ...}` |
-| `vertex` | `gcloud auth application-default login`, `export GOOGLE_CLOUD_PROJECT=...` (`GOOGLE_CLOUD_REGION` optional, default `global`); pass `--provider vertex --model <m>` — no provider default — and include the SDK: `uv run --extra vertex gap generate ...`; claude-* and gemini-* models both route correctly |
+| `vertex` | `gcloud auth application-default login`, `export GOOGLE_CLOUD_PROJECT=...` (`GOOGLE_CLOUD_REGION` optional, default `global`); pick per call (`--provider vertex --model <m>` — no provider default) or once per shell (`export GAP_LLM_PROVIDER=vertex GAP_LLM_MODEL=<m>`), and include the SDK: `uv run --extra vertex gap generate ...`; claude-* and gemini-* models both route correctly |
 
 Pick per call with `--provider/--model`, or pin everything (temperature,
 retries, per-agent models) in a config YAML passed via `--config`.

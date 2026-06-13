@@ -165,10 +165,12 @@ class PipelineConfig:
             )
 
         # LLM config
+        from .llm import default_model, default_provider
+
         llm_raw = raw.get("llm", {}) or {}
         llm = LlmConfig(
-            provider=llm_raw.get("provider", LlmConfig.provider),
-            model=llm_raw.get("model"),
+            provider=llm_raw.get("provider") or default_provider(),
+            model=llm_raw.get("model") or default_model(),
             endpoint=llm_raw.get("endpoint"),
             api_key=llm_raw.get("api_key"),
             project_id=llm_raw.get("project_id"),

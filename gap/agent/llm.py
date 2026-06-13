@@ -39,7 +39,7 @@ import os
 import random
 import weakref
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -74,15 +74,33 @@ _vertex_gemini_clients: dict[tuple[str, str], Any] = {}
 _HTTPX_TRANSPORT: Any | None = None
 
 
+def default_provider() -> str:
+    """``$GAP_LLM_PROVIDER`` when set, else ``"anthropic"``.
+
+    Lets a shell pin its provider once (e.g. ``export
+    GAP_LLM_PROVIDER=vertex GAP_LLM_MODEL=gemini-...``) so the bare
+    ``gap generate "<task>"`` works without per-call flags. Precedence
+    stays: ``--provider`` flag > config YAML > this env default.
+    """
+    return os.environ.get("GAP_LLM_PROVIDER", "").strip().lower() or "anthropic"
+
+
+def default_model() -> str | None:
+    """``$GAP_LLM_MODEL`` when set, else ``None`` (provider default)."""
+    return os.environ.get("GAP_LLM_MODEL", "").strip() or None
+
+
 @dataclass
 class LlmConfig:
     """LLM API configuration for the codegen pipeline."""
 
-    provider: str = "anthropic"
-    """``"anthropic"`` (default) | ``"openai"`` | ``"vertex"``."""
+    provider: str = field(default_factory=default_provider)
+    """``"anthropic"`` (default) | ``"openai"`` | ``"vertex"``. The
+    dataclass default honors ``$GAP_LLM_PROVIDER``."""
 
-    model: str | None = None
-    """Model id. ``None`` uses the provider default (anthropic only)."""
+    model: str | None = field(default_factory=default_model)
+    """Model id. ``None`` uses the provider default (anthropic only).
+    The dataclass default honors ``$GAP_LLM_MODEL``."""
 
     endpoint: str | None = None
     """OpenAI-compatible base URL (``http://host:port/v1``) or a full

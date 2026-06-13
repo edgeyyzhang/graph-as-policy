@@ -83,6 +83,23 @@ def _handle(args: argparse.Namespace) -> int:
         )
     except Exception as exc:
         print(f"FAIL: {exc}")
+        if "Could not resolve authentication method" in str(exc):
+            provider = args.provider or (config.llm.provider if config else None)
+            if provider is None:
+                import os as _os
+
+                provider = _os.environ.get("GAP_LLM_PROVIDER", "anthropic")
+            print(
+                f"\nhint: no LLM credentials for provider {provider!r} "
+                f"(anthropic is the default).\n"
+                "  anthropic:  export ANTHROPIC_API_KEY=...\n"
+                "  vertex:     gcloud auth application-default login\n"
+                "              export GOOGLE_CLOUD_PROJECT=<project> \\\n"
+                "                     GAP_LLM_PROVIDER=vertex GAP_LLM_MODEL=<gemini-model>\n"
+                "              (install the SDK per run: uv run --extra vertex gap generate ...)\n"
+                "  openai:     export OPENAI_API_KEY=...\n"
+                "`gap check` shows which providers are configured."
+            )
         return 1
 
     n_subgraphs = len(graph.workflow.get("subgraphs", {}))
