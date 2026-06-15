@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from gap.tools import ToolRegistry
-from gap.tools.ray_executor import (
+from gap_core.tools import ToolRegistry
+from gap_core.tools.ray_executor import (
     RayToolExecutor,
     bundle_for_tool,
     substitute_ray_tools,

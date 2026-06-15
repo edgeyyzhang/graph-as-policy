@@ -1,25 +1,32 @@
-"""``gap policy`` subcommand — serve / list learned-policy presets."""
+"""``gap policy`` subcommand — serve / list learned-policy bundles.
+
+Policies are ``kind='policy'`` skill bundles (under ``<registry>/policies/``)
+that own their server launch recipe via SKILL.md ``gap.serving:``. The CLI
+discovers them through the active registry set (same precedence as
+``gap skills list``) and spawns them via :class:`PolicyManager`, which runs
+the bundle's own venv via ``uv run --project <bundle_dir>``.
+"""
 
 from __future__ import annotations
 
 import argparse
+from typing import Any
 
 
 def register(subparsers: argparse._SubParsersAction) -> None:
     sp = subparsers.add_parser(
         "policy",
-        help="Manage learned-policy servers (serve a preset, list presets)",
+        help="Manage learned-policy servers (serve a bundle, list known bundles)",
     )
     psub = sp.add_subparsers(dest="policy_command")
 
     serve = psub.add_parser(
         "serve",
-        help="Spawn a policy server from a named preset and block until "
-             "Ctrl-C",
+        help="Spawn a policy server from a bundle and block until Ctrl-C",
     )
     serve.add_argument(
-        "preset",
-        help="Preset name (see `gap policy list`), e.g. pi05-libero",
+        "bundle",
+        help="Policy bundle name (see `gap policy list`), e.g. pi05-libero",
     )
     serve.add_argument(
         "--port", type=int, default=None,
@@ -30,12 +37,29 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="How long to wait for the server port to open (default 900; "
              "first run downloads checkpoints)",
     )
+    _add_registry_args(serve)
     serve.set_defaults(func=_handle_serve)
 
-    lst = psub.add_parser("list", help="List the known policy presets")
+    lst = psub.add_parser(
+        "list", help="List the policy bundles discovered in active registries",
+    )
+    _add_registry_args(lst)
     lst.set_defaults(func=_handle_list)
 
     sp.set_defaults(func=_handle_help, _parser=sp)
+
+
+def _add_registry_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--skills", action="append", default=None, metavar="PATH",
+        help="Registry checkout root(s); repeatable. Overrides "
+             "$GAP_SKILLS_PATH and configured registries (default: the "
+             "resolved registry set — see `gap registry list`)",
+    )
+    parser.add_argument(
+        "--registry", default=None, metavar="NAME",
+        help="Restrict to one active registry by name",
+    )
 
 
 def _handle_help(args: argparse.Namespace) -> int:
@@ -43,20 +67,55 @@ def _handle_help(args: argparse.Namespace) -> int:
     return 1
 
 
-def _handle_list(args: argparse.Namespace) -> int:
-    from gap.runtime.policy_presets import PRESETS
+def _load_policy_bundles(args: argparse.Namespace) -> dict[str, Any]:
+    """Return ``{bundle_name: SkillInfo}`` for every kind='policy' bundle
+    in the active registry set."""
+    from gap.skills import load_skills, resolve_registries
+    from gap.skills.registries import RegistrySet
 
-    print(f"{len(PRESETS)} preset(s):\n")
-    for name, preset in sorted(PRESETS.items()):
+    registry_set = resolve_registries(args.skills, required=True)
+    if getattr(args, "registry", None):
+        registry_set = RegistrySet([registry_set.get(args.registry)])
+
+    bundles: dict[str, Any] = {}
+    for spec in registry_set:
+        reg = load_skills(spec.path)
+        for info in reg.list_skills(kind="policy"):
+            # Higher-precedence registries win on name collision.
+            bundles.setdefault(info.name, info)
+    return bundles
+
+
+def _handle_list(args: argparse.Namespace) -> int:
+    try:
+        bundles = _load_policy_bundles(args)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"error: {exc}")
+        return 2
+
+    if not bundles:
+        print(
+            "0 policy bundle(s) discovered.\n"
+            "Add one under <registry>/policies/<name>/ with a SKILL.md that "
+            "declares `gap.serving:`."
+        )
+        return 0
+
+    print(f"{len(bundles)} policy bundle(s):\n")
+    for name in sorted(bundles):
+        info = bundles[name]
+        serving = info.meta.serving
         print(f"  {name}")
-        print(f"    checkpoint: {preset.get('checkpoint_uri', '-')}")
-        cmd = " ".join(str(preset.get("start_cmd", "")).split())
-        print(f"    start_cmd:  {cmd}")
-        notes = str(preset.get("notes", "")).strip()
-        if notes:
-            print(f"    notes:      {notes}")
+        if serving:
+            cmd = " ".join(serving.command)
+            print(f"    command:  {cmd}")
+            print(f"    protocol: {serving.protocol}")
+            if serving.weights_uri:
+                print(f"    weights:  {serving.weights_uri}")
+        else:
+            print("    (no gap.serving: block — `gap policy serve` will fail)")
         print()
-    print("serve one with: gap policy serve <preset> [--port N]")
+    print("serve one with: gap policy serve <bundle> [--port N]")
     return 0
 
 
@@ -70,18 +129,39 @@ def _handle_serve(args: argparse.Namespace) -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    from gap.runtime.policy_manager import PolicyManager
-    from gap.runtime.policy_presets import PRESETS, resolve_policies
+    from gap.runtime.policy_manager import PolicyConfigError, PolicyManager
 
-    if args.preset not in PRESETS:
+    try:
+        bundles = _load_policy_bundles(args)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"error: {exc}")
+        return 2
+
+    if args.bundle not in bundles:
+        available = ", ".join(sorted(bundles)) or "(none)"
         print(
-            f"error: unknown preset {args.preset!r} "
-            f"(available: {', '.join(sorted(PRESETS))})"
+            f"error: unknown policy bundle {args.bundle!r} "
+            f"(available: {available})"
         )
         return 2
 
-    policy_id = args.preset
-    entries = resolve_policies({policy_id: {"preset": args.preset}})
+    info = bundles[args.bundle]
+    serving = info.meta.serving
+    if serving is None:
+        print(
+            f"error: policy bundle {args.bundle!r} declares no "
+            f"`gap.serving:` block in SKILL.md"
+        )
+        return 2
+
+    policy_id = args.bundle
+    entries = {
+        policy_id: {
+            "command": list(serving.command),
+            "bundle_dir": info.meta.bundle_dir,
+            "env": dict(serving.env or {}),
+        }
+    }
 
     @contextmanager
     def _pinned_port(port: int | None):
@@ -110,6 +190,9 @@ def _handle_serve(args: argparse.Namespace) -> int:
     try:
         with _pinned_port(args.port):
             manager.boot_all([policy_id])
+    except PolicyConfigError as exc:
+        print(f"FAIL: {exc}")
+        return 2
     except Exception as exc:
         print(f"FAIL: {exc}")
         return 1

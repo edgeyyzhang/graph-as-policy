@@ -15,6 +15,7 @@ import pickle
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import pytest
 
@@ -23,7 +24,6 @@ from gap.agent.parallel import (
     TrialResult,
     WorkerSetupConfig,
     WorkItem,
-    required_policy_ids,
     run_parallel_trials,
     run_trial_on_worker,
     worker_setup,
@@ -531,7 +531,7 @@ def test_bundle_tools_survive_connector_rebuild(tmp_path, monkeypatch) -> None:
     """The @tool pending queue drains once per process; a persistent
     worker switching tasks (new connector -> new registry) must keep the
     bundle tools via the WorkerState catalog."""
-    import gap.tools._registry as registry_mod
+    import gap_core.tools._registry as registry_mod
 
     monkeypatch.setattr(registry_mod, "_PENDING_TOOLS", [{
         "name": "vision.fake_bundle_tool",
@@ -595,11 +595,34 @@ def test_extra_env_propagated(monkeypatch) -> None:
 
 
 # --------------------------------------------------------------------------
-# Policy preflight scan (workflow -> required policy ids)
+# Policy discovery (workflow -> required policy skills, by kind="policy")
 # --------------------------------------------------------------------------
 
 
-def test_required_policy_ids_both_forms(tmp_path) -> None:
+class _FakeInfo:
+    """SkillInfo stand-in: just the fields required_policies() reads."""
+
+    def __init__(self, kind: str) -> None:
+        self.kind = kind
+        # `meta` is unused by required_policies after the kind-based rewrite,
+        # but boot_policies reads `meta.serving` and `meta.bundle_dir` — kept
+        # as a permissive stub so a downstream test can populate it.
+        self.meta = type("_M", (), {"tags": [], "serving": None, "bundle_dir": None})()
+
+
+class _FakeRegistry:
+    """Minimal skills-registry stand-in (``.get(name)`` only)."""
+
+    def __init__(self, mapping: dict) -> None:
+        self._m = mapping
+
+    def get(self, name: str):
+        if name not in self._m:
+            raise KeyError(name)
+        return self._m[name]
+
+
+def _policy_workflow(tmp_path) -> Path:
     wf = {
         "version": 3,
         "meta": {"name": "p"},
@@ -617,20 +640,17 @@ def test_required_policy_ids_both_forms(tmp_path) -> None:
                 "inputs": {},
                 "outputs": {},
                 "nodes": {
-                    # canonical form
-                    "vla": {
-                        "type": "tool", "tool": "run_policy",
-                        "inputs": {"policy_id": "libero_pi05"},
-                    },
-                    # legacy form: tool name IS the policy id
-                    "legacy": {"type": "tool", "tool": "molmoact"},
-                    # unrelated tool
+                    # a policy skill (owns its preset; no policy_id)
+                    "vla": {"type": "tool", "tool": "pi05-libero.run", "inputs": {}},
+                    # a non-policy skill bundle
+                    "track": {"type": "tool", "tool": "tracking-objects.track"},
+                    # an unrelated connector tool
                     "check": {"type": "tool", "tool": "sim.check_success"},
                     "ok": {"type": "noop"},
                 },
                 "edges": [
-                    ["START", "vla"], ["vla", "legacy"],
-                    ["legacy", "check"], ["check", "ok"], ["ok", "END"],
+                    ["START", "vla"], ["vla", "track"],
+                    ["track", "check"], ["check", "ok"], ["ok", "END"],
                 ],
                 "conditional_edges": {},
                 "exit": {"router_field": None, "success_values": ["ok"]},
@@ -640,20 +660,34 @@ def test_required_policy_ids_both_forms(tmp_path) -> None:
     wf_dir = tmp_path / "wf"
     wf_dir.mkdir()
     (wf_dir / "workflow.json").write_text(json.dumps(wf))
+    return wf_dir
 
-    configured = {"libero_pi05", "molmoact", "unused"}
-    assert required_policy_ids(wf_dir, configured) == {
-        "libero_pi05", "molmoact",
-    }
-    # Nothing configured -> nothing required.
-    assert required_policy_ids(wf_dir, set()) == set()
-    # Unreadable workflow -> empty (caller fails later with clear error).
-    assert required_policy_ids(tmp_path / "nope", configured) == set()
+
+def test_required_policies_discovers_policy_skills(tmp_path) -> None:
+    from gap.runtime.policy_boot import required_policies
+
+    wf_dir = _policy_workflow(tmp_path)
+    registry = _FakeRegistry({
+        "pi05-libero": _FakeInfo("policy"),
+        "tracking-objects": _FakeInfo("skill"),  # not a policy
+    })
+    # Only the kind='policy' bundle is required; the non-policy skill, the
+    # connector tool (sim.*), and unknown tools are ignored.
+    assert required_policies(wf_dir, registry) == {"pi05-libero"}
+    # No registry -> nothing discovered.
+    assert required_policies(wf_dir, None) == set()
+    # Unreadable workflow -> empty (caller fails later with a clear error).
+    assert required_policies(tmp_path / "nope", registry) == set()
 
 
 def test_required_policies_boot_through_manager(tmp_path) -> None:
-    """A workflow referencing a configured external policy validates its
-    URL through the PolicyManager during the trial."""
+    """A workflow referencing a policy skill boots its server through the
+    PolicyManager during the trial; a malformed override URL fails it."""
+    from .conftest import SKILLS_ROOT
+
+    if not (SKILLS_ROOT / "policies" / "pi05-libero").is_dir():
+        pytest.skip("open-robot-skills pi05-libero policy bundle not on disk")
+
     wf = {
         "version": 3,
         "meta": {"name": "p"},
@@ -671,21 +705,16 @@ def test_required_policies_boot_through_manager(tmp_path) -> None:
                 "inputs": {},
                 "outputs": {},
                 "nodes": {
-                    "check": {"type": "tool", "tool": "sim.check_success"},
+                    # A policy skill: the launcher must boot its server.
+                    "vla": {"type": "tool", "tool": "pi05-libero.run", "inputs": {}},
                     "ok": {"type": "noop"},
                 },
-                "edges": [["START", "check"], ["check", "ok"], ["ok", "END"]],
+                "edges": [["START", "vla"], ["vla", "ok"], ["ok", "END"]],
                 "conditional_edges": {},
                 "exit": {"router_field": None, "success_values": ["ok"]},
             },
         },
     }
-    # Reference a policy via the legacy form so the scan finds it, but
-    # give it a malformed URL -> the trial records the failure.
-    wf["subgraphs"]["m"]["nodes"]["vla"] = {"type": "tool", "tool": "badpol"}
-    wf["subgraphs"]["m"]["edges"] = [
-        ["START", "vla"], ["vla", "check"], ["check", "ok"], ["ok", "END"],
-    ]
     wf_dir = tmp_path / "wf"
     wf_dir.mkdir()
     (wf_dir / "workflow.json").write_text(json.dumps(wf))
@@ -693,7 +722,10 @@ def test_required_policies_boot_through_manager(tmp_path) -> None:
     cfg = WorkerSetupConfig(
         suite_name="s",
         output_dir=str(tmp_path / "out"),
-        policies={"badpol": {"url": "not-a-url"}},
+        skills_path=str(SKILLS_ROOT),
+        # Override the pi05-libero preset with a malformed external URL ->
+        # the PolicyManager rejects it and the trial records the failure.
+        policies={"pi05-libero": {"url": "not-a-url"}},
     )
     state = worker_setup(0, cfg, connector_factory=stub_connector_factory)
     result = run_trial_on_worker(

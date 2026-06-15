@@ -53,8 +53,8 @@ class _TemplateMode(BenchmarkMode):
                 f"workflow_dir (the workflow template) in the benchmark YAML"
             )
         # ``policy_id`` is an optional knob — ``materialize_for_task``
-        # falls back to ``libero_pi05`` when None.
-        policy_id = req.extra.get("policy_id") or "libero_pi05"
+        # falls back to ``pi05-libero`` when None.
+        policy_id = req.extra.get("policy_id") or "pi05-libero"
         out: dict[int, str] = {}
         for tid in req.task_ids:
             out[tid] = materialize_for_task(

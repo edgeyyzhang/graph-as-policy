@@ -17,7 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import gap
-from gap.tools import ToolRegistry
+from gap_core.tools import ToolRegistry
 from gap.viz import api as viz_api
 from gap.viz.server import create_app
 from gap.viz.trial_loader import (

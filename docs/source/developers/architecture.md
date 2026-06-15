@@ -54,7 +54,8 @@ explicit principles:
         │          molmo, vlm, curobo, geometry       │
         │ skills/  perceiving-objects(+variants),     │
         │          grasping-*, transporting-objects,  │
-        │          tracking-objects, running-policies │
+        │          tracking-objects, pi05-libero,     │
+        │          molmoact-libero                    │
         └─────────────────────────────────────────────┘
 ```
 

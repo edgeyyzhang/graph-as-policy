@@ -32,9 +32,9 @@ from typing import Any
 
 import numpy as np
 
-from gap.errors import ToolError
-from gap.tools import ToolRegistry
-from gap.types import (
+from gap_core.errors import ToolError
+from gap_core.tools import ToolRegistry
+from gap_core.types import (
     ArmState,
     CameraFrame,
     Observation,

@@ -141,7 +141,7 @@ def test_posvar_yaml_parses_with_mode_overrides(skills_root) -> None:
     # policies block carried for the policy modes.
     pc = cfg.pipeline_config
     assert pc is not None
-    assert pc.policies["libero_pi05"]["url"].startswith("ws://")
+    assert pc.policies["pi05-libero"]["url"].startswith("ws://")
 
     # Override precedence + workflow_dir absolutized vs the YAML dir.
     eff_policy = cfg.effective("llm_plus_policy")
@@ -150,8 +150,8 @@ def test_posvar_yaml_parses_with_mode_overrides(skills_root) -> None:
     assert eff_gen["num_workers"] == cfg.num_workers  # inherited
     wf = eff_policy["workflow_dir"]
     assert wf is not None and Path(wf).is_absolute()
-    # References the steered_policy example graph (lands separately).
-    assert Path(wf).parts[-2:] == ("steered_policy", "graph")
+    # References the steered_policy example graph (the loop template).
+    assert Path(wf).parts[-2:] == ("steered_policy", "graph_loop")
     assert eff_policy["n_seeds"] == cfg.n_seeds      # not overridden
 
 

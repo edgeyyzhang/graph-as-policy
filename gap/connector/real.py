@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import Any
 
 from gap.connector.core import Capabilities, Connector
-from gap.tools import ToolRegistry
+from gap_core.tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

@@ -64,7 +64,7 @@ class StubConnector:
     """Duck-typed connector: tool registry + reset/obs/success, no sim."""
 
     def __init__(self, *, succeed: bool = True, reward: float = 1.0) -> None:
-        from gap.tools import ToolRegistry
+        from gap_core.tools import ToolRegistry
 
         self.succeed = succeed
         self.reward = reward

@@ -9,7 +9,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from gap import NodeContext
-from gap.types import CameraFrame, OrientedBoundingBox, PointCloud
+from gap_core.types import CameraFrame, OrientedBoundingBox, PointCloud
 
 logger = logging.getLogger(__name__)
 

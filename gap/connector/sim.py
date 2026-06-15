@@ -19,9 +19,9 @@ from typing import Any
 import numpy as np
 
 from gap.connector.core import Capabilities, Connector
-from gap.errors import ToolError
-from gap.tools import ToolRegistry
-from gap.types import Observation, make_pose
+from gap_core.errors import ToolError
+from gap_core.tools import ToolRegistry
+from gap_core.types import Observation, make_pose
 
 logger = logging.getLogger(__name__)
 

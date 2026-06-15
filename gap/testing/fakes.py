@@ -6,7 +6,7 @@ import threading
 from dataclasses import dataclass
 from typing import Any
 
-from gap.errors import ToolError
+from gap_core.errors import ToolError
 from gap.runtime.context import CancelToken
 
 

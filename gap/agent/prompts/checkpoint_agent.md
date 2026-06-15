@@ -55,7 +55,7 @@ builder methods, but the static validator only allows
 `subgraphs["<X>"].add_checkpoint(...)` calls. Do **not** redeclare
 nodes, edges, outputs, or imports.
 
-The values in `o[...]` are **gap.types TypedDicts** — index them with
+The values in `o[...]` are **gap_core.types TypedDicts** — index them with
 string keys (`o["target_obb"]["center"]["x"]`), never attribute access.
 The privileged side (`w.body(...)`, `w.robot()`) keeps attribute access
 — `World`/`Body`/`Robot` are real objects.

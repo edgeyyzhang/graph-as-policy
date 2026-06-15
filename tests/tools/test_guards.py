@@ -2,8 +2,8 @@
 
 import pytest
 
-from gap.errors import GuardLimitExceeded
-from gap.tools import guards
+from gap_core.errors import GuardLimitExceeded
+from gap_core.tools import guards
 
 _ENV_VARS = (
     "GAP_MAX_PERCEPTION_CALLS",

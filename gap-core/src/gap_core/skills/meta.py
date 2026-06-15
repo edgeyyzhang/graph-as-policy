@@ -93,6 +93,60 @@ class SkillRequires:
 
 
 @dataclass
+class Serving:
+    """How gap launches a bundle's out-of-process server.
+
+    Populated from SKILL.md frontmatter ``gap.serving``. Required for
+    ``kind='policy'`` bundles (the launcher spawns one server per
+    referenced policy preset); optional for ``kind='tool'`` bundles
+    (declaring it opts the bundle into the out-of-process RPC path
+    instead of in-process ``@tool`` dispatch).
+
+    Example (policy)::
+
+        gap:
+          serving:
+            command: ["python", "-m", "pi05_libero.server",
+                      "--policy.config=pi05_libero",
+                      "--port", "{port}"]
+            protocol: websocket
+
+    Example (tool)::
+
+        gap:
+          serving:
+            command: ["python", "-m", "gap_tool_server", "--bundle", "sam3"]
+            protocol: stdio-msgpack
+
+    The launcher prepends ``uv run --project <bundle_dir> --`` so the
+    bundle runs in its own venv (see ``gap skills install``). ``{port}``
+    in any ``command`` element is substituted with an OS-allocated free
+    port at spawn time (websocket protocol only)."""
+
+    command: list[str]
+    """Argv (NOT a shell string). One ``{port}`` placeholder is allowed
+    for ``protocol: websocket``."""
+
+    protocol: str = "in-process"
+    """``websocket`` (policies), ``stdio-msgpack`` (out-of-process tools),
+    or ``in-process`` (the default — equivalent to omitting the block;
+    kept as an explicit escape hatch for tools that want to declare the
+    block for documentation while staying in-process)."""
+
+    env: dict[str, str] = field(default_factory=dict)
+    """Extra environment variables passed to the spawned process.
+    Merged over ``os.environ`` at spawn time."""
+
+    requires_gpu: bool = False
+    """The server needs a GPU at the spawn host. Surfaced by ``gap check``;
+    independent of ``gap.requires.gpu`` (which gates the client-side import)."""
+
+    weights_uri: str = ""
+    """Where the server downloads weights from on first run (informational —
+    the server, not gap, performs the fetch)."""
+
+
+@dataclass
 class SkillMeta:
     """Structured metadata for a skill bundle.
 
@@ -119,10 +173,12 @@ class SkillMeta:
 
     # Bundle kind — set by the registry from the bundle's folder, never
     # from frontmatter. Replaces the legacy ``runtime.shape`` field.
-    kind: Literal["tool", "skill"] = "skill"
+    kind: Literal["tool", "skill", "policy"] = "skill"
     """``tool`` bundles (under ``tools/``) expose model-backed callables via
     ``tools.py``; ``skill`` bundles (under ``skills/``) own subgraphs and ship
-    canonical scripts (and *may* also expose a callable via ``tools.py``)."""
+    canonical scripts (and *may* also expose a callable via ``tools.py``);
+    ``policy`` bundles (under ``policies/``) drive one learned-policy
+    checkpoint and own their server's launch recipe via :attr:`serving`."""
 
     # Schema-related (populated from Python introspection at the registry, not frontmatter)
     params: dict[str, Param] = field(default_factory=dict)
@@ -186,6 +242,11 @@ class SkillMeta:
     registry test suites can tell "undeclared" from an explicit
     ``requires: {}``."""
 
+    serving: Serving | None = None
+    """How gap launches the bundle's out-of-process server. Required for
+    ``kind='policy'``; optional for ``kind='tool'`` (declaring it opts the
+    bundle into the RPC path). ``None`` means in-process dispatch."""
+
     # Bundle metadata
     bundle_dir: Path | None = None
     """Filesystem path of the owning bundle. Set by the registry at discovery."""
@@ -215,7 +276,7 @@ class Skill:
     Function-style callable skills (module-level ``_meta`` + ``def run(ctx, ...)``)
     continue to work unchanged. Subclassing ``Skill`` is opt-in and is
     motivated by genuine state needs — long-running loops with replan
-    caches (running-policies), trackers accumulating evidence
+    caches (pi05-libero), trackers accumulating evidence
     (tracking-objects), etc.
     """
 

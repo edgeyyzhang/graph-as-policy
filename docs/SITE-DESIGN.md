@@ -66,7 +66,7 @@ results table. Architecture diagram (ASCII from README, styled code block).
 
 **Benchmarks & Policies** (`benchmarks/`)
 30. `benchmarking` — grid vs suites configs, 3 modes, policy A/B, `--gate` (≥0.90, errored-cell semantics), `--resume`, outputs (summary.json/tsv, videos), GPU spread, timeout guidance
-31. `policies` — learned VLA policies: `gap policy serve` presets, running-policies skill (termination modes), steered-graph pattern, collect_and_train (DataCollector → LeRobot)
+31. `policies` — learned VLA policies as per-checkpoint skills (`pi05-libero`, `molmoact-libero`): skill owns its preset (no `policy_id`), launcher auto-boots it, `gap policy serve`, termination modes, steered-graph pattern, collect_and_train (DataCollector → LeRobot)
 
 **Real Robots** (`real-robots/`)
 32. `connectors` — franka (rr-session/msgpack bridge, autostart, heartbeat) + ur_zed (perception-only, ZED SDK, calibration); capabilities model; what's structurally disabled on real

@@ -17,12 +17,11 @@ from pathlib import Path
 import pytest
 
 from gap.skills import (
-    CanonicalScript,
-    Skill,
     SkillsRegistry,
     load_prompt,
     load_skills,
 )
+from gap_core.skills import CanonicalScript, Skill
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -247,7 +246,7 @@ def test_load_prompt_missing_prompt_or_variable_raises() -> None:
 
 
 def test_tools_py_registers_pending_tools() -> None:
-    from gap.tools import _registry as tools_registry
+    from gap_core.tools import _registry as tools_registry
 
     reg = load_skills(FIXTURES)
     info = reg.get("fixture-tool")
@@ -280,7 +279,7 @@ def test_class_based_skill_in_skill_py(tmp_path: Path) -> None:
     )
     (bundle / "skill.py").write_text(
         "from typing import TypedDict\n"
-        "from gap.skills import Skill\n"
+        "from gap_core.skills import Skill\n"
         "\n"
         "class Output(TypedDict):\n"
         "    count: int\n"

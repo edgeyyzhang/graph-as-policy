@@ -46,7 +46,7 @@ START
   │ ready                   failed ▶ ✗ abort
   ▼
 ┌─ grasp ──────────────────────── generic ─┐
-│ run_policy ⚙ running-policies.run        │
+│ run_policy ⚙ {{policy_id}}.run           │
 └──────────────────────────────────────────┘
   │ grasped                 failed ▶ ✗ abort
   ▼

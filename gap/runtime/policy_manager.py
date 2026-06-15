@@ -10,19 +10,22 @@ message. There is no LRU, no eviction, no runtime registration of new
 policies. Call :meth:`shutdown_all` in a ``finally`` to make sure no
 server outlives the run.
 
-Registry entries come from the ``policies:`` block in the task config
-(task.yaml). Each entry is either:
+Registry entries are bundle-owned: :func:`gap.runtime.policy_boot.boot_policies`
+walks the workflow, discovers each ``kind='policy'`` skill bundle it
+references, and translates the bundle's SKILL.md ``gap.serving:`` block
+into one entry per preset. A user-supplied ``policies:`` block in
+task.yaml can override the bundle's recipe (or point at an external
+server). Each entry is either:
 
-- **managed**: carries ``start_cmd`` (with a ``{port}`` placeholder the
-  manager substitutes). The manager owns the subprocess for the run's
-  lifetime.
+- **managed**: carries ``command`` (a list[str], NOT a shell string) and
+  optionally ``bundle_dir``. When ``bundle_dir`` is set, the manager
+  prepends ``uv run --project <bundle_dir> --`` so the spawn runs in
+  the bundle's own venv. A ``{port}`` token in any ``command`` element
+  is substituted at spawn time.
 - **external**: carries ``url``. Already running; the manager only
   records the URL and never touches the process.
-- **preset**: carries ``preset: <name>`` — expanded at construction
-  time into a full managed entry via
-  :func:`gap.runtime.policy_presets.resolve_policies`.
 
-Specifying both ``url`` and ``start_cmd`` is a config error.
+Specifying both ``url`` and ``command`` is a config error.
 """
 
 from __future__ import annotations
@@ -117,7 +120,7 @@ class PolicyManager:
             startup_timeout_s=task_cfg.get("policy_manager", {})
                 .get("startup_timeout_s", 120.0),
         )
-        manager.boot_all(required_policy_ids)    # raises on failure
+        manager.boot_all(required_ids)    # raises on failure
         try:
             executor.execute()
         finally:
@@ -130,11 +133,7 @@ class PolicyManager:
         startup_timeout_s: float = 120.0,
         evict_grace_s: float = 10.0,
     ) -> None:
-        # Lazy import to avoid a module-level cycle (policy_presets
-        # imports PolicyConfigError from this module).
-        from .policy_presets import resolve_policies
-
-        self._entries: dict[str, dict[str, Any]] = resolve_policies(entries)
+        self._entries: dict[str, dict[str, Any]] = dict(entries or {})
         self._timeout = float(startup_timeout_s)
         self._grace = float(evict_grace_s)
         self._managed: dict[str, _Managed] = {}
@@ -165,25 +164,26 @@ class PolicyManager:
             if entry is None:
                 raise PolicyConfigError(
                     f"workflow references policy {pid!r} but no entry "
-                    f"exists in the task config's policies: block. "
-                    f"Add an entry with either 'start_cmd' (managed), "
-                    f"'url' (external), or 'preset' (named recipe from "
-                    f"gap.runtime.policy_presets)."
+                    f"exists. Either ship a `kind='policy'` skill bundle "
+                    f"named {pid!r} (boot_policies auto-resolves its "
+                    f"`gap.serving:` block), or add an entry to the task "
+                    f"config's `policies:` block with `command:` (managed) "
+                    f"or `url:` (external)."
                 )
             if not isinstance(entry, dict):
                 raise PolicyConfigError(
                     f"policy {pid!r}: entry must be a mapping, got "
                     f"{type(entry).__name__}"
                 )
-            if "url" in entry and "start_cmd" in entry:
+            if "url" in entry and "command" in entry:
                 raise PolicyConfigError(
-                    f"policy {pid!r}: specify either 'url' or 'start_cmd', "
+                    f"policy {pid!r}: specify either 'url' or 'command', "
                     f"not both"
                 )
-            if "url" not in entry and "start_cmd" not in entry:
+            if "url" not in entry and "command" not in entry:
                 raise PolicyConfigError(
                     f"policy {pid!r}: entry must declare 'url' (external) "
-                    f"or 'start_cmd' (managed)"
+                    f"or 'command' (managed)"
                 )
             resolved[pid] = entry
 
@@ -315,8 +315,24 @@ class PolicyManager:
         Returns the managed record; raises ``PolicyStartupError`` on any
         failure. Guaranteed not to leak a subprocess: on any error path
         before return, the started process is terminated.
+
+        Spawn shape:
+          - ``entry["command"]`` MUST be a list[str]. A ``{port}`` token
+            in any element is substituted at spawn time.
+          - If ``entry["bundle_dir"]`` is set, the manager prepends
+            ``uv run --project <bundle_dir> --`` so the spawn activates
+            the bundle's own venv (no shell, no env-var expansion).
+          - Without ``bundle_dir``, the command is spawned directly via
+            ``subprocess.Popen(argv, shell=False)`` — useful when the
+            user provides a self-contained absolute-path command in
+            task.yaml.
         """
-        start_cmd = str(entry["start_cmd"])
+        command = entry["command"]
+        if not isinstance(command, list) or not command:
+            raise PolicyConfigError(
+                f"policy {policy_id!r}: 'command' must be a non-empty "
+                f"list[str] (NOT a shell string)"
+            )
         env_overrides = entry.get("env") or {}
         if not isinstance(env_overrides, dict):
             raise PolicyConfigError(
@@ -325,26 +341,35 @@ class PolicyManager:
             )
 
         port = _allocate_free_port()
-        cmd = start_cmd.format(port=port)
+        argv = [str(arg).format(port=port) if "{port}" in str(arg) else str(arg)
+                for arg in command]
+        bundle_dir = entry.get("bundle_dir")
+        cwd = None
+        if bundle_dir is not None:
+            argv = ["uv", "run", "--project", str(bundle_dir), "--", *argv]
+            # cwd at the bundle root: the bundle's `command` can reference
+            # its own files by relative path (e.g. `server.py`) without
+            # depending on env-var expansion.
+            cwd = str(bundle_dir)
         env = {**os.environ, **{str(k): str(v) for k, v in env_overrides.items()}}
 
-        # Log to stdout of this process by default; caller can redirect.
         logger.info(
             "[policy:%s] spawning on port %d: %s",
-            policy_id, port, cmd.replace("\n", " ").strip(),
+            policy_id, port, " ".join(argv),
         )
         try:
             proc = subprocess.Popen(
-                cmd,
-                shell=True,
+                argv,
+                shell=False,
                 env=env,
+                cwd=cwd,
                 start_new_session=True,  # own process group for clean teardown
                 stdout=None, stderr=None,
             )
         except OSError as exc:
             raise PolicyStartupError(
                 f"policy {policy_id!r}: failed to spawn subprocess "
-                f"({type(exc).__name__}: {exc}); command was {cmd!r}"
+                f"({type(exc).__name__}: {exc}); argv was {argv!r}"
             ) from exc
 
         url = f"ws://127.0.0.1:{port}"

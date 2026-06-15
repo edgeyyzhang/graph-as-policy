@@ -463,7 +463,7 @@ def _ensure_connector(state: WorkerState, suite_name: str, task_id: int) -> Any:
     # them too — the pending queue itself only yields them once.
     reg = getattr(conn, "tool_registry", None)
     if reg is None:
-        from gap.tools import default_tool_registry
+        from gap_core.tools import default_tool_registry
 
         reg = default_tool_registry()
     if hasattr(reg, "discover_pending"):
@@ -510,35 +510,6 @@ def _copy_codegen_to_trial(item: WorkItem, trial_dir: Path) -> None:
             shutil.copytree(src_dir, codegen_dest / sub, dirs_exist_ok=True)
 
 
-def required_policy_ids(workflow_dir: str | Path, configured: set[str]) -> set[str]:
-    """Policy ids a workflow references, restricted to configured ones.
-
-    Two invocation forms are recognised (same as the source):
-
-    * legacy: ``{type: tool, tool: <policy_id>}``;
-    * canonical: ``{type: tool, tool: run_policy,
-      inputs: {policy_id: <id>}}``.
-    """
-    from gap.runtime.workflow import load_workflow
-
-    out: set[str] = set()
-    try:
-        wf = load_workflow(Path(workflow_dir) / "workflow.json")
-    except Exception:
-        return out
-    for sg in wf.subgraphs.values():
-        for node in sg.nodes.values():
-            if node.type != "tool" or not node.tool:
-                continue
-            if node.tool in configured:
-                out.add(node.tool)
-            elif node.tool == "run_policy":
-                pid = (node.inputs or {}).get("policy_id")
-                if isinstance(pid, str) and pid in configured:
-                    out.add(pid)
-    return out
-
-
 def _execute_trial(
     state: WorkerState,
     item: WorkItem,
@@ -547,7 +518,7 @@ def _execute_trial(
 ) -> None:
     """Core trial: connector → reset(seed) → workflow → success check → video."""
     from gap.runtime.executor import WorkflowExecutor
-    from gap.tools import guards
+    from gap_core.tools import guards
 
     config = state.config
     suite_name = item.suite_name or config.suite_name
@@ -563,29 +534,23 @@ def _execute_trial(
     conn = _ensure_connector(state, suite_name, item.task_id)
     conn.reset(seed=item.trial_id)
 
-    # Boot every policy the workflow references before execution. Graph
-    # is the source of truth — a missing/unstartable policy fails the
-    # trial here with a clear error.
-    policy_manager = None
-    policy_executor = None
-    required = required_policy_ids(
-        item.workflow_dir, set(config.policies or {})
-    )
-    if required:
-        from gap.runtime.policy import PolicyExecutor
-        from gap.runtime.policy_manager import PolicyManager
+    # Boot every policy the workflow references before execution. Graph is
+    # the source of truth — each policy skill owns its preset (auto-resolved
+    # from PRESETS unless overridden in `policies:`); a missing/unstartable
+    # server fails the trial here with a clear error.
+    from gap.runtime.policy_boot import boot_policies
 
-        policy_manager = PolicyManager(
-            entries=config.policies,
-            startup_timeout_s=float(
-                config.policy_manager.get("startup_timeout_s", 120.0)
-            ),
-            evict_grace_s=float(
-                config.policy_manager.get("evict_grace_s", 10.0)
-            ),
-        )
-        policy_manager.boot_all(required)
-        policy_executor = PolicyExecutor(policy_manager)
+    policy_manager, policy_executor = boot_policies(
+        item.workflow_dir,
+        state.skill_registry,
+        config_policies=config.policies,
+        startup_timeout_s=float(
+            config.policy_manager.get("startup_timeout_s", 120.0)
+        ),
+        evict_grace_s=float(
+            config.policy_manager.get("evict_grace_s", 10.0)
+        ),
+    )
 
     executor = None
     try:

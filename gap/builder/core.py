@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from gap.errors import (
+from gap_core.errors import (
     GraphValidationError,
     ValidationIssue,
     WorkflowValidationError,

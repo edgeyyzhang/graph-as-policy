@@ -25,11 +25,31 @@ from pathlib import Path
 from typing import Any
 
 from gap.skills import SkillInfo, SkillsRegistry
-from gap.skills.meta import SkillMeta
-from gap.tools import ToolDescriptor, ToolRegistry
-from gap.tools.schema import FieldInfo, UnitSchema
+from gap_core.skills.meta import SkillMeta
+from gap_core.tools import ToolDescriptor, ToolRegistry
+from gap_core.tools.schema import FieldInfo, UnitSchema
 
 from ._registry import AgentRegistry, AgentSpec, read_include
+
+
+#: One-line descriptions for ``gap.schema.TYPE_REGISTRY`` names that are NOT
+#: TypedDicts (``type_fields`` returns ``[]`` for these), so the generated type
+#: reference still documents them.
+_NON_TYPEDDICT_NOTES: dict[str, str] = {
+    "Mask": "bare `np.ndarray` uint8 `[H, W]` (0 = background, 255 = foreground)",
+    "str": "scalar string",
+    "int": "scalar integer",
+    "float": "scalar float",
+    "bool": "scalar boolean (Python `True` / `False`, not JSON)",
+}
+
+#: ``Subgraph`` methods kept OUT of the generated builder-API reference shown to
+#: the subgraph_agent: checkpoints are the checkpoint_agent's job (the
+#: subgraph_agent is told never to call ``add_checkpoint``), and save/load/
+#: to_dict/dump are serialization plumbing it never authors.
+_BUILDER_API_DENYLIST: frozenset[str] = frozenset({
+    "add_checkpoint", "dump_checkpoints_module", "save", "load", "to_dict",
+})
 
 
 @dataclass
@@ -107,6 +127,12 @@ class PromptAssembler:
 
         parts: list[str] = [spec.body, ""]
         parts.extend(self._render_includes(spec))
+        # Ground the prompt in real interfaces (generated from code, never
+        # hand-maintained): the complete gap.types field reference and the
+        # authoritative gap.builder.Subgraph API. These replace the static,
+        # partial tables that used to live in the shared include docs.
+        parts.append(self._render_type_reference())
+        parts.append(self._render_builder_api())
         parts.append(self._render_skill_body(skill_info))
         parts.append(self._render_filtered_tools_for_skill(skill_info))
         parts.append(self._render_subgraph_context(subgraph_spec, skill_info, upstream_outputs))
@@ -193,6 +219,10 @@ class PromptAssembler:
         spec = self.agents.get("coder")
         parts: list[str] = [spec.body, ""]
         parts.extend(self._render_includes(spec))
+        # The coder writes run(ctx, ...) scripts that touch gap.types fields —
+        # give it the same complete, generated field reference (no builder API:
+        # it does not author graphs).
+        parts.append(self._render_type_reference())
         parts.append("## Script spec\n")
         parts.append(f"- **name:** `{coder_spec['name']}`")
         parts.append(f"- **signature:** `{coder_spec['signature']}`")
@@ -356,6 +386,129 @@ class PromptAssembler:
             lines.append("(no runtime tools registered)")
             return "\n".join(lines)
         lines.extend(self._render_tool_catalog(runtime))
+        lines.append("")
+        return "\n".join(lines)
+
+    def _render_type_reference(self) -> str:
+        """The complete gap.types field reference, generated from
+        ``gap.schema`` — never hand-maintained, so it cannot drift or omit a
+        type.
+
+        Field *names* and nesting come from ``gap.schema.type_fields`` (the
+        same introspection the runtime validator uses); array-shape
+        *semantics* come from the ``gap.types`` module docstring (the in-code
+        conventions the type system can't express). This replaces the partial,
+        hand-typed tables that used to live in ``_workflow_spec.md`` /
+        ``_script_contract.md``.
+        """
+        import gap_core.types as gap_types
+        from gap_core.schema import TYPE_REGISTRY, type_fields
+
+        lines = ["## Type field reference (generated from `gap.schema`)\n"]
+        lines.append(
+            "These are the ONLY field names that exist. Every typed value is a "
+            "**plain dict** — index with string keys, never attribute access:\n"
+        )
+        lines.append("```python")
+        lines.append('z = pose["position"]["z"]   # ✅')
+        lines.append("z = pose.position.z         # ❌ AttributeError — these are dicts")
+        lines.append("```")
+        lines.append("")
+
+        conventions = (gap_types.__doc__ or "").strip()
+        if conventions:
+            lines.append("### Conventions (from `gap.types`)\n")
+            lines.append(conventions)
+            lines.append("")
+
+        # Group registry names by the underlying type so aliases (e.g.
+        # ``Pose`` → ``Se3Pose``) render once.
+        by_type: dict[int, dict] = {}
+        for name, tp in TYPE_REGISTRY.items():
+            entry = by_type.setdefault(id(tp), {"type": tp, "names": []})
+            entry["names"].append(name)
+
+        def _primary(tp: Any, names: list[str]) -> str:
+            # Prefer the type's own __name__ (the canonical gap.types name —
+            # e.g. "Se3Pose" over its legacy alias "Pose", "CameraFrame" over
+            # "CameraObservation"); fall back to shortest-then-alphabetical for
+            # non-TypedDicts like Mask. Deterministic for prompt-cache hashing.
+            canon = getattr(tp, "__name__", None)
+            if canon in names:
+                return canon
+            return sorted(names, key=lambda n: (len(n), n))[0]
+
+        lines.append("### Types\n")
+        entries = sorted(
+            by_type.values(),
+            key=lambda e: _primary(e["type"], e["names"]).lower(),
+        )
+        for entry in entries:
+            names = sorted(entry["names"])
+            primary = _primary(entry["type"], names)
+            aliases = [n for n in names if n != primary]
+            header = f"- **`{primary}`**"
+            if aliases:
+                header += f" (aliases: {', '.join('`' + a + '`' for a in aliases)})"
+            fields = type_fields(primary)
+            if not fields:
+                note = _NON_TYPEDDICT_NOTES.get(primary)
+                lines.append(f"{header} — {note}" if note else header)
+                continue
+            lines.append(f"{header}:")
+            for fi in fields:
+                type_str = f"list[{fi.type_str}]" if fi.is_repeated else fi.type_str
+                flags = []
+                if not fi.required:
+                    flags.append("optional")
+                if fi.is_message:
+                    flags.append("nested dict")
+                suffix = f"  ({', '.join(flags)})" if flags else ""
+                lines.append(f'  - `"{fi.name}"`: {type_str}{suffix}')
+        lines.append("")
+        return "\n".join(lines)
+
+    def _render_builder_api(self) -> str:
+        """The authoritative ``gap.builder.Subgraph`` authoring API, introspected
+        from the class so signatures can never drift from the code.
+
+        Listing the real methods + signatures kills the invented-method /
+        invented-kwarg class of hallucination (e.g. mis-signed
+        ``set_exit_router``). ``Ref`` / ``START`` / ``END`` are module-level
+        and described in prose.
+        """
+        import inspect
+
+        from gap.builder import Subgraph
+
+        lines = ["## Builder API (`gap.builder.Subgraph`, authoritative)\n"]
+        lines.append(
+            "These are the ONLY methods on your `sg` object — use them exactly "
+            "as signed; do not invent methods or keyword arguments. "
+            '`Ref("<node>.<field>")` builds a `$ref` dict; `START` / `END` are '
+            "the virtual endpoints (`from gap.builder import Subgraph, Ref, "
+            "START, END`).\n"
+        )
+        members = inspect.getmembers(Subgraph, predicate=inspect.isfunction)
+        for name, fn in sorted(members):
+            if name.startswith("_") or name in _BUILDER_API_DENYLIST:
+                continue
+            try:
+                # eval_str resolves the `from __future__ import annotations`
+                # string hints to real types so the rendered signature reads
+                # `str` not `'str'`; fall back if a name isn't importable.
+                sig = inspect.signature(fn, eval_str=True)
+            except (TypeError, ValueError, NameError):
+                try:
+                    sig = inspect.signature(fn)
+                except (TypeError, ValueError):
+                    continue
+            params = [p for p in sig.parameters.values() if p.name != "self"]
+            sig_str = str(sig.replace(parameters=params))
+            lines.append(f"- `sg.{name}{sig_str}`")
+            doc = (fn.__doc__ or "").strip().splitlines()
+            if doc and doc[0].strip():
+                lines.append(f"  - {doc[0].strip()}")
         lines.append("")
         return "\n".join(lines)
 
@@ -580,6 +733,26 @@ _GRASP_SHAPES: list[dict[str, str]] = [
     },
 ]
 
+# Per-policy capability checkpoints. A learned policy is a black box, so its
+# success is verified against the privileged world (never the policy's own
+# report). The two shipped LIBERO policies share these shapes because they
+# share the capability — pick (and optionally place) a tabletop rigid object;
+# each policy skill still keys its own entry in the dict below.
+_POLICY_SHAPES: list[dict[str, str]] = [
+    {
+        "shape": "lambda w: w.body('<target>').is_in(w.body('<container>'))",
+        "rationale": "pick-and-place segment: the target settled inside the "
+                     "container after the policy ran (task-level success over "
+                     "the privileged world).",
+    },
+    {
+        "shape": "lambda w: w.body('<target>').is_grasped()",
+        "rationale": "pick-only / steered-grasp segment: the target is held "
+                     "at policy exit — use this instead of the container "
+                     "check when the policy only grasps.",
+    },
+]
+
 _CANONICAL_CHECKPOINTS_BY_SKILL: dict[str, list[dict[str, str]]] = {
     "perceiving-objects": _PERCEPTION_SHAPES,
     "perceiving-objects-oneshot": _PERCEPTION_SHAPES,
@@ -631,13 +804,8 @@ _CANONICAL_CHECKPOINTS_BY_SKILL: dict[str, list[dict[str, str]]] = {
                          "release",
         },
     ],
-    "running-policies": [
-        {
-            "shape": "lambda w: w.body('<target>').is_in(w.body('<container>'))",
-            "rationale": "task-level success predicate over the privileged "
-                         "world (policy black-box)",
-        },
-    ],
+    "pi05-libero": _POLICY_SHAPES,
+    "molmoact-libero": _POLICY_SHAPES,
     "tracking-objects": [
         {
             "shape": "lambda w: w.has_body('<target>')",

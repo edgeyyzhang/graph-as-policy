@@ -48,7 +48,7 @@ sg.add_checkpoint(
     *produced* match the privileged ground truth?" — e.g. perception
     OBB vs. real body pose, computed grasp pose vs. body AABB,
     `compute_drop_pose` output vs. container cavity. The values in
-    the dict are gap.types TypedDicts — index with string keys
+    the dict are gap_core.types TypedDicts — index with string keys
     (`o["grasp_pose"]["position"]["z"]`), never attribute access.
 
   The world snapshot is taken AFTER the subgraph exits, with streaming
@@ -162,7 +162,7 @@ subgraph declared in `sg.set_outputs(...)`. This is how you write
 without circularity: one side is the workflow output, the other side is
 the privileged `World`.
 
-The output values are **gap.types TypedDicts** (plain dicts) — index
+The output values are **gap_core.types TypedDicts** (plain dicts) — index
 them with string keys. The privileged `w` side keeps attribute access.
 
 When the LLM has declared:

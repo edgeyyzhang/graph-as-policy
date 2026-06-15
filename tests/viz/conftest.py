@@ -12,8 +12,8 @@ from typing import TypedDict
 
 import pytest
 
-from gap.tools import ToolRegistry
-from gap.types import CameraFrame, PointCloud, Se3Pose
+from gap_core.tools import ToolRegistry
+from gap_core.types import CameraFrame, PointCloud, Se3Pose
 
 # ---------------------------------------------------------------------------
 # Stub tool I/O types (gap.schema-registered names where it matters)
@@ -68,7 +68,7 @@ def golden_tool_registry() -> ToolRegistry:
 CHECK_SCRIPT = '''\
 from typing import TypedDict
 
-from gap.types import PointCloud
+from gap_core.types import PointCloud
 
 
 class CheckOut(TypedDict):

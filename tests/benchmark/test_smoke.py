@@ -46,19 +46,23 @@ def test_cli_modules_register() -> None:
     args = parser.parse_args(["policy", "list"])
     assert args.command == "policy"
     args = parser.parse_args(["policy", "serve", "pi05-libero", "--port", "9100"])
-    assert args.preset == "pi05-libero" and args.port == 9100
+    assert args.bundle == "pi05-libero" and args.port == 9100
 
 
-def test_policy_list_shows_presets(capsys) -> None:
+def test_policy_list_works_without_policy_bundles(tmp_path, capsys) -> None:
+    """`gap policy list` over an empty registry prints a clean 0-bundles
+    message — no PRESETS dict, no hardcoded recipes, all sourced from the
+    bundle catalog."""
     import argparse
 
     from gap.cli.policy import _handle_list
-    from gap.runtime.policy_presets import PRESETS
 
-    assert _handle_list(argparse.Namespace()) == 0
+    # Empty registry: a checkout dir with no policies/ subdir.
+    (tmp_path / "skills").mkdir()
+    args = argparse.Namespace(skills=[str(tmp_path)], registry=None)
+    assert _handle_list(args) == 0
     out = capsys.readouterr().out
-    for name in PRESETS:
-        assert name in out
+    assert "0 policy bundle(s)" in out
 
 
 def test_example_yamls_exist() -> None:

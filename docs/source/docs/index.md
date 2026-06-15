@@ -119,7 +119,8 @@ Every number is measured on the engine repo at the committed `uv.lock`:
         │          molmo, vlm, curobo, geometry       │
         │ skills/  perceiving-*, grasping-*,          │
         │          transporting-objects,              │
-        │          tracking-objects, running-policies │
+        │          tracking-objects, pi05-libero,     │
+        │          molmoact-libero                    │
         └─────────────────────────────────────────────┘
 ```
 

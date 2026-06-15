@@ -71,7 +71,7 @@ uv sync --extra quickstart
 | `uv sync` | Engine only: runtime, validator, `gap.builder`, viz, in-process IK (pyroki), plus the dev group (pytest, ruff, mypy). CPU, any OS. |
 | `uv sync --extra quickstart` | + `[libero]` sim stack (`mujoco==3.6.0`, the vendored LIBERO fork and robosuite, `torch>=2.7`) + the open-robot-skills `quickstart` bundles: SAM3, Grounding DINO, geometry. |
 | `CUDA_HOME=/usr/local/cuda uv sync --extra grocery` | Everything in `quickstart` + the CuRobo motion-planning bundle (CUDA build at install time). The acceptance-benchmark set. |
-| `CUDA_HOME=/usr/local/cuda uv sync --extra all` | Everything in `grocery` + Ray workers (`ray[serve]`), the Vertex provider, the OpenPI policy client, and the Gemini-ER and running-policies bundles. |
+| `CUDA_HOME=/usr/local/cuda uv sync --extra all` | Everything in `grocery` + Ray workers (`ray[serve]`), the Vertex provider, the OpenPI policy client, and the Gemini-ER and learned-policy (`pi05-libero`, `molmoact-libero`) bundles. |
 
 The `quickstart`, `grocery`, and `all` extras are meta-extras spanning both
 repos: each combines the engine's `[libero]` sim stack with the matching

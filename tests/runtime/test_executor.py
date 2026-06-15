@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 import gap
-from gap.errors import (
+from gap_core.errors import (
     NodeExecutionError,
     PipelineError,
     VerificationFailed,
@@ -26,7 +26,7 @@ from gap.errors import (
 from gap.runtime.execute import ExecutionResult
 from gap.runtime.executor import SubgraphExitEvent, WorkflowExecutor
 from gap.runtime.verify import StubWorld
-from gap.tools import ToolRegistry, guards
+from gap_core.tools import ToolRegistry, guards
 
 # ---------------------------------------------------------------------------
 # Helpers

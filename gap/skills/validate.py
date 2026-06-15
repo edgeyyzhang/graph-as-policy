@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Literal
 
 from ._meta_from_skill_md import parse_skill_md
-from .meta import SkillMeta
+from gap_core.skills.meta import SkillMeta
 
 __all__ = [
     "BundleIssue",
@@ -51,10 +51,11 @@ __all__ = [
 
 Severity = Literal["error", "warning"]
 
-#: The two bundle roots, mirroring gap.skills._registry._KIND_DIRS.
-_KIND_DIRS: tuple[tuple[Literal["tool", "skill"], str], ...] = (
+#: The three bundle roots, mirroring gap.skills._registry._KIND_DIRS.
+_KIND_DIRS: tuple[tuple[Literal["tool", "skill", "policy"], str], ...] = (
     ("tool", "tools"),
     ("skill", "skills"),
+    ("policy", "policies"),
 )
 
 # The spec's canonical cue is "Use when …", but any third-person usage cue
@@ -82,7 +83,7 @@ class BundleReport:
     """Aggregated format-validation result for one bundle."""
 
     name: str
-    kind: Literal["tool", "skill"]
+    kind: Literal["tool", "skill", "policy"]
     bundle_dir: Path
     meta: SkillMeta | None = None
     issues: list[BundleIssue] = field(default_factory=list)
@@ -161,7 +162,7 @@ def load_checkout_extras(root: str | Path) -> dict[str, list[str]] | None:
 def validate_bundle_meta(
     meta: SkillMeta,
     *,
-    kind: Literal["tool", "skill"],
+    kind: Literal["tool", "skill", "policy"],
     bundle_dir: str | Path | None = None,
     known_tools: set[str] | frozenset[str] | None = None,
     extras: dict[str, list[str]] | None = None,
@@ -257,7 +258,7 @@ def validate_bundle_meta(
             )
 
     # --- declared I/O type names resolve ------------------------------------
-    from gap.schema import TYPE_REGISTRY
+    from gap_core.schema import TYPE_REGISTRY
 
     for label, mapping in (
         ("produces_outputs", meta.produces_outputs),
@@ -271,7 +272,14 @@ def validate_bundle_meta(
                 )
 
     # --- pip extra convention -------------------------------------------------
-    if extras is not None and meta.name not in extras:
+    # Bundles that own a per-bundle `pyproject.toml` are exempted: gap manages
+    # their venv via `gap skills install <name>` (uv sync --project <dir>),
+    # so they don't need to appear in the root extras table.
+    if (
+        extras is not None
+        and meta.name not in extras
+        and not (bundle_dir / "pyproject.toml").is_file()
+    ):
         warning(
             f"pyproject.toml has no pip extra named {meta.name!r} — declare "
             f"the bundle's dependencies as one extra (empty list when it has "

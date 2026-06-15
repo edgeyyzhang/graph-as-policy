@@ -161,7 +161,7 @@ dispatch name), recovery entries with `service`/`method` keys (rewrite as
 - **`tool`** — dispatches the flat name through the `ToolRegistry`:
   connector tools (`robot.get_observation`, `sim.check_success`), tool-bundle
   functions (`sam3.segment_box`, `geometry.iou`), or a callable skill bundle
-  registered under its own name (`running-policies.run`). Returns whatever
+  registered under its own name (`pi05-libero.run`). Returns whatever
   the tool returns.
 - **`script`** — imports the Python file and calls its typed
   `run(ctx: NodeContext, ...) -> Output` function, where `Output` is a

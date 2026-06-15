@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from gap.errors import WorkflowValidationError
+from gap_core.errors import WorkflowValidationError
 
 logger = logging.getLogger(__name__)
 

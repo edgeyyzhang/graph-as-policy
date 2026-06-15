@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from gap.skills import SkillsRegistry
-from gap.tools import ToolRegistry
+from gap_core.tools import ToolRegistry
 
 from ._registry import AgentRegistry
 from .codegen_context import CodegenContext
@@ -1308,7 +1308,7 @@ def _structural_subgraph_errors(
     post-assembly. ``_parse_subgraph`` raises on malformed dicts; that
     message becomes feedback rather than crashing the pipeline.
     """
-    from gap.errors import WorkflowValidationError
+    from gap_core.errors import WorkflowValidationError
     from gap.runtime.validate import _check_subgraph_level
     from gap.runtime.workflow import _parse_subgraph
 

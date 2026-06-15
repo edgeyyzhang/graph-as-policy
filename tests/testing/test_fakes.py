@@ -2,7 +2,7 @@
 
 import pytest
 
-from gap.errors import PerceptionFailed, ToolError
+from gap_core.errors import PerceptionFailed, ToolError
 from gap.testing import FakeContext
 
 

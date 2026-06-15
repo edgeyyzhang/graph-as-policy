@@ -22,12 +22,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from gap.tools.schema import UnitSchema, extract_schema
+from gap_core.tools.schema import UnitSchema, extract_schema
 
 logger = logging.getLogger(__name__)
 
 ToolScope = Literal["runtime", "codegen"]
-ToolTransport = Literal["python"]
+ToolTransport = Literal["python", "rpc"]
 
 #: Name prefixes reserved for connector-registered tools. ``@tool``
 #: declarations and bundle discovery may not claim these — the connector
@@ -154,6 +154,38 @@ class PythonAdapter:
         return fn(**filtered)
 
 
+class RpcAdapter:
+    """Dispatch tools that live in a per-bundle subprocess via stdio msgpack.
+
+    Holds a ``{tool_name: ToolClient}`` map. The runtime's
+    ``tool_bundle_manager`` constructs the ToolClient (one subprocess per
+    bundle) and registers each tool the bundle exports through here. On
+    invoke, this adapter just delegates to the client's ``call`` method —
+    no schema introspection, no ctx injection (the RPC path is for
+    ctx-free tool functions only; see ``gap_core/rpc/server.py``).
+    """
+
+    transport: ToolTransport = "rpc"
+
+    def __init__(self) -> None:
+        # Forward declaration to avoid the import cycle at module load time
+        # (gap_core.rpc.client imports nothing from this module, but the
+        # symmetry is still nice).
+        self._clients: dict[str, Any] = {}  # tool_name → ToolClient
+
+    def register(self, name: str, client: Any) -> None:
+        self._clients[name] = client
+
+    def invoke(self, name: str, ctx: Any | None, **kwargs: Any) -> Any:
+        client = self._clients.get(name)
+        if client is None:
+            raise KeyError(f"RPC tool {name!r} not registered with this adapter")
+        # ctx is intentionally dropped — the RPC path is for ctx-free tools.
+        # Tools that need ctx must declare `protocol: in-process` in SKILL.md
+        # and stay in gap-runtime's venv.
+        return client.call(name, **kwargs)
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
@@ -174,6 +206,7 @@ class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, ToolDescriptor] = {}
         self.python_adapter = PythonAdapter()
+        self.rpc_adapter = RpcAdapter()
 
     # --- discovery ---
 
@@ -387,7 +420,50 @@ class ToolRegistry:
         descriptor = self.get(name)
         if descriptor.transport == "python":
             return self.python_adapter.invoke(name, ctx, **kwargs)
+        if descriptor.transport == "rpc":
+            return self.rpc_adapter.invoke(name, ctx, **kwargs)
         raise ValueError(f"unknown transport {descriptor.transport!r}")
+
+    # ------------------------------------------------------------------
+    # RPC registration (gap.runtime.tool_bundle_manager calls this after
+    # spawning a per-bundle subprocess and reading its catalog)
+    # ------------------------------------------------------------------
+
+    def register_rpc(
+        self,
+        name: str,
+        client: Any,
+        *,
+        summary: str = "",
+        schema: UnitSchema | None = None,
+        tags: tuple[str, ...] = (),
+        scope: ToolScope = "runtime",
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Register an RPC-routed tool fronted by ``client`` (a ToolClient).
+
+        Unlike :meth:`register_callable`, no Python signature exists on the
+        gap-runtime side — the schema comes from the bundle server's
+        startup catalog frame. The descriptor's ``transport`` is set to
+        ``"rpc"`` so :meth:`invoke` dispatches through :class:`RpcAdapter`.
+        """
+        if name in self._tools:
+            raise ValueError(f"Tool name collision: {name!r} already registered")
+        self.rpc_adapter.register(name, client)
+        self._tools[name] = ToolDescriptor(
+            name=name,
+            summary=summary,
+            schema=schema or UnitSchema(name=name, description=summary),
+            transport="rpc",
+            scope=scope,
+            tags=tuple(tags),
+            metadata={
+                "bundle": getattr(client, "bundle_name", ""),
+                **(metadata or {}),
+            },
+        )
+        logger.debug("Registered rpc tool %r (bundle=%s)", name,
+                     getattr(client, "bundle_name", "?"))
 
 
 # ---------------------------------------------------------------------------

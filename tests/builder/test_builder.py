@@ -28,7 +28,7 @@ from gap.builder import (
     Workflow,
     WorkflowSpec,
 )
-from gap.errors import GraphValidationError
+from gap_core.errors import GraphValidationError
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -165,12 +165,11 @@ def _build_approach_sg() -> Subgraph:
 
 
 def _build_run_sg() -> Subgraph:
-    sg = Subgraph(name="run_sg", skill="running-policies")
+    sg = Subgraph(name="run_sg", skill="generic")
     sg.add_input("observation_stream", type_name="ObservationStream")
-    sg.add_node("run_policy", type="tool", tool="running-policies.run_policy",
+    sg.add_node("run_policy", type="tool", tool="pi05-libero.run",
                 inputs={
                     "observation_stream": Ref("in.observation_stream"),
-                    "policy_id": "libero_pi05",
                     "prompt": "pick the {{target}} and place it in the basket",
                     "termination_prompt": "",
                     "max_windows": 60,

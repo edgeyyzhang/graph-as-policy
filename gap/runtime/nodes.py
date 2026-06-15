@@ -18,7 +18,7 @@ import typing
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from gap.errors import NodeExecutionError, WorkflowValidationError
+from gap_core.errors import NodeExecutionError, WorkflowValidationError
 
 from .context import NodeContext
 from .observation_stream import ObservationStream, ObservationStreamHandle

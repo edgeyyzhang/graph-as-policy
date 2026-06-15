@@ -92,9 +92,10 @@ class BenchmarkModeOverride:
     num_workers: int | None = None
     time_budget_s: float | None = None
     workflow_dir: str | None = None
-    # Which entry in ``policies:`` the template-driven modes reference
-    # via the ``{{policy_id}}`` placeholder. ``None`` inherits the
-    # template default (``libero_pi05``).
+    # Which policy SKILL the template-driven modes steer (== its preset /
+    # bundle name, e.g. ``pi05-libero``), substituted into the template's
+    # ``{{policy_id}}`` placeholder. ``None`` inherits the template default
+    # (``pi05-libero``).
     policy_id: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 

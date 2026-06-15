@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from gap.errors import StreamUnavailable
+from gap_core.errors import StreamUnavailable
 from gap.runtime.observation_stream import (
     ObservationStream,
     ObservationStreamHandle,

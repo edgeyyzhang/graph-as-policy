@@ -126,7 +126,7 @@ def test_skill_without_exit_conditions_fails_unless_callable(tmp_path: Path):
         "---\nname: exitless\ndescription: No exits. Use when testing.\n---\n# s\n"
     ))
     # A callable-unit skill (gap.tools declared) is exempt, like
-    # running-policies / tracking-objects in the real checkout.
+    # pi05-libero / tracking-objects in the real checkout.
     _write(root, "skills/callable-unit/SKILL.md", (
         "---\nname: callable-unit\ndescription: Runs as one unit. Use when testing.\n"
         "gap:\n  tools:\n    - callable-unit.run: Run it.\n---\n# s\n"

@@ -47,7 +47,7 @@ Distribution name `graph-as-policy`, import `gap`, Python ≥3.10 (isaaclab pin 
 
 **Tools vs skills — a first-class split, mirrored in the repo layout.** open-robot-skills has two top-level categories:
 - **Tools** (`open-robot-skills/tools/<bundle>/`) = *what the robot can compute*: model-backed callables with no task strategy. **Tool bundles are named after the model**: `sam3`, `grounding-dino`, `gemini-er`, `molmo`, `vlm` (generic API VLM), `curobo` (motion planning), `geometry` (pure math). A tool bundle exposes typed functions via `@tool` in `tools.py`; its SKILL.md documents when to call them. (IK is NOT a tool bundle — it's built into the connector, see §7.)
-- **Skills** (`open-robot-skills/skills/<bundle>/`) = *what the robot can do*: manipulation strategies that own subgraphs in generated graphs — perceive an object, grasp, transport, track, run a learned policy. Skills keep capability names. **All skills are flat** — no atomic/composite distinction; a skill bundles LLM guidance (SKILL.md) + canonical scripts, and *may* also expose a callable via `tools.py` when it is invocable as a single unit (running-policies, tracking-objects).
+- **Skills** (`open-robot-skills/skills/<bundle>/`) = *what the robot can do*: manipulation strategies that own subgraphs in generated graphs — perceive an object, grasp, transport, track, run a learned policy. A learned policy is itself a skill, one bundle per model checkpoint (`pi05-libero`, `molmoact-libero`), so the coordinator picks the model by its capability description rather than via a generic runner + `policy_id`. Skills keep capability names. **All skills are flat** — no atomic/composite distinction; a skill bundles LLM guidance (SKILL.md) + canonical scripts, and *may* also expose a callable via `tools.py` when it is invocable as a single unit (pi05-libero, molmoact-libero, tracking-objects).
 
 So tools come from exactly two registries: **connector tools** (`robot.*`, `sim.*` — embodiment surface shipped by gap core, not in open-robot-skills) and **tool bundles** (`<model>.<func>`, e.g. `curobo.plan_to_pose`, `sam3.segment_text`). Model-named prefixes deliberately match the old gRPC service short names, so the tool-name migration is mostly `Method` → `snake_case` with the prefix unchanged. Graph `script` nodes are per-graph generated code — neither tool nor skill; they call tools.
 
@@ -74,7 +74,7 @@ So tools come from exactly two registries: **connector tools** (`robot.*`, `sim.
         │          /-parts), grasping-with-planner,      │
         │          grasping-direct-ik, grasping-short-axis,│
         │          transporting-objects, tracking-objects,│
-        │          running-policies                      │
+        │          pi05-libero, molmoact-libero          │
         └──────────────────────────────────────────────────┘
 ```
 
@@ -179,8 +179,12 @@ open-robot-skills/
     │                                   #   already required for G1
     ├── transporting-objects/
     ├── tracking-objects/               # exposes its callable as a tool (streaming)
-    └── running-policies/               # exposes its callable as a tool (openpi websocket);
-                                        #   gripper-cycle + VLM termination
+    ├── pi05-libero/                    # learned-policy skill: openpi π0.5 LIBERO checkpoint.
+    │                                   #   Owns its serving preset (skill name == preset == policy
+    │                                   #   id); exposes its callable as a tool (openpi websocket);
+    │                                   #   gripper-cycle + VLM termination
+    └── molmoact-libero/                # learned-policy skill: MolmoAct LIBERO checkpoint (same task
+                                        #   family — the MolmoAct alternative to pi05-libero)
 ```
 
 Both categories use the same Agent Skills bundle format (SKILL.md + resources); the folder conveys the kind. Each is one directory = one bundle = one PR for contributors.
@@ -220,7 +224,7 @@ from gap.testing import FakeContext, make_test_observation     # unit-test witho
 ```
 - Bundle tools live in `tools.py`, lazy-load model weights on first call (module-level cached loader), honor per-bundle `device` config.
 - `load_prompt(__package__, name, **vars)` + synthetic packages kept (legacy prefix → `gap_skills.*`) — skill scripts depend on bundle-relative prompt loading.
-- Class-based stateful tools (`Skill` base, one instance per workflow — running-policies, tracking-objects) keep working.
+- Class-based stateful tools (`Skill` base, one instance per workflow — pi05-libero, molmoact-libero, tracking-objects) keep working. The policy skills subclass `gap.runtime.policy_skill.PolicyLoopSkill`, which wraps the unchanged closed-loop body `gap.runtime.policy.run_policy_loop`; each sets `preset` to its bundle name (== preset == policy id) and takes no `policy_id` argument.
 - open-robot-skills has a **one-way runtime dependency on gap** (ctx/types/errors/load_prompt — verified: every existing skill script imports these). "Standalone" means discovery and contribution are path-based (`gap.skills.find_skills_path`: explicit path > `GAP_SKILLS_PATH` > the side-by-side checkout), not pip-coupled.
 
 Cut from the dev tree: grasp_moe, grasp_multi (graspgen), bimanual_crate_lift (yam).
@@ -277,7 +281,7 @@ FastAPI + React 19 trial browser ports as-is (backup branch's redesigned swimlan
 
 - **gap core deps**: numpy, scipy, pyyaml, httpx, anthropic, fastapi, uvicorn, pillow, opencv-python-headless, robot_descriptions, yourdfpy, **pyroki + jax (CPU — the connector's in-process IK)**, matplotlib, h5py, msgpack(+numpy), viser. No grpcio/protobuf/protoc/cargo anywhere.
 - **Extras**: `[libero]` mujoco/robosuite/posvar-fork/bddl/robomimic/imageio[ffmpeg]; `[ray]`; `[real]` ur-rtde (pyzed = documented manual ZED SDK install, lazy import); `[vertex]` anthropic[vertex] + google-genai; `[dev]` pytest/ruff/mypy.
-- **open-robot-skills dependency mechanism (clean by construction)**: open-robot-skills is one pip distribution; **each bundle = one extra** (extra name == bundle name: `[sam3]`, `[grounding-dino]`, `[curobo]`, `[gemini-er]`, `[running-policies]`, …) plus meta-extras `[quickstart]` (sam3+grounding-dino+geometry), `[grocery]` (quickstart+curobo — the G1 set), `[all]`. Non-PyPI deps (the sam3 fork, nvidia-curobo) are **pinned `git+https` entries inside those extras** — one resolver run surfaces cross-bundle conflicts at install time, and CI installs `[all]` to prove co-installability (dev's docker venv already proved these deps coexist). `uv.lock` pins the exact G1-gate environment. **Ownership split: pip owns code; `gap skills check` only verifies** (import probe + weight presence per bundle, mapping bundle→extra by name); `--download` prefetches **weights only** (HF_TOKEN documented) — nothing ever pip-installs behind the user's back. Quickstart is literally `pip install -e gap -e "open-robot-skills[quickstart]"` → `gap skills check --download` → `gap run …`. The one documented wart: curobo's CUDA JIT (`--no-build-isolation`, `CUDA_HOME`) lives on that extra alone. P2 task: diff the dev tree's vendored sam3 against upstream — if patched, publish the fork (or vendor under `tools/sam3/_vendor/`) and pin that.
+- **open-robot-skills dependency mechanism (clean by construction)**: open-robot-skills is one pip distribution; **each bundle = one extra** (extra name == bundle name: `[sam3]`, `[grounding-dino]`, `[curobo]`, `[gemini-er]`, `[pi05-libero]`, `[molmoact-libero]` — the last two both pull `openpi-client`, …) plus meta-extras `[quickstart]` (sam3+grounding-dino+geometry), `[grocery]` (quickstart+curobo — the G1 set), `[all]` (now including both policy skills). Non-PyPI deps (the sam3 fork, nvidia-curobo) are **pinned `git+https` entries inside those extras** — one resolver run surfaces cross-bundle conflicts at install time, and CI installs `[all]` to prove co-installability (dev's docker venv already proved these deps coexist). `uv.lock` pins the exact G1-gate environment. **Ownership split: pip owns code; `gap skills check` only verifies** (import probe + weight presence per bundle, mapping bundle→extra by name); `--download` prefetches **weights only** (HF_TOKEN documented) — nothing ever pip-installs behind the user's back. Quickstart is literally `pip install -e gap -e "open-robot-skills[quickstart]"` → `gap skills check --download` → `gap run …`. The one documented wart: curobo's CUDA JIT (`--no-build-isolation`, `CUDA_HOME`) lives on that extra alone. P2 task: diff the dev tree's vendored sam3 against upstream — if patched, publish the fork (or vendor under `tools/sam3/_vendor/`) and pin that.
 - Submodules: `robots_realtime`, `Variational-Automation-Benchmark` (both pinned). `py.typed` shipped. uv-first docs, pip supported.
 
 ## 15. Testing strategy
@@ -350,7 +354,7 @@ Ported from dev tree: `tests/runtime` (11 files), `tests/builder`, `tests/compos
 |---|---|---|
 | `libero_quickstart/` | **A NEW graph, authored for v1** — no curobo-free LIBERO graph exists anywhere in the dev tree (every `graph_cartesian_obb` variant calls `curobo.PlanToGraspPoses` via `grasp_curobo_obb`). Base it on graph_cartesian_obb's topology but swap the grasp subgraph to a grasping-direct-ik-style top-down descend. **Fallback decided**: if direct-IK grasp success is poor on libero_object/0 (<~80% in P4 testing), the quickstart documents the curobo install (CUDA-JIT toolchain) rather than shipping a flaky demo — G4's "one command" then includes that install step. | `[libero]` + sam3/grounding-dino/geometry bundles + `ANTHROPIC_API_KEY` (vlm) |
 | `grocery_fulfillment/` | the G1 flagship: posvar all-variance / grocery_packing tasks via `gap generate` + the acceptance benchmark configs (ported `grocery_packing*.yaml`); uses perceiving-objects-oneshot + grasping-with-planner (curobo) + transporting-objects | `[libero]`, curobo backend |
-| `steered_policy/` | G3: `graph_obb_policy_loop` (+ `_grasp` variant) — perceive (perceiving-objects-oneshot) → `approach_above` hover over target → **handover to the learned policy** (running-policies, gripper-cycle termination). Reproducible via `gap policy serve pi05-libero` (preset downloads the checkpoint + spawns the server) | `[libero]`, `gap policy serve pi05-libero` |
+| `steered_policy/` | G3: `graph_obb_policy_loop` (+ `_grasp` variant) — perceive (perceiving-objects-oneshot) → `approach_above` hover over target → **handover to the learned-policy skill** (`{{policy_id}}.run`, e.g. `pi05-libero.run`; no `policy_id` input; gripper-cycle termination). The launcher auto-boots the skill's preset (downloads the checkpoint + spawns the server); `gap policy serve pi05-libero` runs it by hand | `[libero]`, `[pi05-libero]` (or run `gap policy serve pi05-libero`) |
 | `cable_ur/` | master's cable example; standalone-connector showcase (perception-only) | `[real]`, ZED SDK |
 | `real_franka_pick_place/` | `pick_and_place_jello` — **v2 schema, migrate to v3** | `[real]`, robots_realtime |
 | `collect_and_train/` | N× execute + data collector → HDF5/LeRobot → external training recipe → eval reusing the steered_policy graph | `[libero]`, policy server |

@@ -80,6 +80,30 @@ def register(subparsers: argparse._SubParsersAction) -> None:
     _add_registry_args(pt)
     pt.set_defaults(func=_handle_test)
 
+    ip = sub.add_parser(
+        "install",
+        help="Sync per-bundle venvs via `uv sync --project <bundle_dir>`. "
+             "No-op for bundles without a pyproject.toml. To wipe a venv "
+             "later, just `rm -rf <bundle>/.venv`.",
+    )
+    ip.add_argument(
+        "bundles", nargs="*",
+        help="Bundle names to install (default: nothing — pair with --all "
+             "or --workflow)",
+    )
+    ip.add_argument(
+        "--all", action="store_true",
+        help="Install every bundle with a pyproject.toml across active "
+             "registries (skips bundles that have none)",
+    )
+    ip.add_argument(
+        "--workflow", default=None, metavar="DIR",
+        help="Install just the bundles a workflow references (same "
+             "discovery as the launcher's boot_policies)",
+    )
+    _add_registry_args(ip)
+    ip.set_defaults(func=_handle_install)
+
     # NOTE: no sp.set_defaults(func=...) here — argparse applies parent
     # defaults to the namespace before the sub-subparser runs, which would
     # mask the per-subcommand handlers. `gap skills` with no subcommand
@@ -230,7 +254,8 @@ def _handle_check(args: argparse.Namespace) -> int:
             totals[status] += 1
             if status == "FAIL":
                 failures += 1
-            print(f"[{report.kind}] {report.name}: {status}")
+            venv_note = _venv_note(report.bundle_dir, report.name)
+            print(f"[{report.kind}] {report.name}: {status}{venv_note}")
             for issue in report.issues:
                 print(f"    {issue}")
         if multi:
@@ -429,7 +454,7 @@ TODO: describe the model this bundle wraps and its tool functions.
 _TOOL_TOOLS_PY = '''\
 """{name} tool bundle."""
 
-from gap.tools import tool
+from gap_core.tools import tool
 
 
 @tool(name="{name}.run", summary="TODO summary of the tool function.")
@@ -699,3 +724,137 @@ def _handle_test(args: argparse.Namespace) -> int:
                 failures += 1
 
     return 1 if failures else 0
+
+
+def _venv_note(bundle_dir, bundle_name: str) -> str:
+    """One-token annotation appended to a `check` status line.
+
+    Empty when the bundle has no pyproject.toml (in-process bundles use
+    gap's own venv); `(venv-ready)` when the bundle's .venv/ exists;
+    install hint otherwise.
+    """
+    from pathlib import Path
+
+    bundle_dir = Path(bundle_dir)
+    if not (bundle_dir / "pyproject.toml").is_file():
+        return ""
+    if (bundle_dir / ".venv").is_dir():
+        return " (venv-ready)"
+    return f" (venv missing — run `gap skills install {bundle_name}`)"
+
+
+# ---------------------------------------------------------------------------
+# install
+# ---------------------------------------------------------------------------
+
+
+def _handle_install(args: argparse.Namespace) -> int:
+    """Sync each bundle's per-bundle venv via ``uv sync --project <bundle_dir>``.
+
+    Selection precedence: explicit ``bundles`` positional args > ``--workflow``
+    discovery > ``--all`` across active registries. Bundles without a
+    ``pyproject.toml`` are skipped with a note (in-process tool / pure skill
+    bundles inherit gap's venv — there's nothing to install per-bundle).
+    """
+    import subprocess
+    from pathlib import Path
+
+    from gap.skills import load_skills
+
+    try:
+        registry_set = _registry_set(args)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"error: {exc}")
+        return 2
+    except KeyError as exc:
+        print(f"error: {exc.args[0]}")
+        return 2
+
+    # 1. Discover the bundle catalog once.
+    catalog: dict[str, "Path"] = {}  # bundle_name -> bundle_dir
+    for spec in registry_set:
+        reg = load_skills(spec.path)
+        for info in reg.list_skills():
+            catalog.setdefault(info.name, info.bundle_dir)
+
+    # 2. Build the install set per selection rules.
+    requested: list[str] = []
+    if args.bundles:
+        requested.extend(args.bundles)
+    if args.workflow:
+        wf_required = _required_bundles_for_workflow(args.workflow, registry_set)
+        for name in wf_required:
+            if name not in requested:
+                requested.append(name)
+    if args.all:
+        for name in sorted(catalog):
+            if name not in requested:
+                requested.append(name)
+
+    if not requested:
+        print("nothing to install — pass bundle names, --workflow DIR, or --all")
+        return 2
+
+    unknown = [n for n in requested if n not in catalog]
+    if unknown:
+        available = ", ".join(sorted(catalog))
+        print(f"error: unknown bundle(s) {unknown!r} (available: {available})")
+        return 2
+
+    # 3. Sync each bundle that owns a pyproject.toml.
+    failures = 0
+    for name in requested:
+        bundle_dir = catalog[name]
+        if bundle_dir is None:
+            print(f"[{name}] skipped: bundle_dir unknown")
+            continue
+        pyproject = bundle_dir / "pyproject.toml"
+        if not pyproject.is_file():
+            print(f"[{name}] skipped: no pyproject.toml (in-process bundle)")
+            continue
+
+        cmd = ["uv", "sync", "--project", str(bundle_dir)]
+        print(f"[{name}] running: {' '.join(cmd)}")
+        proc = subprocess.run(cmd)
+        if proc.returncode != 0:
+            failures += 1
+            print(f"[{name}] FAIL (uv sync returncode={proc.returncode})")
+        else:
+            print(f"[{name}] OK ({bundle_dir / '.venv'})")
+
+    return 1 if failures else 0
+
+
+def _required_bundles_for_workflow(workflow_dir: str, registry_set) -> list[str]:
+    """Return the set of bundle names referenced by tools in a workflow.
+
+    Mirrors the launcher's discovery (gap.runtime.policy_boot.required_policies)
+    but covers *all* bundle kinds so `gap skills install --workflow` installs
+    every per-bundle venv the workflow touches, not just policies.
+    """
+    from pathlib import Path
+
+    from gap.runtime.workflow import load_workflow
+    from gap.skills import load_skills
+
+    try:
+        wf = load_workflow(Path(workflow_dir) / "workflow.json")
+    except Exception as exc:
+        print(f"error: failed to load workflow at {workflow_dir}: {exc}")
+        return []
+
+    # Cache loaded registries; same dedup precedence as the catalog.
+    bundle_names: set[str] = set()
+    for spec in registry_set:
+        reg = load_skills(spec.path)
+        for sg in wf.subgraphs.values():
+            for node in sg.nodes.values():
+                if node.type != "tool" or not node.tool:
+                    continue
+                bundle = node.tool.split(".", 1)[0]
+                try:
+                    reg.get(bundle)
+                except KeyError:
+                    continue
+                bundle_names.add(bundle)
+    return sorted(bundle_names)

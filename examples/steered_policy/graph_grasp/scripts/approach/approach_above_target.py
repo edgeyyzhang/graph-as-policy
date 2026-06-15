@@ -25,7 +25,7 @@ Compared to the canonical ``approach_above.py`` used by graph_cartesian_obb:
 from typing import TypedDict
 
 from gap import NodeContext
-from gap.types import OrientedBoundingBox, Se3Pose
+from gap_core.types import OrientedBoundingBox, Se3Pose
 
 
 class Output(TypedDict):

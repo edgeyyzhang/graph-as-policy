@@ -3,7 +3,7 @@
 #   gap benchmark examples/benchmark/posvar.yaml
 #
 # Modes run sequentially; every mode produces a workflow.json zero-shot
-# and is scored by the same in-process LIBERO eval. The libero_pi05
+# and is scored by the same in-process LIBERO eval. The pi05-libero
 # policy (modes llm_plus_policy / policy_only) must be running before
 # the sweep:
 #   gap policy serve pi05-libero --port 9100      # -> ws://127.0.0.1:9100
@@ -23,7 +23,7 @@ llm:
 # llm_plus_policy / policy_only modes use it; the harness preflights the
 # websocket and never owns the server lifecycle.
 policies:
-  libero_pi05:
+  pi05-libero:
     url: ws://127.0.0.1:9100
 
 policy_manager:
@@ -41,14 +41,14 @@ benchmark:
   output_dir: ../../benchmark_runs/posvar
   mode_overrides:
     llm_plus_policy:
-      # The steered-policy example graph (OBB approach + run_policy with
-      # a {{policy_id}} placeholder). NOTE: examples/steered_policy lands
-      # in a follow-up — until then, point workflow_dir at your template.
-      workflow_dir: ../steered_policy/graph
-      # libero_pi05 is a single shared websocket server — throttle to
+      # The steered-policy example graph (OBB approach + the policy node;
+      # tool `{{policy_id}}.run` is substituted with the policy-skill name,
+      # e.g. pi05-libero — the skill owns its server).
+      workflow_dir: ../steered_policy/graph_loop
+      # pi05-libero is a single shared websocket server — throttle to
       # avoid serializing every worker on one inference endpoint.
       num_workers: 4
     policy_only:
-      # Bare VLA baseline: setup + run_policy, no OBB/approach graph.
-      workflow_dir: ../steered_policy/graph
+      # Bare VLA baseline: setup + the policy node, no OBB/approach graph.
+      workflow_dir: ../steered_policy/graph_loop
       num_workers: 4

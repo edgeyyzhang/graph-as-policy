@@ -15,7 +15,7 @@ the basket before releasing.
 from typing import TypedDict
 
 from gap import NodeContext
-from gap.types import OrientedBoundingBox
+from gap_core.types import OrientedBoundingBox
 
 
 class Output(TypedDict):

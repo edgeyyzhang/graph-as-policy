@@ -96,8 +96,8 @@ def bundle_tool_registry():
     import importlib
 
     from gap.skills import load_skills
-    from gap.tools import ToolRegistry
-    from gap.tools import _registry as tool_registry_mod
+    from gap_core.tools import ToolRegistry
+    from gap_core.tools import _registry as tool_registry_mod
 
     skills = load_skills(_skills_root())
     snapshot = list(tool_registry_mod._PENDING_TOOLS)
@@ -107,6 +107,18 @@ def bundle_tool_registry():
             importlib.reload(info.tools_module)
     reg = ToolRegistry()
     reg.discover_pending()
+    # Bundles whose serving.protocol is stdio-msgpack run out-of-process —
+    # their @tool decorators never fire in this process. Register a stub
+    # descriptor for every tool name they declare in SKILL.md gap.tools so
+    # the workflow's tool-name validator finds them.
+    for info in skills.list_skills():
+        serving = getattr(info.meta, "serving", None)
+        if serving is None or getattr(serving, "protocol", None) != "stdio-msgpack":
+            continue
+        for tool_name, summary in (info.meta.tools or {}).items():
+            if tool_name in reg:
+                continue
+            reg.register_rpc(tool_name, client=None, summary=summary)
     tool_registry_mod._PENDING_TOOLS.extend(snapshot)
     return reg
 

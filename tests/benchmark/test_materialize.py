@@ -158,4 +158,4 @@ def test_materialize_for_task_targetless_template_tolerates_any_prompt(
         task_prompt="Pack every item from the floor into the basket",
     )
     wf = json.loads((Path(out) / "workflow.json").read_text())
-    assert wf["meta"]["description"] == "libero_pi05"  # default policy
+    assert wf["meta"]["description"] == "pi05-libero"  # default policy

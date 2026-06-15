@@ -1,4 +1,4 @@
-"""Type-name registry: the string names graphs use ↔ gap.types definitions.
+"""Type-name registry: the string names graphs use ↔ gap_core.types definitions.
 
 Subgraph ``inputs:`` / ``outputs:`` declarations (and the viz frontend's port
 schemas) reference types by bare name — ``"OrientedBoundingBox"``,
@@ -12,12 +12,12 @@ import typing
 from dataclasses import dataclass
 from typing import Any
 
-import gap.types as _t
+from gap_core import types as _t
 
 __all__ = ["TYPE_REGISTRY", "resolve_type", "type_fields", "FieldInfo"]
 
 
-#: Bare type-name → TypedDict class (or alias) from gap.types.
+#: Bare type-name → TypedDict class (or alias) from gap_core.types.
 TYPE_REGISTRY: dict[str, Any] = {
     "Vec3": _t.Vec3,
     "Quaternion": _t.Quaternion,

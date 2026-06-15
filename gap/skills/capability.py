@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from .meta import SkillMeta
+from gap_core.skills.meta import SkillMeta
 from .registries import RegistrySet, RegistrySpec
 from .validate import load_checkout_extras, validate_checkout
 
@@ -226,7 +226,7 @@ def probe_bundle_import(
     name: str,
     bundle_dir: Path,
     *,
-    kind: Literal["tool", "skill"],
+    kind: Literal["tool", "skill", "policy"],
     fix_hint: str = "",
 ) -> tuple[ProbeResult, Any | None]:
     """Import-probe one bundle in isolation.
@@ -329,7 +329,7 @@ class BundleCapability:
     """Operational status of one bundle in one registry."""
 
     name: str
-    kind: Literal["tool", "skill"]
+    kind: Literal["tool", "skill", "policy"]
     registry: str
     bundle_dir: Path
     deps: ProbeResult

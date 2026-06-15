@@ -18,9 +18,9 @@ its training distribution instead of from wherever a perturbed reset left it.
 - **`graph_loop/`** — the clean-all-items loop. `capture` records the
   episode-start arm pose; each iteration resets to it, perceives the next
   item (`perceiving-objects-oneshot` — a VLM answer of "none" cleanly ends
-  the loop), approaches above its OBB, then `running-policies.run` picks
-  *and places* the item, terminating when the commanded gripper completes a
-  full open → close → open cycle.
+  the loop), approaches above its OBB, then the policy skill's `.run` tool
+  (e.g. `pi05-libero.run`) picks *and places* the item, terminating when the
+  commanded gripper completes a full open → close → open cycle.
 - **`graph_grasp/`** — VLA-grasp + geometric-place split. The policy does
   only the dexterous grasp (terminated by a VLM held-and-lifted check), then
   `place_above_basket.py` lifts straight up, transports high, descends over
@@ -46,8 +46,11 @@ uv run gap policy serve pi05-libero --port 9100
 
 Then run a graph. The workflows carry a `{{policy_id}}` placeholder that the
 benchmark harness materializes per cell; for a standalone run, template it
-first (for example, sed the placeholder in `workflow.json` to your registered
-policy id) and pass any remaining inputs with `--inputs`:
+first (for example, sed the placeholder in `workflow.json` to a policy-skill
+name such as `pi05-libero`, which forms the `pi05-libero.run` tool) and pass
+any remaining inputs with `--inputs`. The launcher auto-boots the named
+skill's preset server, so the explicit `gap policy serve` above is only needed
+when you want to share one server across runs:
 
 ```bash
 MUJOCO_GL=egl uv run gap run examples/steered_policy/graph_loop \
@@ -55,8 +58,8 @@ MUJOCO_GL=egl uv run gap run examples/steered_policy/graph_loop \
 ```
 
 See [Policies](../benchmarks/policies.md) for the full policy-serving guide,
-including custom checkpoints and the `policies:` registry that maps a policy
-id to a websocket URL.
+including the per-checkpoint policy skills, custom checkpoints, and the
+`policies:` overrides that point a skill at an external websocket server.
 
 ## Graph anatomy
 
@@ -87,15 +90,17 @@ START → capture → target → approach → run → reset → target → ...
 ### The policy node
 
 The `run` subgraph declares a graph-scoped `ObservationStream` input and
-calls the `running-policies.run` tool:
+calls the policy skill's `.run` tool. The template carries a `{{policy_id}}`
+placeholder that the harness substitutes with a policy-**skill** name (e.g.
+`pi05-libero`) to form the concrete tool — the skill owns its model, so there
+is **no `policy_id` input**:
 
 ```json
 {
   "type": "tool",
-  "tool": "running-policies.run",
+  "tool": "{{policy_id}}.run",
   "inputs": {
     "observation_stream": {"$ref": "in.observation_stream"},
-    "policy_id": "{{policy_id}}",
     "prompt": "pick up the object and place it in the basket",
     "termination_prompt": "",
     "gripper_cycle_termination": true,

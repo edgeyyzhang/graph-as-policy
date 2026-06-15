@@ -133,7 +133,7 @@ Legacy v2 constructs are rejected with targeted migration messages:
 - **`tool`** — dispatches the flat name through the `ToolRegistry`:
   connector tools (`robot.get_observation`, `sim.check_success`), tool-bundle
   functions (`sam3.segment_box`, `geometry.iou`), or a callable skill bundle
-  registered under its own name (`running-policies.run`). Returns whatever
+  registered under its own name (`pi05-libero.run`). Returns whatever
   the tool returns. See [Connector Tools](connector-tools.md) for the
   `robot.*`/`sim.*` surface.
 - **`script`** — imports the Python file and calls its typed

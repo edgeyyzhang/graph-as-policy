@@ -136,7 +136,7 @@ from typing import TypedDict
 import numpy as np
 
 from gap import NodeContext
-from gap.types import OrientedBoundingBox, PointCloud
+from gap_core.types import OrientedBoundingBox, PointCloud
 
 
 class Output(TypedDict):
@@ -276,7 +276,7 @@ from typing import TypedDict
 import numpy as np
 
 from gap import NodeContext
-from gap.types import OrientedBoundingBox, PointCloud
+from gap_core.types import OrientedBoundingBox, PointCloud
 
 FIXED_MARKER = True
 

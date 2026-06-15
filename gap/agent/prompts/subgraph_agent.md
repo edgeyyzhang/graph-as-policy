@@ -12,6 +12,7 @@ tools:
   - request_inline_script
 includes:
   - _workflow_spec.md
+  - _script_contract.md
 ---
 
 # Subgraph agent

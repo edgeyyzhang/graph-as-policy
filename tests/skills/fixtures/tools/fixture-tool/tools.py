@@ -5,7 +5,7 @@ Imported by the registry through the synthetic package
 ``gap.tools._registry._PENDING_TOOLS`` for the tool registry to drain.
 """
 
-from gap.tools import tool
+from gap_core.tools import tool
 
 
 @tool(name="fixture-tool.echo", summary="Echo a string back, uppercased.")

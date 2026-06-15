@@ -127,7 +127,7 @@ def test_build_summary_writes_json_and_tsv(tmp_path) -> None:
         ),
         normalize_task_results(
             mode="llm_plus_policy", variation="pos_var", suite_name="sA",
-            family="posvar", policy_id="libero_pi05",
+            family="posvar", policy_id="pi05-libero",
             task_results=[_task(0, 2, 1, 0.5)],
         ),
         error_cell(mode="policy_only", family="posvar", variation="pos_var",
@@ -144,7 +144,7 @@ def test_build_summary_writes_json_and_tsv(tmp_path) -> None:
     assert len(loaded["cells"]) == 3
     col = "posvar/pos_var"
     assert loaded["matrix"]["llm_generation"][col]["success_rate"] == 1.0
-    assert loaded["matrix"]["llm_plus_policy@libero_pi05"][col]["success_rate"] == 0.5
+    assert loaded["matrix"]["llm_plus_policy@pi05-libero"][col]["success_rate"] == 0.5
     assert loaded["matrix"]["policy_only"][col]["error"] == "no workflow_dir"
     assert summary["matrix"] == loaded["matrix"]
 

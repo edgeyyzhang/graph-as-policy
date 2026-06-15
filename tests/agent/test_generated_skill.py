@@ -70,7 +70,7 @@ COUNT_SCRIPT = '''\
 from typing import TypedDict
 
 from gap import NodeContext
-from gap.types import Observation
+from gap_core.types import Observation
 
 
 class Output(TypedDict):
@@ -303,7 +303,7 @@ COMPUTE_TWIST_SCRIPT = '''\
 from typing import TypedDict
 
 from gap import NodeContext
-from gap.types import OrientedBoundingBox, Se3Pose
+from gap_core.types import OrientedBoundingBox, Se3Pose
 
 
 class Output(TypedDict):

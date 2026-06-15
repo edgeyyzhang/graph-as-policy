@@ -9,9 +9,9 @@ happens outside gap with your framework of choice.
 [examples/collect_and_train](gh-engine:examples/collect_and_train) closes the
 data loop: a verified gap graph acts as a **scripted expert**, its rollouts
 become a demonstration dataset, an external recipe trains a VLA policy on
-them, and the trained policy comes back into gap as a `running-policies`
-node — steered by the same perception that collected the data
-([Steered Policy](steered-policy.md)).
+them, and the trained policy comes back into gap as its own **policy-skill**
+node (like the shipped `pi05-libero` / `molmoact-libero` skills) — steered by
+the same perception that collected the data ([Steered Policy](steered-policy.md)).
 
 The whole example is one script,
 [collect.py](gh-engine:examples/collect_and_train/collect.py), plus the
@@ -100,14 +100,19 @@ review pass.
 
 ## 4. Serve and run the trained policy
 
-Serve a preset, or your own checkpoint:
+A shipped policy skill auto-boots its preset, so a steered graph referencing
+`pi05-libero` / `molmoact-libero` needs nothing extra; to run one server by
+hand:
 
 ```bash
 uv run gap policy serve pi05-libero --port 9100
 ```
 
-For a custom server, register a `start_cmd` with a `{port}` placeholder in
-the config's `policies:` block instead of a preset:
+For your own checkpoint, the cleanest path is to package it as its own
+policy-skill bundle (subclass `gap.runtime.policy_skill.PolicyLoopSkill` with
+its own preset). For a quick one-off, reference it from the graph by a name and
+override that name in the config's `policies:` block with a `start_cmd` that
+carries a `{port}` placeholder:
 
 ```yaml
 policies:

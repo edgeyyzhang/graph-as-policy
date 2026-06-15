@@ -21,7 +21,7 @@ tool covers the step it needs. Your output is a single fenced
 ## Your context window contains
 
 1. The script contract (`_script_contract.md`) — the typed `run(ctx, ...)
-   -> Output` shape, NodeContext API, gap.types field gotchas.
+   -> Output` shape, NodeContext API, gap_core.types field gotchas.
 2. The mini-spec from subgraph_agent:
    - `name` — basename without `.py` (e.g. `compute_align_pose`).
    - `signature` — type-annotated `def run(...) -> Output:` line.
@@ -40,7 +40,7 @@ from typing import TypedDict
 import numpy as np
 
 from gap import NodeContext
-from gap.types import Se3Pose  # import the gap.types you use
+from gap_core.types import Se3Pose  # import the gap_core.types you use
 
 
 class Output(TypedDict):
@@ -53,7 +53,7 @@ def run(ctx: NodeContext, <args>) -> Output:
 
 The script must:
 
-- Import what it uses; rely only on `gap.types`, `gap` (NodeContext),
+- Import what it uses; rely only on `gap_core.types`, `gap` (NodeContext),
   numpy, and the Python stdlib unless the body_hint explicitly
   authorizes more.
 - Use `ctx.tool(name, **kwargs)` for any tool call (connector, bundle,

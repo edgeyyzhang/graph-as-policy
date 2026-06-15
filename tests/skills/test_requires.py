@@ -12,8 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from gap.skills import SkillRequires, parse_skill_md
+from gap.skills import parse_skill_md
 from gap.skills.validate import validate_bundle_meta
+from gap_core.skills import SkillRequires
 
 FRONT = """\
 ---

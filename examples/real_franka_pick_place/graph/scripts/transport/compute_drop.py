@@ -3,7 +3,7 @@
 from typing import TypedDict
 
 from gap import NodeContext
-from gap.types import OrientedBoundingBox, Quaternion, Se3Pose
+from gap_core.types import OrientedBoundingBox, Quaternion, Se3Pose
 
 
 class Output(TypedDict):

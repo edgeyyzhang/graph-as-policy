@@ -1,15 +1,19 @@
 """Skill-bundle registry — discovers, registers, and manages open-robot-skills bundles.
 
 A bundle is a directory containing at minimum a ``SKILL.md``. An open-robot-skills
-checkout has two bundle roots, and the folder conveys the bundle's kind:
+checkout has three bundle roots, and the folder conveys the bundle's kind:
 
-- ``<root>/tools/<bundle>/``  — model-backed callables (``kind="tool"``);
+- ``<root>/tools/<bundle>/``    — model-backed callables (``kind="tool"``);
   exposes typed functions via ``@tool`` in ``tools.py``.
-- ``<root>/skills/<bundle>/`` — manipulation strategies (``kind="skill"``);
+- ``<root>/skills/<bundle>/``   — manipulation strategies (``kind="skill"``);
   ship canonical scripts under ``scripts/`` that the subgraph_agent emits
   as ``type: script`` states, and *may* also expose a callable (a
   function-style ``run()`` or a class-based :class:`Skill`) when invocable
-  as a single unit (running-policies, tracking-objects).
+  as a single unit (tracking-objects).
+- ``<root>/policies/<bundle>/`` — learned-policy skills (``kind="policy"``);
+  one bundle per checkpoint. Owns its own pyproject + venv and declares its
+  server launch recipe in SKILL.md ``gap.serving:`` — the launcher boots
+  one server per referenced preset via ``uv run --project <bundle_dir>``.
 
 Build a registry from a checkout with :func:`load_skills`; discovery walks
 each immediate subdirectory of both roots:
@@ -42,10 +46,10 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Literal
 
-from gap.tools.schema import UnitSchema, extract_schema
+from gap_core.tools.schema import UnitSchema, extract_schema
 
 from ._meta_from_skill_md import parse_skill_md
-from .meta import Skill, SkillMeta
+from gap_core.skills.meta import Skill, SkillMeta
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +57,10 @@ logger = logging.getLogger(__name__)
 _SYNTHETIC_ROOT = "gap_skills"
 
 #: Folder name (== synthetic-package namespace) for each bundle kind.
-_KIND_DIRS: tuple[tuple[Literal["tool", "skill"], str], ...] = (
+_KIND_DIRS: tuple[tuple[Literal["tool", "skill", "policy"], str], ...] = (
     ("tool", "tools"),
     ("skill", "skills"),
+    ("policy", "policies"),
 )
 
 
@@ -114,10 +119,10 @@ def load_skills(
 ) -> SkillsRegistry:
     """Construct a :class:`SkillsRegistry` from an open-robot-skills checkout.
 
-    Discovers both bundle roots — ``<root>/tools/`` and ``<root>/skills/`` —
-    assigning each bundle its ``kind`` from the folder it lives in. Bundle
-    name collisions (within or across the two roots) raise
-    :class:`ValueError` at registration time (silent last-wins is a
+    Discovers all three bundle roots — ``<root>/tools/``, ``<root>/skills/``,
+    and ``<root>/policies/`` — assigning each bundle its ``kind`` from the
+    folder it lives in. Bundle name collisions (within or across roots)
+    raise :class:`ValueError` at registration time (silent last-wins is a
     debugging trap).
     """
     root = Path(root)
@@ -131,7 +136,7 @@ def load_skills(
         reg.discover(bundles_dir, kind=kind, only=only, disable=disable)
     if not found_any:
         logger.warning(
-            "open-robot-skills root %s has neither a tools/ nor a skills/ directory",
+            "open-robot-skills root %s has none of tools/, skills/, or policies/",
             root,
         )
     return reg
@@ -153,9 +158,10 @@ class SkillInfo:
     """Metadata + cached schema for a registered skill bundle."""
 
     name: str
-    kind: Literal["tool", "skill"]
-    """Which bundle root the bundle was discovered under: ``tools/`` or
-    ``skills/``. Replaces the legacy ``runtime.shape`` field."""
+    kind: Literal["tool", "skill", "policy"]
+    """Which bundle root the bundle was discovered under: ``tools/``,
+    ``skills/``, or ``policies/``. Replaces the legacy ``runtime.shape``
+    field."""
 
     bundle_dir: Path
     meta: SkillMeta
@@ -196,7 +202,7 @@ class SkillsRegistry:
         self,
         bundles_dir: str | Path,
         *,
-        kind: Literal["tool", "skill"] = "skill",
+        kind: Literal["tool", "skill", "policy"] = "skill",
         only: list[str] | None = None,
         disable: list[str] | None = None,
         registry: str = "",
@@ -283,7 +289,7 @@ class SkillsRegistry:
         name: str,
         bundle_dir: Path,
         *,
-        kind: Literal["tool", "skill"] = "skill",
+        kind: Literal["tool", "skill", "policy"] = "skill",
         registry: str = "",
     ) -> None:
         """Register a single bundle by name.
@@ -445,15 +451,25 @@ class SkillsRegistry:
     def _load_tools_module(self, info: SkillInfo) -> None:
         """Import ``tools.py`` (when present) through the synthetic package.
 
-        Importing is the integration point with :mod:`gap.tools`: the
+        Importing is the integration point with :mod:`gap_core.tools`: the
         module's ``@tool`` decorators append pending registrations to
-        ``gap.tools._registry._PENDING_TOOLS``, which
+        ``gap_core.tools._registry._PENDING_TOOLS``, which
         ``ToolRegistry.discover_pending()`` drains when it builds the flat
         tool catalog. Class-based stateful tools
         (a :class:`Skill` subclass living in ``tools.py`` —
-        running-policies, tracking-objects) are wired up as the bundle's
+        pi05-libero, tracking-objects) are wired up as the bundle's
         callable too.
+
+        Skipped for out-of-process bundles (``serving.protocol`` other
+        than ``in-process``): their ``tools.py`` runs in the bundle's
+        own venv (whose deps gap-runtime does NOT have — torch + sam3,
+        cuRobo, openpi, …); ``gap.runtime.tool_bundle_manager`` boots
+        the server and registers each tool through
+        :meth:`ToolRegistry.register_rpc` after the catalog handshake.
         """
+        serving = getattr(info.meta, "serving", None)
+        if serving is not None and getattr(serving, "protocol", "in-process") != "in-process":
+            return
         tools_path = info.bundle_dir / "tools.py"
         if not tools_path.is_file():
             return
@@ -479,11 +495,12 @@ class SkillsRegistry:
         self,
         category: str | None = None,
         *,
-        kind: Literal["tool", "skill"] | None = None,
+        kind: Literal["tool", "skill", "policy"] | None = None,
     ) -> list[SkillInfo]:
         """List all registered bundles, optionally filtered by category/kind.
 
-        The coordinator's Skills catalog is ``list_skills(kind="skill")``;
+        The coordinator's Skills catalog is ``list_skills(kind="skill")``
+        plus ``list_skills(kind="policy")`` (both are subgraph-owning);
         tool bundles never own subgraphs and appear only through the flat
         tool catalog.
         """

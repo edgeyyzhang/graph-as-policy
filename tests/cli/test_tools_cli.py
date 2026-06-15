@@ -37,7 +37,7 @@ def fixture_registry(tmp_path: Path) -> Path:
     )
     (good / "tools.py").write_text(
         "from typing import TypedDict\n"
-        "from gap.tools import tool\n\n\n"
+        "from gap_core.tools import tool\n\n\n"
         "class Out(TypedDict):\n"
         "    text: str\n\n\n"
         '@tool(name="rgt-tools-good.echo", summary="Echo a string.", tags=("echoing",))\n'

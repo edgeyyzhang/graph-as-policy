@@ -406,12 +406,11 @@
       "nodes": {
         "run_policy": {
           "type": "tool",
-          "tool": "running-policies.run",
+          "tool": "{{policy_id}}.run",
           "inputs": {
             "observation_stream": {
               "$ref": "in.observation_stream"
             },
-            "policy_id": "{{policy_id}}",
             "prompt": "pick up the object",
             "termination_prompt": "Is the object held in the gripper and lifted off the surface?",
             "max_windows": 70,

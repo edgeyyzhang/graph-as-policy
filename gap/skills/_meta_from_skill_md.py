@@ -38,10 +38,11 @@ from typing import Any
 
 import yaml
 
-from .meta import (
+from gap_core.skills.meta import (
     CanonicalScript,
     ExampleDoc,
     ReferenceDoc,
+    Serving,
     SkillMeta,
     SkillRequires,
 )
@@ -57,7 +58,7 @@ _GAP_ONLY_KEYS = frozenset({
     "allowed_tools", "allowed-tools", "exit_conditions", "produces_outputs",
     "required_inputs", "canonical_scripts", "prompts", "references",
     "examples", "errors", "tips", "hard_rules", "streaming", "tools",
-    "requires",
+    "requires", "serving",
 })
 _REMOVED_KEYS = frozenset({"runtime", "shape", "composes", "category", "tags", "contract"})
 
@@ -173,6 +174,7 @@ def _meta_from_dict(data: dict, *, body: str, bundle_dir: Path) -> SkillMeta:
         streaming=bool(gap_ext.get("streaming", False)),
         tools=_tools_map(gap_ext.get("tools")),
         requires=_requires(gap_ext["requires"]) if "requires" in gap_ext else None,
+        serving=_serving(gap_ext["serving"]) if "serving" in gap_ext else None,
         bundle_dir=bundle_dir,
         body=body,
     )
@@ -229,6 +231,61 @@ def _requires(v: Any) -> SkillRequires:
         env=env,
         env_any=env_any,
         weights=bool(v.get("weights", False)),
+    )
+
+
+_SERVING_KEYS = frozenset({
+    "command", "protocol", "env", "requires_gpu", "weights_uri",
+})
+_SERVING_PROTOCOLS = frozenset({"websocket", "stdio-msgpack", "in-process"})
+
+
+def _serving(v: Any) -> Serving:
+    """``gap.serving`` — out-of-process launch recipe.
+
+    Required for ``kind='policy'`` bundles (the launcher boots one server
+    per referenced preset) and optional for ``kind='tool'`` (opts into
+    the out-of-process RPC path). ``command`` must be a list[str] — never
+    a shell string — so spawn is shell-free and the bundle's own venv
+    activates via ``uv run --project <bundle_dir>`` at launch time.
+    """
+    if v is None:
+        raise ValueError(
+            "gap.serving must be a mapping with at minimum `command:` "
+            "(a non-empty list[str]); to declare in-process dispatch, "
+            "omit the block entirely"
+        )
+    if not isinstance(v, dict):
+        raise ValueError("gap.serving must be a mapping")
+    unknown = sorted(set(v) - _SERVING_KEYS)
+    if unknown:
+        raise ValueError(
+            f"gap.serving has unknown keys {unknown} "
+            f"(allowed: {sorted(_SERVING_KEYS)})"
+        )
+    command = v.get("command")
+    if not isinstance(command, list) or not command:
+        raise ValueError(
+            "gap.serving.command must be a non-empty list[str] (NOT a "
+            "shell string — gap spawns argv directly, no shell expansion)"
+        )
+    cmd = [str(arg) for arg in command]
+    protocol = str(v.get("protocol", "in-process"))
+    if protocol not in _SERVING_PROTOCOLS:
+        raise ValueError(
+            f"gap.serving.protocol={protocol!r} is not one of "
+            f"{sorted(_SERVING_PROTOCOLS)}"
+        )
+    env_raw = v.get("env") or {}
+    if not isinstance(env_raw, dict):
+        raise ValueError("gap.serving.env must be a mapping of str -> str")
+    env = {str(k): str(val) for k, val in env_raw.items()}
+    return Serving(
+        command=cmd,
+        protocol=protocol,
+        env=env,
+        requires_gpu=bool(v.get("requires_gpu", False)),
+        weights_uri=str(v.get("weights_uri", "") or ""),
     )
 
 

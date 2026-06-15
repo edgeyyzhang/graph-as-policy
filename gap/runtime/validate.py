@@ -67,8 +67,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from gap.errors import ValidationIssue
-from gap.schema import FieldInfo, type_fields
+from gap_core.errors import ValidationIssue
+from gap_core.schema import FieldInfo, type_fields
 
 from .workflow import (
     END,

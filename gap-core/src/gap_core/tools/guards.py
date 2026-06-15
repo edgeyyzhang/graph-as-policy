@@ -15,7 +15,7 @@ import threading
 from collections.abc import Iterable
 from enum import Enum
 
-from gap.errors import GuardLimitExceeded
+from gap_core.errors import GuardLimitExceeded
 
 
 class CallCategory(Enum):

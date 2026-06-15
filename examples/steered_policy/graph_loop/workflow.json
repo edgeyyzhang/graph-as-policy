@@ -311,12 +311,11 @@
       "nodes": {
         "run_policy": {
           "type": "tool",
-          "tool": "running-policies.run",
+          "tool": "{{policy_id}}.run",
           "inputs": {
             "observation_stream": {
               "$ref": "in.observation_stream"
             },
-            "policy_id": "{{policy_id}}",
             "prompt": "pick up the object and place it in the basket",
             "termination_prompt": "",
             "gripper_cycle_termination": true,

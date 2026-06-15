@@ -9,7 +9,7 @@ as a fallback when a planner cannot find a collision-free path).
 from typing import TypedDict
 
 from gap import NodeContext
-from gap.types import Quaternion, Se3Pose
+from gap_core.types import Quaternion, Se3Pose
 
 # Canonical top-down gripper orientation (z-axis pointing down in world).
 _DOWN: Quaternion = {"w": 0.0, "x": 1.0, "y": 0.0, "z": 0.0}

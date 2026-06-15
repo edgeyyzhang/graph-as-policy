@@ -1,6 +1,6 @@
 # Skill Catalog
 
-The [open-robot-skills](gh-skills:.) registry ships ten skill bundles
+The [open-robot-skills](gh-skills:.) registry ships eleven skill bundles
 under `skills/`. Each bundle owns one **subgraph** in a generated
 workflow: its `SKILL.md` frontmatter declares the tools it may call
 (`allowed_tools`), the exit conditions, the typed inputs and outputs it
@@ -303,39 +303,69 @@ Optional states and variants:
 
 ## Policy and tracking skills
 
-These two are **class-based, long-running skills**: a workflow invokes
-them as a single stateful node fed by the graph-scoped
-`observation_stream`, rather than as a multi-state subgraph. Both are
-also exposed as **flat tools** (`running-policies.run`,
-`tracking-objects.track`) for callers that want a one-shot invocation.
+These are **class-based, long-running skills**: a workflow invokes them
+as a single stateful node fed by the graph-scoped `observation_stream`,
+rather than as a multi-state subgraph. Each is also exposed as a **flat
+tool** (`pi05-libero.run`, `molmoact-libero.run`, `tracking-objects.track`)
+for callers that want a one-shot invocation.
 
-### running-policies
+The two policy skills are **per-checkpoint learned VLA policies**: a
+learned policy is a first-class skill, not a generic runner. The
+coordinator chooses between them by their `SKILL.md` descriptions
+(same task family, different checkpoint), and the chosen skill **owns its
+serving preset** — a policy node names the skill's `.run` tool and carries
+**no `policy_id`**.
 
-Run a learned VLA policy in closed loop until a termination signal
-fires. Each window the loop reads `observation_stream.latest()`, asks an
-openpi websocket policy server for an action chunk, and forwards the
-first `replan_every` rows to the robot via `sim.apply_policy_action`.
+### pi05-libero
+
+Run the openpi π0.5 LIBERO checkpoint (`pi05_libero`) in closed loop
+until a termination signal fires. Each window the loop reads
+`observation_stream.latest()`, asks the skill's preset policy server for
+an action chunk, and forwards the first `replan_every` rows to the robot
+via `sim.apply_policy_action`.
 
 | | |
 |---|---|
-| Bundle | [skills/running-policies](gh-skills:skills/running-policies) |
-| Form | Class-based skill + flat tool `running-policies.run` |
-| Key inputs | `observation_stream`, `policy_id`, `prompt`; knobs `termination_prompt=""`, `max_windows=20`, `replan_every=5`, `term_period=2`, `arm_id=0`, `vlm_camera=0`, `settle_steps=10`, `gripper_cycle_termination=False` |
-| Returns | `{status, num_windows, num_steps}` with `status` ∈ `completed_by_vlm` \| `gripper_cycle` \| `max_windows` |
-| Install | `running-policies` extra (`openpi-client`); a policy server |
-| Env vars | `GAP_OPENPI_DIR` (used by the shipped presets) |
+| Bundle | [skills/pi05-libero](gh-skills:skills/pi05-libero) |
+| Form | Class-based skill + flat tool `pi05-libero.run` |
+| Checkpoint | openpi π0.5 LIBERO (`s3://openpi-assets/checkpoints/pi05_libero`) |
+| Task family | LIBERO Franka pick-and-place (robosuite `OSC_POSE` deltas); **not** for deformables/folding, articulated objects, non-LIBERO embodiments |
+| Key inputs | `observation_stream`, `prompt`; knobs `termination_prompt=""`, `max_windows=20`, `replan_every=5`, `term_period=2`, `arm_id=0`, `vlm_camera=0`, `settle_steps=10`, `gripper_cycle_termination=False` |
+| Returns | `{status, num_windows, num_steps}`; success exits `gripper_cycle` \| `completed_by_vlm` \| `max_windows`, failure exit `failed` |
+| Install | `pi05-libero` extra (`openpi-client`) |
+| Env vars | `GAP_OPENPI_DIR` (used by the shipped preset) |
 
-Three additive terminators: the `max_windows` backstop, a VLM yes/no
-`termination_prompt` checked every `term_period` windows, and
-gripper-cycle termination (one open → close → open cycle, with the close
-debounced to ≥ 3 windows) — the per-item terminator for clean-all-items
-loops. Policies are registered in the task config's `policies:` block as
-an external `url:`, a managed `start_cmd:`, or a `preset:`
-(`pi05-libero`, `molmoact-libero`); `gap policy serve pi05-libero` is
-the one-command path. The websocket client is cached per `policy_id` via
-the executor's `PolicyExecutor`. Connectors without a VLA passthrough
-do not register `sim.apply_policy_action`, so the call fails loudly
-rather than driving the robot with the wrong action space. See
+### molmoact-libero
+
+The **MolmoAct alternative to `pi05-libero`** for the same task family —
+the two are the policy A/B axis the benchmark ablates. Identical loop and
+capability envelope; it serves the MolmoAct checkpoint instead.
+
+| | |
+|---|---|
+| Bundle | [skills/molmoact-libero](gh-skills:skills/molmoact-libero) |
+| Form | Class-based skill + flat tool `molmoact-libero.run` |
+| Checkpoint | MolmoAct LIBERO (`allenai/MolmoAct-7B-D-LIBERO-0812`), behind a vLLM-style openpi-protocol serve script |
+| Task family | LIBERO Franka pick-and-place (robosuite `OSC_POSE` deltas); same "not for" list as `pi05-libero` |
+| Key inputs | `observation_stream`, `prompt`; same knobs as `pi05-libero.run` |
+| Returns | `{status, num_windows, num_steps}`; same exits as `pi05-libero` |
+| Install | `molmoact-libero` extra (`openpi-client`) |
+| Env vars | `GAP_OPENPI_DIR` (used by the shipped preset) |
+
+Both skills share three additive terminators: the `max_windows`
+backstop, a VLM yes/no `termination_prompt` checked every `term_period`
+windows, and gripper-cycle termination (one open → close → open cycle,
+with the close debounced to ≥ 3 windows) — the per-item terminator for
+clean-all-items loops. Whether the **task** succeeded is a postcondition
+checkpoint, never an exit value. The launcher auto-boots the matching
+preset server when a workflow references the skill — no `policies:` block
+is needed for the common case; an entry keyed by the skill name overrides
+the serving recipe (e.g. an external `url:`). `gap policy serve
+pi05-libero` (or `molmoact-libero`) runs the preset by hand. The
+websocket client is cached per preset via the executor's
+`PolicyExecutor`. Connectors without a VLA passthrough do not register
+`sim.apply_policy_action`, so the call fails loudly rather than driving
+the robot with the wrong action space. See
 [Benchmark policies](../benchmarks/policies.md) for the policy-serving
 workflow.
 

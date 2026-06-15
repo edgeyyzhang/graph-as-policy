@@ -25,8 +25,8 @@ collision-aware variant is needed, it is the SEPARATE node
 from typing import TypedDict
 
 from gap import NodeContext
-from gap.errors import PlanningFailed
-from gap.types import Quaternion, Se3Pose
+from gap_core.errors import PlanningFailed
+from gap_core.types import Quaternion, Se3Pose
 
 
 class Output(TypedDict):

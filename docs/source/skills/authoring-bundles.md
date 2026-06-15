@@ -19,7 +19,7 @@ format.
 |---|---|---|
 | **What it is** | *what the robot can compute*: model-backed callables with no task strategy | *what the robot can do*: a manipulation strategy that owns subgraphs in generated graphs |
 | **Naming** | named after the **model** (`sam3`, `grounding-dino`, `gemini-er`, `molmo`, `vlm`, `curobo`, `geometry`) | named after the **capability** (`perceiving-objects`, `grasping-direct-ik`, `transporting-objects`, …) |
-| **Exposes** | typed functions via `@tool` in `tools.py` (`sam3.segment_box`, `curobo.plan_to_pose`) | LLM guidance (SKILL.md body) + canonical scripts under `scripts/`; *may* also expose a callable via `tools.py`/`skill.py` when invocable as a single unit (`running-policies`, `tracking-objects`) |
+| **Exposes** | typed functions via `@tool` in `tools.py` (`sam3.segment_box`, `curobo.plan_to_pose`) | LLM guidance (SKILL.md body) + canonical scripts under `scripts/`; *may* also expose a callable via `tools.py`/`skill.py` when invocable as a single unit (`pi05-libero`, `molmoact-libero`, `tracking-objects`) |
 | **Appears in graphs as** | `type: tool` nodes (and `ctx.tool(...)` calls inside scripts) | the `skill:` field of a subgraph; its scripts as `type: script` nodes |
 | **LLM context** | flat tool catalog (name + summary + typed schema) | the coordinator sees name + description; the subgraph agent gets the full SKILL.md plus the schemas of its `gap.allowed_tools` |
 

@@ -21,6 +21,12 @@ classifiers = [
 # extra; the connector's in-process IK (pyroki, CPU JAX) is core because every
 # motion-capable connector needs it.
 dependencies = [
+  # Bundle-author surface (workspace sibling): @tool decorator, gap_core.types,
+  # gap_core.errors, gap_core.schema, gap_core.skills.meta, gap_core.rpc. Tool
+  # / policy bundle .venvs install ONLY this distribution; gap-runtime installs
+  # both. Editable via [tool.uv.sources].graph-as-policy-core.
+  "graph-as-policy-core",
+
   # Pipeline / serving
   "httpx>=0.27",
   "pyyaml>=6.0",
@@ -57,13 +63,11 @@ dependencies = [
 
   # NotRequired backport for py3.10
   "typing_extensions>=4.10; python_version < '3.11'",
-]
 
-[project.optional-dependencies]
-# LIBERO simulation stack (quickstart, benchmark). The posvar LIBERO fork and
-# robosuite are vendored submodules wired via [tool.uv.sources] below; pip
-# users: `pip install -e third_party/Variational-Automation-Benchmark -e third_party/robosuite`.
-libero = [
+  # LIBERO sim stack (Variational-Automation-Benchmark fork + robosuite).
+  # Vendored as third_party submodules and resolved via [tool.uv.sources] —
+  # the dev/CI box always runs the sim, so promote these from an opt-in
+  # extra to baseline deps. `gap run --sim …` works out of the box.
   # Physics-exact pin: the dev tree's uv.lock resolved 3.6.0 and the
   # acceptance numbers were measured on it — MuJoCo minors change contact
   # dynamics enough to move grasp/drop success rates materially.
@@ -89,6 +93,15 @@ libero = [
   # loose transitive requirement.
   "torch>=2.7",
 ]
+
+[project.optional-dependencies]
+# LIBERO simulation stack (quickstart, benchmark). The posvar LIBERO fork and
+# robosuite are vendored submodules wired via [tool.uv.sources] below; pip
+# users: `pip install -e third_party/Variational-Automation-Benchmark -e third_party/robosuite`.
+libero = []   # historical alias: the LIBERO sim stack is now a baseline
+              # dep (see [project.dependencies]). Kept as an empty extra so
+              # `pip install graph-as-policy[libero]` and meta-extras that
+              # reference `[libero]` don't break.
 # Scale-out: shared skill actors for parallel benchmark workers.
 ray = ["ray[serve]>=2.30"]
 # Real hardware (UR + RTDE; pyzed is a manual ZED SDK install — lazy import).
@@ -127,10 +140,17 @@ Homepage = "https://github.com/graph-robots/graph-as-policy"
 # ---------------------------------------------------------------------------
 # uv sources — vendored submodules (linux sim stack) + the sibling skills repo
 # ---------------------------------------------------------------------------
+[tool.uv.workspace]
+# The repo is a uv workspace: this gap pyproject is the runtime distribution
+# (graph-as-policy) and `gap-core/` is the small bundle-author surface
+# (graph-as-policy-core). One uv.lock + .venv at the repo root for both.
+members = ["gap-core"]
+
 [tool.uv.sources]
 libero = { path = "third_party/Variational-Automation-Benchmark", editable = true }
 robosuite = { path = "third_party/robosuite", editable = true }
 open-robot-skills = { path = "../open-robot-skills", editable = true }
+graph-as-policy-core = { workspace = true }
 
 [tool.uv]
 # sam3's published metadata over-pins numpy==1.26, which is unsolvable next to

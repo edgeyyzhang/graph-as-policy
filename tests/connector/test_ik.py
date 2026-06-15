@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from gap.connector import ik as gik
-from gap.types import make_pose
+from gap_core.types import make_pose
 
 _HOME = [0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785]
 

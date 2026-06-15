@@ -33,8 +33,8 @@ from types import SimpleNamespace
 from typing import Any
 
 from gap.skills import SkillsRegistry
-from gap.tools import ToolDescriptor, ToolRegistry
-from gap.tools import _registry as _tools_registry_module
+from gap_core.tools import ToolDescriptor, ToolRegistry
+from gap_core.tools import _registry as _tools_registry_module
 
 from ._meta_tools import register_codegen_meta_tools
 
@@ -91,15 +91,50 @@ def build_codegen_tool_registry(
     """Build the flat tool catalog the codegen prompts render from.
 
     Contains: connector tool descriptors (schema-only), every bundle
-    ``@tool`` (imported by *skills_registry* discovery), and the
-    codegen-scope meta-tools.
+    ``@tool`` (imported by *skills_registry* discovery), bundles whose
+    serving.protocol is ``stdio-msgpack`` (those declare tools in SKILL.md
+    ``gap.tools`` — the @tool decorators only fire inside the bundle's
+    own venv when ``gap_tool_server`` boots), and the codegen-scope
+    meta-tools.
     """
     registry = ToolRegistry()
     for name, descriptor in connector_tool_descriptors().items():
         registry._tools.setdefault(name, descriptor)
     _drain_pending_with_archive(registry)
+    if skills_registry is not None:
+        _register_rpc_bundle_tools(registry, skills_registry)
     register_codegen_meta_tools(registry)
     return registry
+
+
+def _register_rpc_bundle_tools(
+    registry: ToolRegistry, skills_registry: SkillsRegistry,
+) -> None:
+    """Register schema-only stubs for tools whose @tool definitions live
+    in an out-of-process bundle venv (``serving.protocol == 'stdio-msgpack'``).
+
+    The codegen LLM needs to KNOW these tools exist + their summaries.
+    Schema introspection isn't available without booting the bundle; this
+    registers a placeholder so the prompt assembler surfaces the tool
+    name and the SKILL.md summary, and the validator accepts ``tool:``
+    references to it. Dispatch happens through the runtime registry's
+    RpcAdapter once :class:`ToolBundleManager` boots the bundle at
+    workflow execution time.
+    """
+    for info in skills_registry.list_skills():
+        serving = getattr(info.meta, "serving", None)
+        if serving is None or getattr(serving, "protocol", None) != "stdio-msgpack":
+            continue
+        for tool_name, summary in (info.meta.tools or {}).items():
+            if tool_name in registry:
+                continue
+            try:
+                registry.register_rpc(tool_name, client=None, summary=summary)
+            except ValueError:
+                # Tool already registered elsewhere (e.g. drained @tool
+                # left over in the archive); first registration wins.
+                logger.debug("rpc tool %r already registered; keeping existing",
+                             tool_name)
 
 
 def load_codegen_registries(

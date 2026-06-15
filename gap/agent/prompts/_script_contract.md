@@ -9,7 +9,7 @@ emitted by the `coder` subagent) follow a uniform contract.
 from typing import TypedDict
 
 from gap import NodeContext
-from gap.types import OrientedBoundingBox, Se3Pose, Vec3
+from gap_core.types import OrientedBoundingBox, Se3Pose, Vec3
 
 
 class Output(TypedDict):
@@ -31,42 +31,23 @@ def run(ctx: NodeContext, obb: OrientedBoundingBox, z_offset: float) -> Output:
   - Use `print()` for debug output.
 - Scripts are Python: `True` / `False`, not JSON.
 
-## The gap.types vocabulary (numpy-first TypedDicts)
+## The gap_core.types vocabulary (numpy-first TypedDicts)
 
-`gap.types` defines plain `TypedDict`s carrying floats and numpy
+`gap_core.types` defines plain `TypedDict`s carrying floats and numpy
 arrays — access fields with **dict subscripts**, never attribute
 access:
 
 ```python
-from gap.types import (
-    Mask,                 # np.ndarray uint8 [H, W] (0 = background, 255 = fg)
-    Observation,          # {"cameras": [CameraFrame], "arms": [ArmState]}
-    OrientedBoundingBox,  # {"center": Vec3, "extent": Vec3, "orientation": Quaternion}
-    PointCloud,           # {"points": float32 [N, 3], "colors"?: float32 [N, 3]}
-    Se3Pose,              # {"position": Vec3, "rotation": Quaternion}
-    Vec3,                 # {"x": float, "y": float, "z": float}
-)
-
 z = pose["position"]["z"]          # ✅
 z = pose.position.z                # ❌ AttributeError — these are dicts
 ```
 
-| Type | Shape |
-|---|---|
-| `Vec3` | `{"x", "y", "z"}` (floats) |
-| `Quaternion` | `{"w", "x", "y", "z"}` — **wxyz scalar-first**. Top-down gripper is `{"w": 0, "x": 1, "y": 0, "z": 0}`. |
-| `Se3Pose` | `{"position": Vec3, "rotation": Quaternion}` — the key is **`rotation`** (NOT `orientation`) |
-| `OrientedBoundingBox` | `{"center": Vec3, "extent": Vec3, "orientation": Quaternion}` — `extent` holds **half**-extents; the key is **`orientation`** (NOT `rotation`) |
-| `CameraFrame` | `{"name": str, "rgb": uint8 [H,W,3], "depth": float32 [H,W] meters, "intrinsics": float64 [3,3] K, "pose": Se3Pose}` — image/depth are numpy arrays |
-| `Mask` | bare `np.ndarray` uint8 `[H, W]` |
-| `PointCloud` | `{"points": float32 [N,3]}` (+ optional `"colors"`) |
-| `JointState` | `{"positions": float64 [dof]}` |
-| `Trajectory` | `{"waypoints": list[JointState]}` |
-| `Observation` | `{"cameras": list[CameraFrame], "arms": list[ArmState]}`; each arm has `joint_state`, `gripper_fraction`, `ee_pose` |
-
-Note the asymmetry: `Se3Pose["rotation"]` vs
-`OrientedBoundingBox["orientation"]` — it trips up generated code
-constantly.
+The **complete field reference for every gap_core.types type** — exact key
+names, nesting, and array shapes — is generated from `gap_core.schema` and
+injected below under "Type field reference". Consult it instead of
+guessing; it is authoritative and always current (e.g. the
+`Se3Pose["rotation"]` vs `OrientedBoundingBox["orientation"]` asymmetry
+that trips up generated code).
 
 ## Loading bundled prompt templates
 

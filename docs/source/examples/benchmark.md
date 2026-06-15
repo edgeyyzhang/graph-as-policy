@@ -99,19 +99,23 @@ devices) and cap concurrency with the config's `num_workers` keys.
   ([Steered Policy](steered-policy.md)).
 - `policy_only` — the bare VLA baseline.
 
-The policy modes talk to an **external** policy server that must be running
-before the sweep; the harness preflights the websocket and never owns the
-server lifecycle:
+The policy modes run a policy **skill** (`pi05-libero` or `molmoact-libero`),
+whose preset server the workers auto-boot. To instead share one **external**
+server across all workers — the setup below — run it yourself and override the
+skill's recipe with a `url:`; the harness then preflights that websocket and
+never owns its lifecycle:
 
 ```bash
 uv run gap policy serve pi05-libero --port 9100    # -> ws://127.0.0.1:9100
 ```
 
-The config wires it in with a shared policy registry and per-mode overrides:
+The config overrides the `pi05-libero` skill's serving recipe to point at that
+external server (the override key must equal the skill name), with per-mode
+worker overrides:
 
 ```yaml
 policies:
-  libero_pi05:
+  pi05-libero:                       # override: skill name == entry key
     url: ws://127.0.0.1:9100
 
 policy_manager:
@@ -131,7 +135,8 @@ benchmark:
 
 Point each mode's `workflow_dir` at the graph template you want it to run —
 for example [examples/steered_policy/graph_loop](gh-engine:examples/steered_policy/graph_loop),
-whose `{{policy_id}}` placeholder the harness materializes per cell. The
+whose `{{policy_id}}.run` tool placeholder the harness materializes per cell
+(substituting the policy-skill name). The
 policy modes are throttled to fewer workers than `llm_generation` because
 every worker shares one inference endpoint. See
 [Policies](../benchmarks/policies.md) for the full policy-serving guide.

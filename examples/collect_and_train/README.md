@@ -4,9 +4,10 @@
 
 The full data loop: a verified gap graph acts as a **scripted expert**, its
 rollouts become a demonstration dataset, an external recipe trains a VLA
-policy on them, and the trained policy comes back into gap as a
-`running-policies` node — steered by the same perception that collected the
-data (see [`../steered_policy/`](../steered_policy)).
+policy on them, and the trained policy comes back into gap as its own
+**policy-skill** node (like the shipped `pi05-libero` / `molmoact-libero`
+skills) — steered by the same perception that collected the data (see
+[`../steered_policy/`](../steered_policy)).
 
 ## 1. Collect
 
@@ -37,9 +38,14 @@ websocket policy server.
 
 ## 3. Serve + run the trained policy
 
+A graph that references a shipped policy skill (`pi05-libero` /
+`molmoact-libero`) auto-boots its preset — no setup needed. To run that
+server by hand, or to serve your own checkpoint:
+
 ```bash
-uv run gap policy serve pi05-libero --port 9100   # or your own checkpoint:
-# policies: {my_policy: {start_cmd: "... --port {port}"}} in the task yaml
+uv run gap policy serve pi05-libero --port 9100   # run a shipped preset by hand
+# your own checkpoint: package it as a policy-skill bundle, or for a one-off
+# add policies: {my_policy: {start_cmd: "... --port {port}"}} to the task yaml
 
 MUJOCO_GL=egl uv run gap run examples/steered_policy/graph_loop \
     --sim libero_object_all_variance/0

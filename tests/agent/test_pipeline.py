@@ -15,7 +15,7 @@ import json
 import pytest
 
 from gap.agent.config import PipelineConfig
-from gap.errors import ValidationIssue
+from gap_core.errors import ValidationIssue
 
 from .conftest import (
     CHECKPOINT_RESPONSE_GOOD,

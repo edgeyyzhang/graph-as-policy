@@ -1,8 +1,14 @@
-"""Tests for gap.runtime.policy_manager + policy_presets — no real policy server.
+"""Tests for gap.runtime.policy_manager — no real policy server.
 
 Managed entries are exercised with a fake ``python -c`` TCP server so the
 ``{port}`` substitution, env overrides, readiness preflight, and eviction
 teardown all run against a real subprocess without any model weights.
+
+The new entry shape is ``command: list[str]`` (NOT a shell string).
+``bundle_dir`` is optional — when set, the manager prepends
+``uv run --project <bundle_dir> --`` so the bundle's own venv activates;
+when omitted, the command spawns directly (used for tests and any
+self-contained user-authored entries).
 """
 
 from __future__ import annotations
@@ -17,7 +23,6 @@ from gap.runtime.policy_manager import (
     PolicyManager,
     PolicyStartupError,
 )
-from gap.runtime.policy_presets import PRESETS, resolve_policies
 
 # Fake policy server: binds the substituted {port} and idles. Reads its
 # lifetime from GAP_TEST_SLEEP with no default, so the managed entry's
@@ -29,9 +34,9 @@ _FAKE_SERVER_CODE = (
     "s.listen(5); "
     "time.sleep(float(os.environ['GAP_TEST_SLEEP']))"
 )
-FAKE_SERVER_CMD = f'{sys.executable} -c "{_FAKE_SERVER_CODE}"'
+FAKE_SERVER_CMD = [sys.executable, "-c", _FAKE_SERVER_CODE]
 
-EXIT_EARLY_CMD = f"{sys.executable} -c 'import sys; sys.exit(3)'"
+EXIT_EARLY_CMD = [sys.executable, "-c", "import sys; sys.exit(3)"]
 
 
 # ---------------------------------------------------------------------------
@@ -78,15 +83,15 @@ def test_unknown_policy_id_fails_preflight():
         mgr.boot_all({"ghost"})
 
 
-def test_entry_with_url_and_start_cmd_rejected():
+def test_entry_with_url_and_command_rejected():
     mgr = PolicyManager(
-        entries={"both": {"url": "ws://h:1", "start_cmd": "x --port {port}"}},
+        entries={"both": {"url": "ws://h:1", "command": ["x", "--port", "{port}"]}},
     )
     with pytest.raises(PolicyConfigError, match="not both"):
         mgr.boot_all({"both"})
 
 
-def test_entry_with_neither_url_nor_start_cmd_rejected():
+def test_entry_with_neither_url_nor_command_rejected():
     mgr = PolicyManager(entries={"empty": {}})
     with pytest.raises(PolicyConfigError, match="must declare"):
         mgr.boot_all({"empty"})
@@ -99,14 +104,17 @@ def test_url_for_before_boot_raises():
 
 
 # ---------------------------------------------------------------------------
-# Managed (start_cmd:) entries
+# Managed (command:) entries
 # ---------------------------------------------------------------------------
 
 
 def test_managed_spawns_with_port_substitution_and_tears_down_on_evict():
     mgr = PolicyManager(
         entries={
-            "srv": {"start_cmd": FAKE_SERVER_CMD, "env": {"GAP_TEST_SLEEP": "60"}},
+            "srv": {
+                "command": FAKE_SERVER_CMD,
+                "env": {"GAP_TEST_SLEEP": "60"},
+            },
         },
         startup_timeout_s=30.0,
         evict_grace_s=5.0,
@@ -131,7 +139,7 @@ def test_managed_spawns_with_port_substitution_and_tears_down_on_evict():
 
 def test_managed_subprocess_early_exit_fails_boot():
     mgr = PolicyManager(
-        entries={"bad": {"start_cmd": EXIT_EARLY_CMD}},
+        entries={"bad": {"command": EXIT_EARLY_CMD}},
         startup_timeout_s=10.0,
     )
     with pytest.raises(PolicyStartupError, match="exited early"):
@@ -141,9 +149,23 @@ def test_managed_subprocess_early_exit_fails_boot():
 
 def test_managed_env_must_be_mapping():
     mgr = PolicyManager(
-        entries={"bad": {"start_cmd": FAKE_SERVER_CMD, "env": "GAP_TEST_SLEEP=60"}},
+        entries={"bad": {"command": FAKE_SERVER_CMD, "env": "GAP_TEST_SLEEP=60"}},
     )
     with pytest.raises((PolicyConfigError, PolicyStartupError), match="mapping"):
+        mgr.boot_all({"bad"})
+
+
+def test_managed_command_must_be_list(tmp_path):
+    mgr = PolicyManager(
+        entries={"bad": {"command": "python -c 'pass' --port {port}"}},
+    )
+    with pytest.raises((PolicyConfigError, PolicyStartupError), match="non-empty list"):
+        mgr.boot_all({"bad"})
+
+
+def test_managed_command_must_be_non_empty():
+    mgr = PolicyManager(entries={"bad": {"command": []}})
+    with pytest.raises((PolicyConfigError, PolicyStartupError), match="non-empty list"):
         mgr.boot_all({"bad"})
 
 
@@ -154,67 +176,115 @@ def test_boot_all_with_no_required_ids_is_noop():
 
 
 # ---------------------------------------------------------------------------
-# Presets
+# bundle_dir wiring → `uv run --project` prefix
 # ---------------------------------------------------------------------------
 
 
-def test_presets_shape_is_minimal_and_factual():
-    assert set(PRESETS) == {"pi05-libero", "molmoact-libero"}
-    for preset in PRESETS.values():
-        assert set(preset) == {"checkpoint_uri", "start_cmd", "env", "notes"}
-        assert "--port {port}" in preset["start_cmd"]
-        assert preset["env"] == {}
+def test_bundle_dir_prepends_uv_run_project(monkeypatch, tmp_path):
+    """A bundle_dir entry wraps the command in ``uv run --project ... --``."""
+    spawn_calls: list[list[str]] = []
 
-    pi = PRESETS["pi05-libero"]
-    assert pi["checkpoint_uri"] == "s3://openpi-assets/checkpoints/pi05_libero"
-    assert "serve_policy.py" in pi["start_cmd"]
+    class _FakeProc:
+        def __init__(self):
+            self.pid = 99999
+            self._exited = False
 
-    molmo = PRESETS["molmoact-libero"]
-    assert "$GAP_OPENPI_DIR" in molmo["start_cmd"]
-    assert "GAP_OPENPI_DIR" in molmo["notes"]
+        def poll(self):
+            return 0 if self._exited else None
 
+        def wait(self, timeout=None):
+            self._exited = True
+            return 0
 
-def test_preset_expansion_produces_managed_entry():
-    resolved = resolve_policies({"pi": {"preset": "pi05-libero"}})
-    entry = resolved["pi"]
-    assert "url" not in entry and "preset" not in entry
-    assert entry["start_cmd"] == PRESETS["pi05-libero"]["start_cmd"]
-    assert "{port}" in entry["start_cmd"]
-    assert entry["env"] == {}
+    def fake_popen(argv, **kwargs):
+        spawn_calls.append(list(argv))
+        # Fake an immediately-listening server: skip the readiness probe.
+        monkeypatch.setattr(pm, "_tcp_ready", lambda *a, **k: True)
+        return _FakeProc()
 
+    monkeypatch.setattr(pm.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(pm, "_allocate_free_port", lambda: 47000)
 
-def test_preset_entry_env_overrides_merge():
-    resolved = resolve_policies(
-        {"pi": {"preset": "pi05-libero", "env": {"JAX_PLATFORMS": "cuda"}}},
+    bundle = tmp_path / "policies" / "fake-policy"
+    bundle.mkdir(parents=True)
+    mgr = PolicyManager(
+        entries={
+            "fake": {
+                "command": ["python", "-m", "fake.server", "--port", "{port}"],
+                "bundle_dir": bundle,
+            },
+        },
+        startup_timeout_s=2.0,
     )
-    assert resolved["pi"]["env"] == {"JAX_PLATFORMS": "cuda"}
-    # The shared preset table is not mutated.
-    assert PRESETS["pi05-libero"]["env"] == {}
+    mgr.boot_all({"fake"})
+
+    assert len(spawn_calls) == 1
+    argv = spawn_calls[0]
+    # uv run --project <bundle_dir> -- <command…> with {port} substituted.
+    assert argv == [
+        "uv", "run", "--project", str(bundle), "--",
+        "python", "-m", "fake.server", "--port", "47000",
+    ]
+    # shell=False is non-negotiable — no env-var expansion in argv.
 
 
-def test_non_preset_entries_pass_through_unchanged():
-    entries = {
-        "ext": {"url": "ws://127.0.0.1:8123"},
-        "managed": {"start_cmd": "serve --port {port}"},
-    }
-    assert resolve_policies(entries) == entries
-    assert resolve_policies(None) == {}
+def test_no_bundle_dir_spawns_command_directly(monkeypatch, tmp_path):
+    """Without bundle_dir, the command is spawned as-is (no uv run prefix)."""
+    spawn_calls: list[list[str]] = []
+
+    class _FakeProc:
+        def __init__(self):
+            self.pid = 99998
+
+        def poll(self):
+            return None
+
+    def fake_popen(argv, **kwargs):
+        spawn_calls.append(list(argv))
+        monkeypatch.setattr(pm, "_tcp_ready", lambda *a, **k: True)
+        return _FakeProc()
+
+    monkeypatch.setattr(pm.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(pm, "_allocate_free_port", lambda: 48000)
+
+    mgr = PolicyManager(
+        entries={
+            "raw": {
+                "command": ["/abs/path/serve", "--port", "{port}"],
+            },
+        },
+        startup_timeout_s=2.0,
+    )
+    mgr.boot_all({"raw"})
+
+    assert spawn_calls == [["/abs/path/serve", "--port", "48000"]]
 
 
-def test_unknown_preset_fails():
-    with pytest.raises(PolicyConfigError, match="unknown preset"):
-        resolve_policies({"pi": {"preset": "pi99-nowhere"}})
+def test_spawn_uses_shell_false(monkeypatch, tmp_path):
+    """The new spawn path NEVER uses shell=True — no env-var expansion."""
+    captured: dict = {}
 
+    class _FakeProc:
+        def __init__(self):
+            self.pid = 99997
 
-def test_preset_with_explicit_start_cmd_rejected():
-    with pytest.raises(PolicyConfigError, match="not both"):
-        resolve_policies(
-            {"pi": {"preset": "pi05-libero", "start_cmd": "x --port {port}"}},
-        )
+        def poll(self):
+            return None
 
+    def fake_popen(argv, **kwargs):
+        captured["argv"] = list(argv)
+        captured["shell"] = kwargs.get("shell", False)
+        monkeypatch.setattr(pm, "_tcp_ready", lambda *a, **k: True)
+        return _FakeProc()
 
-def test_policy_manager_resolves_presets_at_construction():
-    mgr = PolicyManager(entries={"pi": {"preset": "pi05-libero"}})
-    entry = mgr._entries["pi"]
-    assert entry["start_cmd"] == PRESETS["pi05-libero"]["start_cmd"]
-    assert "preset" not in entry
+    monkeypatch.setattr(pm.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(pm, "_allocate_free_port", lambda: 49000)
+
+    mgr = PolicyManager(
+        entries={"x": {"command": ["python", "--version"]}},
+        startup_timeout_s=2.0,
+    )
+    mgr.boot_all({"x"})
+
+    assert captured["shell"] is False
+    assert captured["argv"] == ["python", "--version"]

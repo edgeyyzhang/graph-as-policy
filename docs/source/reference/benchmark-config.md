@@ -67,21 +67,22 @@ wins.
 
 ### `policies`
 
-The learned-policy registry: `policies.<id>` entries referenced by
-`run_policy` nodes and by `benchmark.policies` /
-`mode_overrides.<mode>.policy_id`. Each entry is **exactly one** of external,
-managed, or preset:
+A learned policy is a **skill** (e.g. `pi05-libero`, `molmoact-libero`); the
+launcher auto-boots its preset server when a workflow references it, so the
+`policies:` block is **optional**. You only add an entry to **override** how a
+skill is served, and the entry **key must equal the skill name**. Each entry
+is **exactly one** of external, managed, or preset, and is referenced by the
+`policy_id` axis (`benchmark.policies` / `mode_overrides.<mode>.policy_id`),
+whose values are policy-skill names:
 
 ```yaml
 policies:
-  libero_pi05:                     # external: already running
+  pi05-libero:                     # override: external server already running
     url: ws://127.0.0.1:9100
-  my_vla:                          # managed: harness owns the subprocess
+  molmoact-libero:                 # override: harness owns the subprocess
     start_cmd: "python serve.py --port {port}"
     env:
       CUDA_VISIBLE_DEVICES: "0"
-  pi05:                            # preset: named recipe expanded at load
-    preset: pi05-libero
 ```
 
 | Key | Type | Notes |
@@ -159,7 +160,7 @@ benchmark:
 | `benchmark.task_ids` | list of int | null | Explicit task subset; overrides `n_tasks`. |
 | `benchmark.n_seeds` | int | `50` | Trials per task. Seed `i` maps to LIBERO init state `(i-1) % len` — identical across modes. |
 | `benchmark.num_workers` | int | `8` | Per-cell parallelism, passed to `launch()` as `trials.num_workers`. GPU spread is `GAP_MUJOCO_EGL_DEVICES=<csv>`. |
-| `benchmark.policies` | list of str | `[]` | The A/B axis: ids from the top-level `policies:` registry. When non-empty, every policy-dependent mode runs once per id and cell dirs gain a `/<policy_id>/` segment. |
+| `benchmark.policies` | list of str | `[]` | The A/B axis: policy-**skill** names (e.g. `pi05-libero`, `molmoact-libero`), each optionally overridden in the top-level `policies:` block. When non-empty, every policy-dependent mode runs once per skill and cell dirs gain a `/<policy_id>/` segment. |
 | `benchmark.record_video` | bool | `trials.record_video` | Record + collate trial videos into `<run>/videos/`. |
 | `benchmark.output_dir` | path | `./benchmark_runs` | Run-dir parent; relative paths resolve against the **YAML's directory**. Ignored in suites mode (which uses `trials.output_dir`). |
 | `benchmark.gate_threshold` | float | `0.90` | Wins over a top-level `gate_threshold`. |
@@ -196,7 +197,7 @@ inherits the top-level value.
 | `mode_overrides.<mode>.n_seeds` | int | inherit | |
 | `mode_overrides.<mode>.num_workers` | int | inherit | Throttle policy modes when sharing one inference endpoint (posvar uses `4`). |
 | `mode_overrides.<mode>.workflow_dir` | path | null | The workflow template directory. **Required** for `llm_plus_policy` and `policy_only` — missing it errors every cell of that mode (and therefore fails `--gate`). Relative paths are absolutized against the YAML's directory. |
-| `mode_overrides.<mode>.policy_id` | str | null | Which `policies:` entry fills the template's `{{policy_id}}` placeholder when `benchmark.policies` is empty; null falls back to `libero_pi05`. |
+| `mode_overrides.<mode>.policy_id` | str | null | Which policy **skill** fills the template's `{{policy_id}}` placeholder when `benchmark.policies` is empty; the value is a skill name (e.g. `pi05-libero` / `molmoact-libero`). Null falls back to `pi05-libero`. |
 | `mode_overrides.<mode>.time_budget_s` | float | null | Parsed but **not consumed by any built-in mode** — inert. |
 | `mode_overrides.<mode>.extra` | mapping | `{}` | Forwarded verbatim to the mode (no built-in mode reads more keys). |
 
@@ -210,7 +211,7 @@ tokens in `workflow.json`:
 | `{{target}}` | Target object phrase parsed from the LIBERO prompt |
 | `{{target_full}}` | Same as `{{target}}` (the prompt has no richer descriptor) |
 | `{{container}}` | Container phrase from the prompt; falls back to `"basket"` |
-| `{{policy_id}}` | Resolved policy id; default `libero_pi05` |
+| `{{policy_id}}` | Resolved policy-**skill** name (e.g. `pi05-libero`), substituted to form the `<skill>.run` tool node; default `pi05-libero` |
 
 Target/container come from matching the prompt against the pick-and-place
 grammar `pick (up) (the) <target> and place it in (the) <container>`. An

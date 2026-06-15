@@ -8,7 +8,7 @@ pose — rotation never happens during the descent.
 from typing import TypedDict
 
 from gap import NodeContext
-from gap.types import Se3Pose
+from gap_core.types import Se3Pose
 
 
 class Output(TypedDict):

@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from gap.errors import WorkflowValidationError
+from gap_core.errors import WorkflowValidationError
 from gap.runtime.validate import validate_workflow
 from gap.runtime.workflow import (
     START,

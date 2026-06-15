@@ -38,7 +38,7 @@ def configure(
         _trial_paths = discover_trials(root_dir)
     # Eagerly create the tool registry for schema introspection
     try:
-        from gap.tools import default_tool_registry
+        from gap_core.tools import default_tool_registry
         _tool_registry = default_tool_registry()
         if skills is not None:
             from gap.skills import load_registry_set

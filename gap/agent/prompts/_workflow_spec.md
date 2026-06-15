@@ -60,7 +60,7 @@ field.
 }
 ```
 
-Input/output **type names** are bare strings from the `gap.schema` type
+Input/output **type names** are bare strings from the `gap_core.schema` type
 registry — e.g. `"OrientedBoundingBox"`, `"Mask"`, `"PointCloud"`,
 `"Se3Pose"`, `"Observation"`, `"Trajectory"`, plus the scalars `"str"` /
 `"int"` / `"float"` / `"bool"`.
@@ -92,11 +92,10 @@ the top level of the workflow (not inside subgraphs).
 { "type": "tool", "tool": "sam3.segment_box",
   "inputs": { "image": { "$ref": "obs.rgb" }, "box": { "$ref": "perceive.box" } } }
 
-{ "type": "tool", "tool": "running-policies",
-  "inputs": { "observation_stream": { "$ref": "in.observation_stream" } } }  /* callable skill bundle */
-
-{ "type": "tool", "tool": "libero_pi05",
-  "inputs": { "prompt": "...", "max_windows": 25 } }       /* learned policy */
+{ "type": "tool", "tool": "pi05-libero.run",
+  "inputs": { "observation_stream": { "$ref": "in.observation_stream" },
+              "prompt": "pick up the object and place it in the basket",
+              "gripper_cycle_termination": true } }          /* learned-policy skill: owns its model + checkpoint, no policy_id */
 
 { "type": "tool", "tool": "tracking-objects", "streaming": true,
   "inputs": { "observation_stream": { "$ref": "in.observation_stream" } } }
@@ -115,8 +114,9 @@ the top level of the workflow (not inside subgraphs).
   `sam3.segment_text`, `grounding-dino.detect`,
   `geometry.filter_and_compute_obb`, `curobo.plan_to_grasp_poses`),
   callable skill bundles (registered by bundle name, e.g.
-  `running-policies`, `tracking-objects`), and learned policies
-  (registered by policy name). `tool:` is always a single flat name.
+  `tracking-objects`), and learned-policy skills (one bundle per model
+  checkpoint, e.g. `pi05-libero`, `molmoact-libero` — each owns its server
+  and takes no `policy_id`). `tool:` is always a single flat name.
 - **`script`** — local Python file in the workflow folder. Prefer to
   point at a canonical bundle script (listed in the chosen skill's
   "Canonical scripts" table); only emit your own inline Python for
@@ -196,31 +196,15 @@ Errors are fed back; fix every error and re-emit the full subgraph.
 
 ## Data types
 
-`gap.types` defines plain TypedDicts carrying floats and numpy arrays.
-Declared input/output type names come from the `gap.schema` registry (`"Vec3"`, `"Quaternion"`, `"Se3Pose"`,
-`"OrientedBoundingBox"`, `"Mask"`, `"PointCloud"`, `"CameraFrame"`,
-`"JointState"`, `"Trajectory"`, `"Observation"`, `"GraspCandidates"`,
-`"WorldConfig"`, plus `"str"` / `"int"` / `"float"` / `"bool"`).
-
-In scripts, import the types and use **dict subscripts**:
+Declared input/output type names are bare strings from the `gap_core.schema`
+type registry (`"OrientedBoundingBox"`, `"Se3Pose"`, `"PointCloud"`,
+`"Mask"`, `"Observation"`, … plus the scalars `"str"` / `"int"` /
+`"float"` / `"bool"`). The **complete, authoritative field reference for
+every type** — exact key names, nesting, and array shapes — is generated
+from `gap_core.schema` and injected into your prompt below under "Type field
+reference"; consult it instead of guessing field names. In scripts,
+import the types and use **dict subscripts** (never attribute access):
 
 ```python
-from gap.types import OrientedBoundingBox, PointCloud, Se3Pose, Vec3
+from gap_core.types import OrientedBoundingBox, PointCloud, Se3Pose, Vec3
 ```
-
-## Field reference
-
-Exact field names — these trip up LLMs (everything is a dict; there is
-no attribute access):
-
-| Type | Keys |
-|---|---|
-| `Vec3` | `"x"`, `"y"`, `"z"` (all floats) |
-| `Quaternion` | `"w"`, `"x"`, `"y"`, `"z"` (WXYZ scalar-first). Top-down gripper is `{"w": 0, "x": 1, "y": 0, "z": 0}`. |
-| `Se3Pose` | `"position": Vec3`, **`"rotation": Quaternion`** (NOT `orientation`) |
-| `OrientedBoundingBox` | `"center": Vec3`, `"extent": Vec3` (half-extents), **`"orientation": Quaternion`** (NOT `rotation`) |
-| `CameraFrame` | `"name"`, `"rgb"` (uint8 numpy [H,W,3]), `"depth"` (float32 numpy [H,W], meters), `"intrinsics"` (float64 numpy [3,3]), `"pose": Se3Pose` |
-| `Mask` | bare uint8 numpy array [H,W] |
-
-Note the asymmetry: `Se3Pose["rotation"]` vs
-`OrientedBoundingBox["orientation"]`.

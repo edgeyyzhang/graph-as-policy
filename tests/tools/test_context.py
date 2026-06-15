@@ -7,9 +7,9 @@ from typing import TypedDict
 
 import pytest
 
-from gap.errors import GuardLimitExceeded, TaskCancelled
+from gap_core.errors import GuardLimitExceeded, TaskCancelled
 from gap.runtime.context import CancelToken, NodeContext
-from gap.tools import ToolRegistry, guards
+from gap_core.tools import ToolRegistry, guards
 
 
 class IouOutput(TypedDict):

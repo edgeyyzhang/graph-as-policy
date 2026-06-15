@@ -132,6 +132,19 @@ staging).
    large (any half-extent ≳ 6 cm), that is the signature of this mistake
    — switch the object perception to `perceiving-object-parts`, do NOT
    just retune the grasp.
+
+   **HARD RULE — learned-policy skills are capability-specific.** A policy
+   skill (e.g. `pi05-libero`, `molmoact-libero`) runs ONE model checkpoint
+   trained for a specific embodiment + task family — read its description in
+   the Available Skills table. Only delegate a segment to a policy skill
+   when the task is inside that envelope (LIBERO Franka pick-and-place for
+   the shipped ones). If it is outside — deformables / cloth folding,
+   articulated objects, a non-LIBERO embodiment, anything the checkpoint
+   never saw — do NOT pick a policy skill and hope: use geometric skills,
+   invent a skill (`generated=True`), or `report_missing_capability`. Route
+   a policy subgraph on ITS declared exit conditions (e.g. `gripper_cycle`,
+   `max_windows`, `failed`), never an invented task word like `folded` —
+   whether the task actually succeeded is a checkpoint, not an exit.
 2. **Each subgraph node's name.** The same skill MAY be instantiated
    multiple times under different names (e.g. two `perceiving-objects`
    instances named `target` and `container`).
@@ -336,7 +349,7 @@ Rules for an invented skill:
   bundle schema to subset against), but they still obey hard rule 4's
   wiring constraint: every input needs an upstream subgraph that produces
   a matching output name + type.
-- `inputs` / `outputs` type names must be `gap.schema` types (you cannot
+- `inputs` / `outputs` type names must be `gap_core.schema` types (you cannot
   invent new data types, only new behavior).
 - Everything else (edges, conditional_edges, end nodes, entry edge) is
   wired exactly as for a normal subgraph.

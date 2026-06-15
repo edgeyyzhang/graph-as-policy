@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
 
-from gap.types import Se3Pose, Trajectory, make_pose
+from gap_core.types import Se3Pose, Trajectory, make_pose
 
 logger = logging.getLogger(__name__)
 

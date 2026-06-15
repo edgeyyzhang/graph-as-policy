@@ -7,7 +7,7 @@ that assert exact registry contents need a clean slate instead.
 
 import pytest
 
-import gap.tools._registry as _registry
+import gap_core.tools._registry as _registry
 
 
 @pytest.fixture(autouse=True)

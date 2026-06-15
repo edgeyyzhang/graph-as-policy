@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from gap.types import ArmState, CameraFrame, Observation, Se3Pose, make_pose, pose_to_matrix
+from gap_core.types import ArmState, CameraFrame, Observation, Se3Pose, make_pose, pose_to_matrix
 
 # Distinct, saturated colors assigned to objects in order.
 _PALETTE: list[tuple[int, int, int]] = [

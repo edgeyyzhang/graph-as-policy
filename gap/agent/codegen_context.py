@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from gap.skills import SkillsRegistry
-    from gap.tools import ToolRegistry
+    from gap_core.tools import ToolRegistry
 
     from .subgraph_runner import SubgraphRunner
 

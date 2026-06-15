@@ -9,7 +9,7 @@ raise here routes the owning subgraph's ``on_error`` exit.
 from typing import TypedDict
 
 from gap import NodeContext
-from gap.types import PointCloud
+from gap_core.types import PointCloud
 
 
 class Output(TypedDict):

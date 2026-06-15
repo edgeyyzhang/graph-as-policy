@@ -21,10 +21,11 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from ..errors import StreamUnavailable
+from gap_core.errors import StreamUnavailable
 
 if TYPE_CHECKING:
-    from ..types import Observation
+    from gap_core.types import Observation
+
     from .context import NodeContext
 
 logger = logging.getLogger(__name__)

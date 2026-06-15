@@ -55,7 +55,7 @@ def materialize_for_task(
     suite_name: str,
     task_id: int,
     task_prompt: str | None = None,
-    policy_id: str = "libero_pi05",
+    policy_id: str = "pi05-libero",
 ) -> str:
     """Materialize the template for one ``(suite, task)``.
 
@@ -67,9 +67,11 @@ def materialize_for_task(
         suite_name / task_id: Identify the LIBERO task.
         task_prompt: Override the resolved prompt (else resolved from
             LIBERO metadata).
-        policy_id: Substituted into the template's ``{{policy_id}}``
-            placeholder. Default ``libero_pi05`` so YAMLs that omit the
-            knob keep their behaviour.
+        policy_id: Name of the policy SKILL to steer (== its preset, e.g.
+            ``pi05-libero`` / ``molmoact-libero``). Substituted into the
+            template's ``{{policy_id}}`` placeholder, which forms the
+            ``<skill>.run`` policy node; the skill owns its server, so no
+            ``policies:`` entry is needed. Default ``pi05-libero``.
 
     Returns:
         Absolute path to the materialized workflow directory.

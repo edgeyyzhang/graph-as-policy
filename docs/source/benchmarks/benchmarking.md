@@ -178,7 +178,7 @@ benchmark_runs/posvar/20260611_142233/
 │       │   └── cell_result.json # resume marker + cell metrics
 │       └── ...
 └── llm_plus_policy/
-    └── libero_pi05/             # policy axis segment
+    └── pi05-libero/             # policy axis segment (the policy-skill name)
         └── posvar/
             ├── pos_var/
             ├── pos_var__wf/     # materialized workflow templates
@@ -264,8 +264,8 @@ Before any cell runs, grid mode probes each `url:` policy named in
 `benchmark.policies` or a `mode_overrides.<mode>.policy_id` with a 5-second
 websocket handshake and raises immediately if one is unreachable — failing
 fast instead of erroring cells mid-sweep. A policy reached only through the
-implicit `libero_pi05` template fallback is not probed. Start the server
-first:
+implicit `pi05-libero` template fallback (whose preset the workers auto-boot)
+is not probed. Start the server first:
 
 ```bash
 gap policy serve pi05-libero --port 9100    # -> ws://127.0.0.1:9100

@@ -29,13 +29,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from gap.errors import (
+from gap_core.errors import (
     GraphValidationError,
     PipelineError,
     TaskCancelled,
     VerificationFailed,
 )
-from gap.tools import guards
+from gap_core.tools import guards
 
 from .context import CancelToken, NodeContext
 from .nodes import (

@@ -36,7 +36,7 @@ import numpy as np
 from .context import NodeContext
 
 if TYPE_CHECKING:
-    from gap.types import JointState, Trajectory
+    from gap_core.types import JointState, Trajectory
 
     from .policy_manager import PolicyManager
 

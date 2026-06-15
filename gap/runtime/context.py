@@ -9,7 +9,7 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING, Any
 
-from gap.errors import TaskCancelled
+from gap_core.errors import TaskCancelled
 
 if TYPE_CHECKING:
     from .tracing import DagTrace
@@ -114,10 +114,10 @@ class NodeContext:
             iou = ctx.tool("geometry.iou", box_a=[0,0,2,2], box_b=[1,1,3,3])
             ctx.tool("robot.move_to_pose", pose=grasp_pose)
         """
-        from gap.tools.guards import check_and_increment_if_applicable
+        from gap_core.tools.guards import check_and_increment_if_applicable
 
         if self._tool_registry is None:
-            from gap.tools import default_tool_registry
+            from gap_core.tools import default_tool_registry
             self._tool_registry = default_tool_registry()
 
         descriptor = self._tool_registry.get(name)

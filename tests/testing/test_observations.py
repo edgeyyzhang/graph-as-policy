@@ -9,7 +9,7 @@ perception-math tests (mask → points → OBB).
 import numpy as np
 
 from gap.testing import make_test_observation
-from gap.types import pose_to_matrix
+from gap_core.types import pose_to_matrix
 
 
 def _unproject(frame, mask):

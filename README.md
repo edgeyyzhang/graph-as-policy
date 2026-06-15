@@ -353,7 +353,7 @@ see [examples/libero_quickstart](examples/libero_quickstart/README.md#vlm-provid
         │          -multiview), perceiving-object-     │
         │          parts, grasping-*, transporting-    │
         │          objects, tracking-objects,          │
-        │          running-policies                    │
+        │          pi05-libero, molmoact-libero        │
         └──────────────────────────────────────────────┘
 ```
 

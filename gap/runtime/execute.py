@@ -68,6 +68,7 @@ def execute(
     trace_dir: str | Path | None = None,
     checkpoints: str = "warn",
     max_node_workers: int = 8,
+    policies: dict[str, dict[str, Any]] | None = None,
 ) -> ExecutionResult:
     """Execute a workflow graph and return an :class:`ExecutionResult`.
 
@@ -98,6 +99,11 @@ def execute(
             mode for ``validate=True`` postcondition checkpoints (only
             active when the connector exposes ``world_snapshot``).
         max_node_workers: Thread budget per parallel super-step.
+        policies: Optional ``{policy_id: entry}`` overrides for learned-policy
+            servers (e.g. ``{"pi05-libero": {"url": "ws://host:port"}}``).
+            Policy skills otherwise auto-resolve to their shipped preset, so
+            this is only needed to point a policy at an external/custom
+            server.
 
     Never raises on workflow failure — the exception lands in
     ``result.error`` with ``result.success == False``.
@@ -112,7 +118,7 @@ def execute(
 
     tool_registry = getattr(connector, "tool_registry", None)
     if tool_registry is None:
-        from gap.tools import default_tool_registry
+        from gap_core.tools import default_tool_registry
         tool_registry = default_tool_registry()
     observation_poll_fn = getattr(connector, "get_observation", None)
     world_snapshot_fn = getattr(connector, "world_snapshot", None)
@@ -138,35 +144,73 @@ def execute(
         if hasattr(tool_registry, "discover_pending"):
             tool_registry.discover_pending(catalog=_BUNDLE_TOOL_CATALOG)
 
-    executor = WorkflowExecutor(
-        target,
-        tool_registry=tool_registry,
-        skill_registry=skill_registry,
-        observation_poll_fn=observation_poll_fn,
-        trace_dir=trace_dir,
-        checkpoints=checkpoints,
-        world_snapshot_fn=world_snapshot_fn,
-        max_node_workers=max_node_workers,
-    )
-    if inputs:
-        executor.initial_inputs.update(inputs)
-
+    # Boot any learned-policy servers the workflow references. A policy skill
+    # owns its preset, so this "just works" without a `policies:` block; pass
+    # `policies` to override (e.g. an external `url:`). Booted before the
+    # executor so the PolicyExecutor can be threaded in, and torn down in the
+    # finally regardless of outcome. RPC tool bundles (those with
+    # `gap.serving.protocol: stdio-msgpack`) boot the same way — their
+    # ToolBundleManager registers each catalog entry with the runtime
+    # ToolRegistry so the executor sees the RPC-routed tools alongside the
+    # in-process @tool catalog.
+    executor: WorkflowExecutor | None = None
+    policy_manager = None
+    policy_executor = None
+    tool_bundle_manager = None
     error: Exception | None = None
     t0 = time.perf_counter()
     try:
+        from gap.runtime.policy_boot import boot_policies
+        from gap.runtime.tool_bundle_boot import boot_tool_bundles
+
+        policy_manager, policy_executor = boot_policies(
+            target, skill_registry, config_policies=policies,
+        )
+        tool_bundle_manager = boot_tool_bundles(
+            target, skill_registry, tool_registry,
+        )
+        executor = WorkflowExecutor(
+            target,
+            tool_registry=tool_registry,
+            skill_registry=skill_registry,
+            policy_executor=policy_executor,
+            observation_poll_fn=observation_poll_fn,
+            trace_dir=trace_dir,
+            checkpoints=checkpoints,
+            world_snapshot_fn=world_snapshot_fn,
+            max_node_workers=max_node_workers,
+        )
+        if inputs:
+            executor.initial_inputs.update(inputs)
         executor.execute()
     except Exception as exc:
         error = exc
         logger.warning("workflow execution failed: %s", exc)
+    finally:
+        if tool_bundle_manager is not None:
+            tool_bundle_manager.shutdown_all()
+        if policy_manager is not None:
+            policy_manager.shutdown_all()
     duration_s = time.perf_counter() - t0
 
-    trace_path = getattr(executor.trace, "_output_dir", None)
+    trace_path = (
+        getattr(executor.trace, "_output_dir", None)
+        if executor is not None else None
+    )
     return ExecutionResult(
-        success=error is None and executor.exit_status == "success",
-        exit_status=executor.exit_status,
-        outputs=dict(executor.cross_subgraph_outputs),
+        success=(
+            error is None
+            and executor is not None
+            and executor.exit_status == "success"
+        ),
+        exit_status=executor.exit_status if executor is not None else None,
+        outputs=(
+            dict(executor.cross_subgraph_outputs) if executor is not None else {}
+        ),
         trace_path=Path(trace_path) if trace_path is not None else None,
-        checkpoint_results=list(executor.checkpoint_results),
+        checkpoint_results=(
+            list(executor.checkpoint_results) if executor is not None else []
+        ),
         error=error,
         duration_s=duration_s,
     )

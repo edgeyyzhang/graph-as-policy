@@ -87,8 +87,9 @@ The repo layout mirrors a first-class conceptual split:
 - **Skills** (`open-robot-skills/skills/<bundle>/`) are *what the robot
   can do*: manipulation strategies that own subgraphs in generated graphs —
   `perceiving-objects`, `grasping-with-planner`, `transporting-objects`,
-  `tracking-objects`, `running-policies`, and friends. The LLM composes
-  them; so can you.
+  `tracking-objects`, the per-checkpoint learned-policy skills
+  `pi05-libero` / `molmoact-libero`, and friends. The LLM composes them;
+  so can you.
 
 A third tool source ships with the engine itself: **connector tools**
 (`robot.*` / `sim.*`), the embodiment surface registered by whichever
@@ -121,7 +122,7 @@ simulator or real-robot connector you open. The full taxonomy is in
         │          -multiview), perceiving-object-     │
         │          parts, grasping-*, transporting-    │
         │          objects, tracking-objects,          │
-        │          running-policies                    │
+        │          pi05-libero, molmoact-libero        │
         └──────────────────────────────────────────────┘
 ```
 

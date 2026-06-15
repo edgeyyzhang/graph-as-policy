@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from gap.connector import Capabilities, SimConnector
-from gap.errors import ToolError
+from gap_core.errors import ToolError
 
 from .conftest import FakeEnv, FakeEnvConfig, FakeIK
 

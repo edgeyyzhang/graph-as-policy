@@ -1,5 +1,5 @@
 """Regression: a registry built AFTER another drained the pendings still gets bundle tools."""
-from gap.tools import ToolRegistry, tool
+from gap_core.tools import ToolRegistry, tool
 
 
 def test_second_registry_gets_tools_after_first_drain():

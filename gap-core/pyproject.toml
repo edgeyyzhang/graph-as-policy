@@ -1,0 +1,49 @@
+[project]
+name = "graph-as-policy-core"
+version = "0.1.0.dev0"
+description = "Bundle-author surface for gap (graph-as-policy): @tool decorator, typed value vocabulary (Se3Pose, Mask, …), error hierarchy, skill metadata dataclasses, and the msgpack-RPC primitives every per-bundle venv installs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "graph-as-policy authors" }]
+
+# Keep this list tight. Every tool / policy bundle's .venv inherits these,
+# so anything added here multiplies across all bundles. Heavy ML deps
+# (torch, transformers, jax, mujoco, fastapi, anthropic, …) belong in the
+# `graph-as-policy` runtime distribution, NOT here.
+dependencies = [
+  # Numeric vocabulary — gap_core.types.* are TypedDicts over numpy arrays.
+  "numpy>=1.26",
+  # Scipy is lazy-imported by gap_core.types pose helpers (pose_to_matrix /
+  # matrix_to_pose use scipy.spatial.transform.Rotation). Light enough to
+  # require eagerly — bundle code typically wants it anyway.
+  "scipy>=1.12",
+  # NotRequired backport for py3.10 (drops on py3.11+ via the marker).
+  "typing_extensions>=4.10; python_version < '3.11'",
+  # msgpack codec for the out-of-process tool RPC (gap_core.rpc.codec).
+  # Numpy support extends msgpack with ndarray (de)serialization so tool
+  # signatures can pass tensors without bespoke wire formats.
+  "msgpack>=1.0",
+  "msgpack-numpy>=0.4.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gap_core"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
