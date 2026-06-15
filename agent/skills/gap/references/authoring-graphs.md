@@ -6,6 +6,11 @@ the task needs). Subgraphs own their inner state machines, declare typed
 inputs/outputs, exit conditions, and postcondition checkpoints. In a
 checkout, `docs/runtime.md` is the full spec; this is the working digest.
 
+> Inside Claude Code you author graphs **here**, by hand, with this builder
+> surface — you are the generator, not `gap generate` (that's the headless
+> pipeline; see SKILL.md §3). The surface and rules below are the contract
+> you build and validate against.
+
 ## Builder surface (`from gap.builder import Workflow, Subgraph, Ref`)
 
 ```python

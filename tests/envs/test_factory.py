@@ -42,7 +42,7 @@ def test_factory_defaults(stubbed_envs):
     assert isinstance(env, _FakeEnv) and not isinstance(env, _FakePerturbedEnv)
     assert env.kwargs["suite_name"] == "libero_object"
     assert env.kwargs["task_id"] == 0
-    assert env.kwargs["joint_motion_mode"] == "teleport"
+    assert env.kwargs["joint_motion_mode"] == "closed_loop"
     assert isinstance(config, EnvConfig)
     assert config.action_mode == "velocity_joints"
     assert config.arm_dof == 7
@@ -73,7 +73,7 @@ def test_factory_explicit_kwargs_override_env_vars(stubbed_envs, monkeypatch):
 def test_factory_invalid_motion_mode_falls_back(stubbed_envs, monkeypatch):
     monkeypatch.setenv("GAP_LIBERO_JOINT_MOTION_MODE", "warp_drive")
     env, _ = libero_env_mod.make_env("libero_object", 0, None, False)
-    assert env.kwargs["joint_motion_mode"] == "teleport"
+    assert env.kwargs["joint_motion_mode"] == "closed_loop"
 
 
 def test_factory_extra_kwargs_pass_through(stubbed_envs):

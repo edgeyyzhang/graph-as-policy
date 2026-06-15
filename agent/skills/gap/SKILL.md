@@ -132,23 +132,48 @@ result = gap.execute("examples/libero_quickstart/graph", conn,
 print(result.success, result.exit_status, result.trace_path)
 ```
 
-## 3. Generate a graph from language
+## 3. Compile a graph from language
 
-Needs an LLM key (`gap check` shows which providers are configured).
+**When this skill is running inside Claude Code, *you* are the codegen
+pipeline — do NOT call `gap generate`.** Turning a task into a graph is a
+§4 hand-authoring job: read the task, pick skills from the active
+registries, build the nodes with `gap.builder`, attach checkpoints, and
+drive `gap run --validate-only` to a clean pass. You are a stronger model
+than the one `gap generate` would dispatch to, and you stay in the loop to
+fix validation errors — so author directly, don't shell out.
+
+`gap generate` is the **headless** path: benchmark grids, cron, or
+`gap.agent.generate_sync()` called from code — any run with no interactive
+model present. It dispatches a coordinator → per-subgraph → checkpoint
+pipeline to the configured provider's API (`--provider`/`--model`; see
+`gap check` for what's configured). Reach for it only when there is no
+Claude in the loop.
 
 ```bash
+# headless only — NOT the path to use from inside Claude Code:
 uv run gap generate "pick up the alphabet soup and put it in the basket" \
     --provider anthropic --out outputs/soup
-uv run gap run outputs/soup/task_00 --validate-only
-MUJOCO_GL=egl uv run gap run outputs/soup/task_00 --sim libero_object/0
 ```
 
-Python: `gap.agent.generate_sync(instruction, provider=..., model=...)`.
-The pipeline (coordinator → per-subgraph agents → checkpoint agent →
-validate + fix loop) picks skills from the active registries — richer
-registries give better graphs.
+## 4. Author a graph (gap.builder) — the default path
 
-## 4. Hand-author a graph (gap.builder)
+This is how you turn a task into a graph. The loop:
+
+1. **Decompose** the task into one subgraph per skill it needs
+   (`gap skills list`). Canonical pick-and-place shape: perceive target →
+   perceive container → grasp → transport.
+2. **Read the contracts first** — don't guess field names. `gap tools show
+   <tool>` gives exact input/output fields (what you bind with `Ref`); each
+   chosen skill's `SKILL.md` gives its recommended inner state flow and
+   canonical scripts. Mirror them — they are the contract the skill was
+   validated with.
+3. **Build** the `Subgraph`s and the top-level `Workflow`, then write a
+   script file for every `type="script"` node.
+4. **Attach `validate=True` checkpoints** per subgraph so success is
+   verified against sim ground truth, not assumed (a grasp/place with no
+   checkpoint is unverified).
+5. **Validate → fix → repeat** (`gap run --validate-only`) until clean,
+   then sim.
 
 ```python
 from gap.builder import Workflow, Subgraph, Ref

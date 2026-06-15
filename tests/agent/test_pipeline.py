@@ -257,3 +257,103 @@ class TestScriptFixLoop:
         assert result.success, result.execution_stderr
         retry_msg = stub.calls[1]["messages"][-1]["content"]
         assert "unknown skill 'perception_single'" in retry_msg
+
+
+def _config_no_checkpoints(skills_root) -> PipelineConfig:
+    cfg = PipelineConfig()
+    cfg.skills = skills_root
+    cfg.composition.checkpoint_agent = False
+    return cfg
+
+
+# A grasp subgraph that references `in.missing_thing` without declaring it
+# (and the coordinator doesn't declare it either) — a genuine S5 structural
+# error that the shallow parse-check misses but the full per-subgraph
+# validator (Part 2) catches and feeds back to the subgraph_agent.
+GRASP_SUBGRAPH_RESPONSE_BAD = '''\
+```python
+from gap.builder import Subgraph, Ref, START, END
+
+sg = Subgraph(name="grasp_target", skill="grasping-direct-ik")
+sg.add_input("target_obb", type_name="OrientedBoundingBox")
+
+sg.add_node("compute_grasp", type="tool",
+            tool="geometry.top_down_grasp_candidates",
+            inputs={"obb": Ref("in.missing_thing")})
+sg.add_node("close", type="tool", tool="robot.close_gripper")
+
+sg.add_exit("grasped")
+sg.add_edge(START, "compute_grasp")
+sg.add_edge("compute_grasp", "close")
+sg.add_edge("close", "grasped")
+sg.add_edge("grasped", END)
+
+sg.set_outputs(grasp_pose=Ref("compute_grasp.candidates.poses.0"))
+sg.set_on_error("failed")
+```
+'''
+
+
+class TestStructuralFeedback:
+    def test_structural_error_regenerates_at_authoring_agent(
+        self, skills_root, stub_llm, tmp_path,
+    ):
+        """A subgraph with a real structural error (S5: `in.missing_thing`
+        not declared) is caught at authoring time and fed back to the SAME
+        subgraph_agent, which regenerates. (Part 2.)"""
+        from gap.agent.multi_agent import run_codegen
+
+        stub = stub_llm([
+            COORDINATOR_RESPONSE,
+            PERCEIVE_SUBGRAPH_RESPONSE,
+            GRASP_SUBGRAPH_RESPONSE_BAD,   # rejected by per-subgraph structural check
+            GRASP_SUBGRAPH_RESPONSE,       # the regenerated (valid) subgraph
+        ])
+        result = asyncio.run(run_codegen(
+            task_id=0,
+            task_prompt="Pick up the alphabet soup",
+            config=_config_no_checkpoints(skills_root),
+            output_dir=tmp_path,
+        ))
+        assert result.success, result.execution_stderr
+        # coordinator + perceive + grasp(bad) + grasp(retry) = 4 calls.
+        assert len(stub.calls) == 4
+        # The retry carried the S5 structural error back to the agent.
+        retry_msg = stub.calls[3]["messages"][-1]["content"]
+        assert "missing_thing" in retry_msg
+        assert "S5" in retry_msg or "not declared in subgraph inputs" in retry_msg
+
+
+class TestHonestReporting:
+    def test_residual_errors_flip_success_false(
+        self, skills_root, stub_llm, tmp_path, monkeypatch,
+    ):
+        """An unfixable residual validation error (workflow-level, no script
+        node to route to) flips success to False and is surfaced on the
+        result, instead of being reported as a successful run. (Part 3.)"""
+        from gap.agent import multi_agent
+
+        def always_failing(wf_dir, config):
+            return [ValidationIssue(
+                severity="error",
+                node_id="workflow.edges",
+                field=None,
+                message="bogus unfixable workflow error (W3)",
+            )]
+
+        monkeypatch.setattr(multi_agent, "_run_graph_validation", always_failing)
+
+        stub_llm([
+            COORDINATOR_RESPONSE,
+            PERCEIVE_SUBGRAPH_RESPONSE,
+            GRASP_SUBGRAPH_RESPONSE,
+        ])
+        result = asyncio.run(multi_agent.run_codegen(
+            task_id=0,
+            task_prompt="Pick up the alphabet soup",
+            config=_config_no_checkpoints(skills_root),
+            output_dir=tmp_path,
+        ))
+        assert result.success is False
+        assert result.validation_errors
+        assert "workflow.edges" in result.execution_stderr

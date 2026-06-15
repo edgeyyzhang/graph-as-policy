@@ -45,6 +45,10 @@ class PipelineResult:
     workflow_dir: Path | None = None
     execution_stderr: str = ""
     attempts: int = 0
+    validation_errors: list = field(default_factory=list)
+    """Error-severity ``ValidationIssue``s still present after the
+    post-generation fix loop. Non-empty ⇒ ``success`` is False — the
+    pipeline never reports success on a structurally-invalid graph."""
 
 
 def _write_workflow_folder(
@@ -216,11 +220,16 @@ async def generate_workflow(
             "inputs": sg_spec.get("inputs", {}),
             "outputs": sg_spec.get("outputs", {}),
             "exit": sg_spec.get("exit", {}),
+            "on_error": sg_spec.get("on_error"),
             "context": sg_spec.get("context", {}),
             # Canonical pick-and-place stage tag — preserved verbatim so
             # downstream refinement tooling can group subgraphs by stage
             # when computing per-stage pass-rates.
             "stage": sg_spec.get("stage"),
+            # Invented-skill marker: tells run_subgraph_agent / the prompt
+            # assembler to synthesize the skill contract from this spec
+            # instead of loading a (non-existent) bundle.
+            "generated": sg_spec.get("generated", False),
         }
         result = await runner.run_subgraph_agent(
             skill_name=skill_name,
@@ -334,6 +343,7 @@ async def run_codegen(
 
         max_fix = config.composition.max_validation_retries
         trace_dir = wf_dir / "agent_traces"
+        validation_errors: list = []
         for fix_attempt in range(max_fix + 1):
             validation_errors = _run_graph_validation(wf_dir, config)
             if not validation_errors:
@@ -357,12 +367,31 @@ async def run_codegen(
                 checkpoint_modules=checkpoint_modules,
             )
 
+        # Honest reporting: success reflects structural validity. Any
+        # error-severity issue still present after the fix loop (e.g.
+        # cross-subgraph W8 / workflow-level errors that the per-subgraph
+        # feedback loop and the script-body fixer cannot repair) flips
+        # success to False so we never ship a broken graph as "OK".
+        # `validation_errors` is the loop's last reading and reflects the
+        # final on-disk state in every loop-exit path.
+        residual = validation_errors
+        if residual:
+            logger.warning(
+                "Task %d: %d residual validation error(s) remain",
+                task_id, len(residual),
+            )
         return PipelineResult(
-            success=True,
+            success=not residual,
             workflow_json=workflow_json,
             scripts=scripts,
             checkpoint_modules=checkpoint_modules,
             workflow_dir=wf_dir,
+            execution_stderr=(
+                "" if not residual
+                else f"{len(residual)} residual validation error(s): "
+                + "; ".join(str(i) for i in residual[:5])
+            ),
+            validation_errors=residual,
             attempts=1,
         )
 

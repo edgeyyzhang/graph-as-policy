@@ -424,6 +424,104 @@ class TestVertex:
         out = run(complete(cfg, system="s", messages=[{"role": "user", "content": "q"}]))
         assert out == "gemini says"
 
+    def test_gemini_vertex_tool_loop(self, monkeypatch):
+        genai = pytest.importorskip("google.genai")
+
+        def _resp(parts, text=None):
+            content = SimpleNamespace(parts=parts)
+            return SimpleNamespace(candidates=[SimpleNamespace(content=content)], text=text)
+
+        responses = [
+            _resp([SimpleNamespace(
+                function_call=SimpleNamespace(name="echo", args={"a": 1}, id="fc_1"),
+            )]),
+            _resp([SimpleNamespace(function_call=None, text="gemini done")], text="gemini done"),
+        ]
+
+        class FakeModels:
+            def __init__(self):
+                self.calls = []
+
+            def generate_content(self, **kwargs):
+                self.calls.append(kwargs)
+                return responses.pop(0)
+
+        models = FakeModels()
+
+        class FakeClient:
+            def __init__(self, **kwargs):
+                self.models = models
+
+        monkeypatch.setattr(genai, "Client", FakeClient)
+        monkeypatch.setattr(llm_mod, "_vertex_gemini_clients", {})
+
+        calls: list = []
+        cfg = LlmConfig(provider="vertex", model="gemini-3-flash", project_id="p", region="global")
+        out = run(complete_with_tools(
+            cfg, system="s", messages=[{"role": "user", "content": "q"}],
+            tools=[{"name": "echo", "description": "d",
+                    "input_schema": {"type": "object", "properties": {"a": {"type": "integer"}}}}],
+            tool_handler=lambda n, k: calls.append((n, k)) or "pong",
+        ))
+        assert out == "gemini done"
+        assert calls == [("echo", {"a": 1})]
+
+        # Tools declared + automatic function calling disabled on the request.
+        first_cfg = models.calls[0]["config"]
+        assert first_cfg.automatic_function_calling.disable is True
+        assert first_cfg.tools[0].function_declarations[0].name == "echo"
+        # Second round echoes the model turn and appends a function response.
+        second_contents = models.calls[1]["contents"]
+        assert second_contents[-1].role == "user"
+        assert second_contents[-1].parts[0].function_response.name == "echo"
+
+    def test_gemini_vertex_tool_loop_forces_final_answer(self, monkeypatch):
+        """A model that never stops calling tools is coaxed into a final
+        tool-free completion instead of raising."""
+        genai = pytest.importorskip("google.genai")
+
+        def _call_resp():
+            content = SimpleNamespace(parts=[SimpleNamespace(
+                function_call=SimpleNamespace(name="echo", args={}, id=None),
+            )])
+            return SimpleNamespace(candidates=[SimpleNamespace(content=content)], text=None)
+
+        class FakeModels:
+            def __init__(self):
+                self.calls = []
+
+            def generate_content(self, **kwargs):
+                self.calls.append(kwargs)
+                # The forced final turn disables function calling via tool_config.
+                if kwargs["config"].tool_config is not None:
+                    text_part = SimpleNamespace(function_call=None, text="forced final")
+                    content = SimpleNamespace(parts=[text_part])
+                    return SimpleNamespace(
+                        candidates=[SimpleNamespace(content=content)], text="forced final",
+                    )
+                return _call_resp()
+
+        models = FakeModels()
+
+        class FakeClient:
+            def __init__(self, **kwargs):
+                self.models = models
+
+        monkeypatch.setattr(genai, "Client", FakeClient)
+        monkeypatch.setattr(llm_mod, "_vertex_gemini_clients", {})
+
+        cfg = LlmConfig(provider="vertex", model="gemini-3-flash", project_id="p", region="global")
+        out = run(complete_with_tools(
+            cfg, system="s", messages=[{"role": "user", "content": "q"}],
+            tools=[{"name": "echo", "description": "", "input_schema": {}}],
+            tool_handler=lambda n, k: "pong",
+            max_rounds=2,
+        ))
+        assert out == "forced final"
+        # max_rounds normal turns + 1 forced tool-free turn.
+        assert len(models.calls) == 3
+        assert models.calls[-1]["config"].tool_config is not None
+
 
 # ---------------------------------------------------------------------------
 # Disk cache + provider selection

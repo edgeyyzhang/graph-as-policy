@@ -21,11 +21,13 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from gap.skills import SkillInfo, SkillsRegistry
+from gap.skills.meta import SkillMeta
 from gap.tools import ToolDescriptor, ToolRegistry
-from gap.tools.schema import FieldInfo
+from gap.tools.schema import FieldInfo, UnitSchema
 
 from ._registry import AgentRegistry, AgentSpec, read_include
 
@@ -93,7 +95,15 @@ class PromptAssembler:
                 map of outputs already declared by earlier subgraphs.
         """
         spec = self.agents.get("subgraph_agent")
-        skill_info = self.skills.get(skill_name)
+        # An invented ("generated") skill has no registered bundle — the
+        # coordinator marked it so and authored its contract inline. Build a
+        # transient SkillInfo from that contract so every render path below
+        # works unchanged (empty allowed_tools => full tool catalog, empty
+        # canonical_scripts => guidance body only).
+        if subgraph_spec.get("generated") or skill_name not in self.skills:
+            skill_info = self._synthesize_generated_skill_info(skill_name, subgraph_spec)
+        else:
+            skill_info = self.skills.get(skill_name)
 
         parts: list[str] = [spec.body, ""]
         parts.extend(self._render_includes(spec))
@@ -103,6 +113,80 @@ class PromptAssembler:
 
         bound = self._bind_codegen_tools(spec)
         return AssembledPrompt(system_prompt="\n".join(parts), bound_codegen_tools=bound)
+
+    def _synthesize_generated_skill_info(
+        self, skill_name: str, spec: dict,
+    ) -> SkillInfo:
+        """Build a transient :class:`SkillInfo` for an invented skill.
+
+        A generated skill has no bundle on disk — its contract is the
+        coordinator-authored ``inputs`` / ``outputs`` / ``exit`` /
+        ``on_error`` carried on the subgraph spec. We materialize that into
+        a :class:`SkillMeta` so the existing render paths
+        (``_render_skill_body``, ``_render_subgraph_context``) produce a
+        coherent prompt: ``allowed_tools=[]`` makes
+        ``_render_filtered_tools_for_skill`` fall back to the full runtime
+        catalog, and ``canonical_scripts={}`` makes ``_render_skill_body``
+        emit just the synthesized guidance body below.
+        """
+        exit_block = spec.get("exit") or {}
+        success_values = list(exit_block.get("success_values") or [])
+        on_error = spec.get("on_error")
+        exit_conditions = {sv: "success exit" for sv in success_values}
+        if on_error:
+            exit_conditions[on_error] = "failure exit (reached by raising)"
+
+        body = (
+            f"You are implementing a **new, invented skill** named "
+            f"`{skill_name}` that does not exist in any registry. The "
+            f"coordinator defined its contract (the inputs, outputs, and "
+            f"exit values listed below) but there is **no SKILL.md, no "
+            f"canonical scripts, and no curated tool whitelist** — you "
+            f"author the entire implementation from scratch.\n\n"
+            f"How to implement it:\n\n"
+            f"1. Compose `type=\"tool\"` nodes from the full tool catalog "
+            f"below (every connector and bundle tool is available) for any "
+            f"step a registered tool already covers.\n"
+            f"2. For every step no tool covers, **author a "
+            f"`type=\"script\"` node** and emit its Python in a "
+            f"` ```python:scripts/<sg>/<file>.py` block (or delegate via "
+            f"`request_inline_script`). For a generated skill these scripts "
+            f"are the PRIMARY implementation surface, not a rare fallback — "
+            f"there are no canonical scripts to collide with, so emit as "
+            f"many as the skill needs (one `run()` per file).\n"
+            f"3. Consume declared inputs as `Ref(\"in.<name>\")` and bind "
+            f"every declared output via `sg.set_outputs(...)`. The "
+            f"inputs/outputs/exit values below ARE the skill's contract — "
+            f"honor them exactly.\n"
+            f"4. Use only `gap.schema` type names (e.g. "
+            f"`OrientedBoundingBox`, `Se3Pose`, `PointCloud`, `Mask`, "
+            f"scalars) for typed I/O — you cannot invent new data types, "
+            f"only new behavior.\n"
+            f"5. If a step genuinely needs a physical primitive that no "
+            f"existing tool provides and cannot be composed from existing "
+            f"tools + Python, call `report_missing_capability` instead of "
+            f"emitting a broken script."
+        )
+
+        meta = SkillMeta(
+            description=spec.get("description") or f"Invented skill {skill_name!r}.",
+            name=skill_name,
+            kind="skill",
+            allowed_tools=[],          # => full runtime catalog in the prompt
+            exit_conditions=exit_conditions,
+            required_inputs=dict(spec.get("inputs") or {}),
+            produces_outputs=dict(spec.get("outputs") or {}),
+            canonical_scripts=[],
+            body=body,
+        )
+        return SkillInfo(
+            name=skill_name,
+            kind="skill",
+            bundle_dir=Path("."),      # never dereferenced during rendering
+            meta=meta,
+            schema=UnitSchema(name=skill_name),
+            canonical_scripts={},
+        )
 
     def assemble_coder(self, coder_spec: dict) -> AssembledPrompt:
         """Build the coder's prompt: agent body + script contract + per-call spec."""

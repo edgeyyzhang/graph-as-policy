@@ -198,7 +198,7 @@ class SubgraphRunner:
                 d = ctx.trace_dir / sg_name
                 (d / f"llm_response_attempt_{attempt}.md").write_text(raw, encoding="utf-8")
 
-            sg_dict, scripts, _legacy_cp_module, _legacy_cp_meta, sg_source = (
+            sg_dict, scripts, _legacy_cp_module, _legacy_cp_meta, sg_source, builder_error = (
                 _parse_subgraph_response(raw)
             )
             missing = _extract_missing(sg_dict, raw)
@@ -207,7 +207,11 @@ class SubgraphRunner:
                 last_error = f"subgraph_agent reported missing capabilities: {missing!r}"
                 continue
             if sg_dict is None:
-                last_error = (
+                # A builder block that execs to an error (e.g. a literal
+                # where a Ref() was required) gets its real message fed
+                # back so the agent can fix it; otherwise the model emitted
+                # no usable ```python``` block at all.
+                last_error = builder_error or (
                     "no parseable subgraph found; emit one ```python``` block "
                     "(no file path) that imports `from gap.builder import "
                     "Subgraph, Ref, START, END`, builds the subgraph, and "
@@ -215,7 +219,18 @@ class SubgraphRunner:
                 )
                 continue
             sg_dict["skill"] = skill_name
-            sg_dict["inputs"] = subgraph_spec.get("inputs", {})
+            # Merge the coordinator's declared inputs with the ones the
+            # subgraph_agent actually declared via `sg.add_input(...)`,
+            # letting the agent's win on conflict. Do NOT overwrite: the
+            # agent's node `Ref("in.<name>")` usages must match its own
+            # declarations, and clobbering them (e.g. with an empty dict for
+            # an invented/generated skill) silently drops inputs the agent
+            # needs and makes the structural validator below flag the
+            # agent's own correct refs as undeclared (S5). Coordinator
+            # inputs the agent omitted are still kept (contract preserved).
+            declared_inputs = dict(subgraph_spec.get("inputs", {}))
+            authored_inputs = dict(sg_dict.get("inputs", {}))
+            sg_dict["inputs"] = {**declared_inputs, **authored_inputs}
             # Carry the canonical pick-and-place stage tag through to
             # workflow.json so downstream refinement tooling can group
             # failures by stage without re-inferring on every read.
@@ -228,6 +243,21 @@ class SubgraphRunner:
             err = _validate_subgraph(sg_dict, subgraph_spec, self.skills)
             if err:
                 last_error = err
+                continue
+            # Full per-subgraph structural validation (S1-S11), reusing the
+            # authoritative runtime validator. The shallow _validate_subgraph
+            # above only catches parse-level mistakes; this catches $ref/
+            # in.<name> validity, reachability, output binding, conditional
+            # edges, etc. — and feeds them back to THIS agent (which has the
+            # full builder context to fix them) via the same retry loop.
+            # Structure-only: cross-subgraph (W8) and script-schema checks
+            # remain at post-assembly (they need the whole workflow / files
+            # on disk).
+            struct_err = _structural_subgraph_errors(
+                sg_name, sg_dict, self.skills,
+            )
+            if struct_err:
+                last_error = struct_err
                 continue
             # Checkpoint authoring has moved out of subgraph_agent's
             # responsibility (run_checkpoint_agent handles it post-hoc).
@@ -289,7 +319,7 @@ class SubgraphRunner:
         #    the final sidecars.
         subgraphs_by_name: dict[str, Any] = {}
         for sg_name, src in sg_sources.items():
-            sub_dict, _, _ = _exec_subgraph_builder(src)
+            sub_dict, _, _, _ = _exec_subgraph_builder(src)
             if sub_dict is None:
                 raise CodegenError(
                     f"checkpoint_agent: failed to re-exec subgraph_agent "
@@ -945,7 +975,7 @@ def _exec_workflow_spec_builder(code: str) -> dict | None:
 
 def _parse_subgraph_response(
     raw: str,
-) -> tuple[dict | None, dict[str, str], str | None, list[dict], str | None]:
+) -> tuple[dict | None, dict[str, str], str | None, list[dict], str | None, str | None]:
     """Parse a subgraph_agent response.
 
     Looks for one of:
@@ -960,11 +990,14 @@ def _parse_subgraph_response(
     separately regardless of which subgraph form was used.
 
     Returns ``(sg_dict_or_None, scripts, checkpoint_module_or_None,
-    checkpoint_meta, builder_block_or_None)``. The trailing
+    checkpoint_meta, builder_block_or_None, builder_error_or_None)``. The
     ``builder_block`` is the verbatim Python source the LLM emitted (the
     block that bound ``sg``), used downstream by the checkpoint_agent's
-    sandbox to re-materialize the subgraph object. ``None`` on the
-    legacy JSON path.
+    sandbox to re-materialize the subgraph object; ``None`` on the
+    legacy JSON path. ``builder_error`` describes why a present builder
+    block failed to produce a subgraph (so the retry loop can feed the
+    real mistake back), and is ``None`` when the block succeeded or none
+    was present.
     """
     sg_dict: dict | None = None
     scripts: dict[str, str] = {}
@@ -997,11 +1030,15 @@ def _parse_subgraph_response(
                     if isinstance(inner, dict) and "nodes" in inner and "edges" in inner:
                         sg_dict = inner
     # Python builder block wins over legacy JSON when both are present.
+    builder_error: str | None = None
     if builder_block is not None:
-        py_dict, checkpoint_module, checkpoint_meta = _exec_subgraph_builder(builder_block)
+        py_dict, checkpoint_module, checkpoint_meta, builder_error = (
+            _exec_subgraph_builder(builder_block)
+        )
         if py_dict is not None:
             sg_dict = py_dict
-    return sg_dict, scripts, checkpoint_module, checkpoint_meta, builder_block
+            builder_error = None
+    return sg_dict, scripts, checkpoint_module, checkpoint_meta, builder_block, builder_error
 
 
 def _checkpoint_meta_from_subgraph(sg: Any) -> list[dict]:
@@ -1022,13 +1059,18 @@ def _checkpoint_meta_from_subgraph(sg: Any) -> list[dict]:
 
 def _exec_subgraph_builder(
     code: str,
-) -> tuple[dict | None, str | None, list[dict]]:
-    """Exec a Python builder block; return ``(sg_dict, checkpoint_module, checkpoint_meta)``.
+) -> tuple[dict | None, str | None, list[dict], str | None]:
+    """Exec a Python builder block; return ``(sg_dict, checkpoint_module,
+    checkpoint_meta, error)``.
 
     ``sg_dict`` is ``None`` on any execution error or if the block does
     not bind a ``Subgraph`` instance to a module-level ``sg`` variable
     (in which case ``checkpoint_module`` is ``None`` and ``checkpoint_meta``
-    is ``[]``). ``checkpoint_module`` is the rendered sidecar source (str)
+    is ``[]``). ``error`` is a human-readable description of the failure on
+    the ``None`` path (fed back to the agent's retry loop so it can fix the
+    actual builder mistake — e.g. a literal where a ``Ref()`` was required —
+    instead of the generic "no parseable subgraph" guidance) and ``None`` on
+    success. ``checkpoint_module`` is the rendered sidecar source (str)
     when the subgraph declared any ``add_checkpoint`` calls, else ``None``.
 
     ``numpy`` and ``math`` are pre-bound in the sandbox under the names
@@ -1039,9 +1081,9 @@ def _exec_subgraph_builder(
     """
     try:
         from gap.builder import END, START, Ref, Subgraph
-    except Exception:
+    except Exception as e:
         logger.exception("gap.builder import failed")
-        return None, None, []
+        return None, None, [], f"gap.builder import failed: {e}"
     try:
         import math as _math
 
@@ -1076,19 +1118,23 @@ def _exec_subgraph_builder(
         exec(compile(code, "<subgraph_agent>", "exec"), sandbox)
     except Exception as e:
         logger.warning("subgraph builder exec failed: %s", e)
-        return None, None, []
+        return None, None, [], f"builder block raised {type(e).__name__}: {e}"
     sg = sandbox.get("sg")
     if sg is None or not isinstance(sg, Subgraph):
+        got = type(sg).__name__ if sg is not None else None
         logger.warning(
             "subgraph builder block did not bind a Subgraph to `sg` (got %r)",
-            type(sg).__name__ if sg is not None else None,
+            got,
         )
-        return None, None, []
+        return None, None, [], (
+            f"builder block did not bind a `Subgraph` instance to a "
+            f"module-level `sg` variable (got {got!r})"
+        )
     try:
         sg_dict = sg.to_dict()
     except Exception as e:
         logger.warning("Subgraph.to_dict() failed: %s", e)
-        return None, None, []
+        return None, None, [], f"Subgraph.to_dict() raised {type(e).__name__}: {e}"
     checkpoint_meta = _checkpoint_meta_from_subgraph(sg)
     checkpoint_module: str | None = None
     if sg._checkpoints:
@@ -1100,7 +1146,7 @@ def _exec_subgraph_builder(
                 "Subgraph._render_checkpoints_module() failed: %s", e,
             )
             checkpoint_module = None
-    return sg_dict, checkpoint_module, checkpoint_meta
+    return sg_dict, checkpoint_module, checkpoint_meta, None
 
 
 def _strip_add_checkpoint_calls(code: str) -> str:
@@ -1216,9 +1262,62 @@ def _validate_workflow_spec(spec: dict, skills: SkillsRegistry) -> str:
         if skill is None:
             issues.append(f"subgraph {name!r} missing `skill` field")
             continue
+        if sg.get("generated"):
+            # Invented skill: `skill` names a brand-new skill (NOT a
+            # registered bundle) whose contract the coordinator authored
+            # inline. Skip the registry-membership check; require only a
+            # non-empty name + description so subgraph_agent has something
+            # to implement.
+            if not isinstance(skill, str) or not skill:
+                issues.append(
+                    f"generated subgraph {name!r} needs a non-empty `skill` name"
+                )
+            if not (sg.get("description") or "").strip():
+                issues.append(
+                    f"generated subgraph {name!r} needs a `description` "
+                    f"(the contract the subgraph_agent implements)"
+                )
+            continue
         if skill not in skills:
-            issues.append(f"subgraph {name!r} references unknown skill {skill!r}")
+            issues.append(
+                f"subgraph {name!r} references unknown skill {skill!r} "
+                f"(set generated=True on declare_subgraph to invent a new "
+                f"skill, otherwise pick one from the Available Skills table)"
+            )
     return "\n".join(issues)
+
+
+def _structural_subgraph_errors(
+    sg_name: str,
+    sg_dict: dict,
+    skills: SkillsRegistry,
+) -> str:
+    """Run the authoritative per-subgraph structural rules (S1-S11) on a
+    just-generated subgraph, in-memory, and return a newline-joined string
+    of error-severity issues (empty when clean).
+
+    Reuses :func:`gap.runtime.validate._check_subgraph_level` so the
+    authoring-time check matches the post-assembly validator exactly. The
+    registry args mirror the post-assembly call in
+    :func:`gap.agent.multi_agent._run_graph_validation`
+    (``skill_registry=skills``, ``agent_registry=None``) so the two passes
+    never disagree.
+
+    Cross-subgraph rules (W8) and script-schema introspection are NOT run
+    here — they need the assembled workflow / files on disk and stay at
+    post-assembly. ``_parse_subgraph`` raises on malformed dicts; that
+    message becomes feedback rather than crashing the pipeline.
+    """
+    from gap.errors import WorkflowValidationError
+    from gap.runtime.validate import _check_subgraph_level
+    from gap.runtime.workflow import _parse_subgraph
+
+    try:
+        sg_def = _parse_subgraph(sg_name, sg_dict)
+    except WorkflowValidationError as e:
+        return str(e)
+    issues = _check_subgraph_level(sg_name, sg_def, skills, None)
+    return "\n".join(str(i) for i in issues if i.severity == "error")
 
 
 def _validate_subgraph(
@@ -1265,9 +1364,31 @@ def _validate_subgraph(
         issues.append("`exit.success_values` must be a non-empty list")
     on_error = sg_dict.get("on_error")
 
-    # Exit conditions match skill contract: union of success_values and on_error.
+    # Exit conditions must match the contract. For a registered skill the
+    # contract is the bundle's exit_conditions; for an invented (generated)
+    # skill the contract is what the coordinator declared on the spec.
     skill_name = sg_dict.get("skill")
-    if skill_name and skill_name in skills:
+    if spec.get("generated"):
+        declared = set((spec.get("exit") or {}).get("success_values") or [])
+        spec_on_error = spec.get("on_error")
+        if spec_on_error:
+            declared.add(spec_on_error)
+        present = set(success_values)
+        if on_error is not None:
+            present.add(on_error)
+        if declared:
+            missing = declared - present
+            extra = present - declared
+            if missing:
+                issues.append(
+                    f"generated skill missing declared exit values: {sorted(missing)}"
+                )
+            if extra:
+                issues.append(
+                    f"generated skill has exit values not in its declared "
+                    f"contract: {sorted(extra)}"
+                )
+    elif skill_name and skill_name in skills:
         info = skills.get(skill_name)
         declared = set(info.meta.exit_conditions.keys())
         present = set(success_values)

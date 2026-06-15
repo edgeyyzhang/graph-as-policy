@@ -49,7 +49,7 @@ class FrankaLiberoEnv(BaseEnv):
         enable_render: bool = False,
         control_freq: int = 20,
         camera_names: list[str] | None = None,
-        joint_motion_mode: str = "teleport",
+        joint_motion_mode: str = "closed_loop",
     ) -> None:
         super().__init__()
         self.max_steps = max_steps
@@ -97,13 +97,14 @@ class FrankaLiberoEnv(BaseEnv):
         self._frame_buffer: list[np.ndarray] = []
         self._subsample_rate = 4
 
-        # ``teleport`` (default) writes joint qpos directly and settles a
-        # few OSC zero-action steps — fast, used by pure graph workflows.
-        # ``closed_loop`` swaps in the JointPositionController and tracks
-        # under physics — slower but leaves OSC's interpolator clean, which
-        # matters when a policy node interleaves OSC actions with joint
-        # trajectories in the same workflow. Selected per worker via
-        # ``GAP_LIBERO_JOINT_MOTION_MODE`` (see ``make_env``).
+        # ``closed_loop`` (default) swaps in the JointPositionController and
+        # tracks under physics — physically faithful, and leaves OSC's
+        # interpolator clean, which matters when a policy node interleaves OSC
+        # actions with joint trajectories in the same workflow.
+        # ``teleport`` writes joint qpos directly and settles a few OSC
+        # zero-action steps — faster (fewer sim steps), fine for pure graph
+        # workflows that only need the arm to reach the IK solution. Selected
+        # per worker via ``GAP_LIBERO_JOINT_MOTION_MODE`` (see ``make_env``).
         if joint_motion_mode not in ("teleport", "closed_loop"):
             raise ValueError(
                 f"joint_motion_mode must be 'teleport' or 'closed_loop', "
@@ -662,9 +663,10 @@ def make_env(
 
     ``perturbed`` opts into the moving-basket variant
     (:class:`gap.envs.libero_perturbed_env.FrankaLiberoPerturbedEnv`);
-    ``joint_motion_mode`` selects ``"teleport"`` (fast qpos writes, pure
-    graph workflows) or ``"closed_loop"`` (physics tracking, mixed
-    policy/graph workflows). Both default to the ``GAP_LIBERO_PERTURBED``
+    ``joint_motion_mode`` selects ``"closed_loop"`` (physics tracking,
+    the default — physically faithful and safe for mixed policy/graph
+    workflows) or ``"teleport"`` (fast qpos writes, fine for pure graph
+    workflows). Both default to the ``GAP_LIBERO_PERTURBED``
     / ``GAP_LIBERO_JOINT_MOTION_MODE`` env vars so parallel workers can be
     configured per process without config plumbing. Remaining ``extra``
     kwargs (``max_steps``, ``seed``, ``control_freq``) pass through to the
@@ -672,14 +674,14 @@ def make_env(
     """
     if joint_motion_mode is None:
         joint_motion_mode = os.environ.get(
-            "GAP_LIBERO_JOINT_MOTION_MODE", "teleport",
+            "GAP_LIBERO_JOINT_MOTION_MODE", "closed_loop",
         ).lower()
         if joint_motion_mode not in ("teleport", "closed_loop"):
             logger.warning(
                 "Unknown GAP_LIBERO_JOINT_MOTION_MODE=%r; "
-                "falling back to 'teleport'", joint_motion_mode,
+                "falling back to 'closed_loop'", joint_motion_mode,
             )
-            joint_motion_mode = "teleport"
+            joint_motion_mode = "closed_loop"
     if perturbed is None:
         perturbed = os.environ.get("GAP_LIBERO_PERTURBED", "").lower() in (
             "1", "true", "yes",

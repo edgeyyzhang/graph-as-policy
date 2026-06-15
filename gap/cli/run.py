@@ -58,9 +58,16 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="Trace output directory (overrides the default outputs/run_<timestamp>)",
     )
     sp.add_argument(
-        "--record-video", action="store_true",
-        help="Sim only: record the run and save <trace-dir>/run_video.mp4 "
-             "(plus per-camera videos when the env buffers them)",
+        "--no-video", action="store_true",
+        help="Sim only: disable run-video recording. Video is ON by default "
+             "for sim runs (saved to <trace-dir>/run_video.mp4, plus per-camera "
+             "videos when the env buffers them); pass this to skip it (faster, "
+             "no rendering).",
+    )
+    sp.add_argument(
+        # Deprecated: video now records by default for sim runs. Kept as an
+        # accepted no-op so existing scripts/examples don't break.
+        "--record-video", action="store_true", help=argparse.SUPPRESS,
     )
     sp.add_argument(
         "--checkpoints", default="warn", choices=["off", "warn", "raise"],
@@ -149,21 +156,22 @@ def _handle(args: argparse.Namespace) -> int:
 
     if args.sim and args.real:
         raise SystemExit("--sim and --real are mutually exclusive")
-    if args.record_video and not args.sim:
-        print("error: --record-video needs a sim connector (--sim SUITE/TASK)")
-        return 2
-    if args.record_video and trace_dir is None:
-        print("error: --record-video needs a trace dir (drop --no-trace)")
-        return 2
+
+    # Video records by default for sim runs. It needs both a sim connector
+    # (to render) and a trace dir (to save into), so it's silently skipped
+    # for real/tools-only runs or when tracing is off. `--no-video` opts out.
+    record_video = bool(args.sim) and trace_dir is not None and not args.no_video
+    if args.sim and args.no_trace and not args.no_video:
+        print("note: skipping run video — needs a trace dir (drop --no-trace)")
 
     connector = None
     if args.sim:
         import gap.connector
 
         connector = gap.connector.sim(
-            "libero", task=args.sim, record_video=args.record_video,
+            "libero", task=args.sim, record_video=record_video,
         )
-        if args.record_video:
+        if record_video:
             # Capture only arms itself on reset(); execute() runs on the
             # already-reset env, so start the frame buffer explicitly.
             connector.start_video()
@@ -187,9 +195,10 @@ def _handle(args: argparse.Namespace) -> int:
             trace_dir=trace_dir,
             checkpoints=args.checkpoints,
         )
-        if args.record_video and connector is not None:
+        save_video = getattr(connector, "save_video", None)
+        if record_video and save_video is not None and trace_dir is not None:
             video_path = Path(trace_dir) / "run_video.mp4"
-            saved = connector.save_video(str(video_path))
+            saved = save_video(str(video_path))
             if saved.get("success") and saved.get("num_frames"):
                 print(f"video: {video_path} ({saved['num_frames']} frames)")
             else:

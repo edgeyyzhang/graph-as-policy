@@ -799,6 +799,7 @@ class WorkflowSpec(_Builder):
         inputs: dict[str, str] | None = None,
         outputs: dict[str, str] | None = None,
         stage: str | None = None,
+        generated: bool = False,
     ) -> None:
         """Declare a subgraph metadata stub.
 
@@ -810,6 +811,14 @@ class WorkflowSpec(_Builder):
         (``"grasp"`` / ``"transport"`` / ``"place"``) used by the
         mechanical-swap engine. Omit for subgraphs outside the canonical
         taxonomy (e.g. perception staging).
+
+        ``generated`` marks an *invented* skill: ``skill`` names a brand-new
+        skill the coordinator is defining (NOT a registered bundle), whose
+        ``inputs`` / ``outputs`` / ``exit_success_values`` / ``on_error``
+        ARE its contract. The subgraph_agent implements it from scratch by
+        composing ``type: tool`` nodes and authoring ``type: script`` nodes
+        (no SKILL.md, no canonical scripts). Use only when no existing
+        skill fits — see the coordinator prompt's fallback policy.
         """
         if not isinstance(name, str) or not name:
             raise BuilderError(f"subgraph name must be a non-empty string, got {name!r}")
@@ -839,6 +848,8 @@ class WorkflowSpec(_Builder):
         }
         if stage is not None:
             entry["stage"] = stage
+        if generated:
+            entry["generated"] = True
         self._subgraphs[name] = entry
 
     def to_dict(self) -> dict[str, Any]:

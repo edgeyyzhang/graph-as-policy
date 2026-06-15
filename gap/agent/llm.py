@@ -651,6 +651,114 @@ async def _call_vertex_async(
     return response.text or ""
 
 
+async def _vertex_gemini_tool_loop(
+    config: LlmConfig,
+    system: str,
+    messages: list[dict],
+    tools: list[dict],
+    tool_handler: Callable[[str, dict], Any],
+    max_rounds: int,
+) -> str:
+    """Native Gemini (google-genai) function-calling loop on Vertex.
+
+    Mirrors the Anthropic/OpenAI loops: tools are declared up front,
+    automatic function calling is disabled so we drive each round trip
+    and dispatch through *tool_handler* ourselves. Anthropic-shaped tool
+    descriptors translate to Gemini ``FunctionDeclaration``s by mapping
+    ``input_schema`` → ``parameters``.
+    """
+    from google.genai import types
+
+    client = _vertex_gemini_client(config)
+    model = _resolve_model(config)
+    gemini_tools = [types.Tool(function_declarations=[
+        {
+            "name": t["name"],
+            "description": t.get("description", ""),
+            "parameters": t.get(
+                "input_schema", {"type": "object", "properties": {}},
+            ),
+        }
+        for t in tools
+    ])]
+    base_kwargs: dict[str, Any] = {
+        "max_output_tokens": config.max_tokens,
+        "system_instruction": system,
+        "automatic_function_calling": types.AutomaticFunctionCallingConfig(
+            disable=True,
+        ),
+    }
+    if config.temperature is not None:
+        base_kwargs["temperature"] = config.temperature
+
+    def _gen_config(force_text: bool):
+        kwargs = dict(base_kwargs, tools=gemini_tools)
+        if force_text:
+            # Final turn: forbid further tool calls so the model must emit
+            # the answer as text instead of looping on tools forever.
+            kwargs["tool_config"] = types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(
+                    mode=types.FunctionCallingConfigMode.NONE,
+                ),
+            )
+        return types.GenerateContentConfig(**kwargs)
+
+    contents = [
+        types.Content(
+            role="model" if m.get("role") == "assistant" else "user",
+            parts=[types.Part.from_text(text=str(m.get("content", "")))],
+        )
+        for m in messages
+    ]
+
+    async def _generate(force_text: bool):
+        return await asyncio.to_thread(
+            client.models.generate_content,
+            model=model,
+            contents=contents,
+            config=_gen_config(force_text),
+        )
+
+    # One extra, tool-free turn beyond max_rounds to coax a final answer.
+    for round_idx in range(max_rounds + 1):
+        force_text = round_idx == max_rounds
+        response = await _generate(force_text)
+        candidate = (response.candidates or [None])[0]
+        content = getattr(candidate, "content", None)
+        parts = list(getattr(content, "parts", None) or [])
+        calls = [p.function_call for p in parts
+                 if getattr(p, "function_call", None)]
+        if not calls or force_text:
+            if calls and force_text:
+                logger.warning(
+                    "vertex gemini tool-use loop hit %d rounds; forced a "
+                    "final tool-free completion", max_rounds,
+                )
+            return response.text or ""
+
+        # Echo the model turn verbatim, then a user turn of function results.
+        if content is not None:
+            contents.append(content)
+        result_parts = []
+        for call in calls:
+            name = getattr(call, "name", "") or ""
+            args = dict(getattr(call, "args", {}) or {})
+            try:
+                out = await _maybe_await(tool_handler(name, args))
+                payload = {"result": _stringify_tool_result(out)}
+            except Exception as e:
+                payload = {"error": f"{type(e).__name__}: {e}"}
+            result_parts.append(
+                types.Part.from_function_response(name=name, response=payload)
+            )
+        contents.append(types.Content(role="user", parts=result_parts))
+
+    # Unreachable: the force_text iteration above always returns.
+    raise RuntimeError(
+        f"tool-use loop exceeded {max_rounds} rounds without a final response"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -757,12 +865,9 @@ async def complete_with_tools(
                 return await _anthropic_tool_loop(
                     client, config, system, messages, tools, tool_handler, max_rounds,
                 )
-            logger.warning(
-                "vertex model %r does not support the tool-use loop; "
-                "falling back to a plain completion (tools ignored)", model,
+            return await _vertex_gemini_tool_loop(
+                config, system, messages, tools, tool_handler, max_rounds,
             )
-    if config.provider == "vertex":
-        return await complete(config, system=system, messages=messages)
     raise ValueError(f"unknown LLM provider {config.provider!r}")
 
 

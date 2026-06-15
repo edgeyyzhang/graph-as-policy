@@ -110,7 +110,8 @@ staging).
 
 1. **Which skills to instantiate.** Pick from the Available Skills table
    (shown in your context). Each `declare_subgraph` names exactly one
-   skill from that table.
+   skill from that table — UNLESS no skill fits, in which case you may
+   invent one with `generated=True` (see "Inventing a new skill").
 
    **HARD RULE — grasp-by-subpart ⇒ `perceiving-object-parts`.** If the
    task says to grasp/pick an object *by* a named part — "by its
@@ -266,14 +267,19 @@ contains an object word that isn't itself a task object name.
    input must have an upstream subgraph on some path to it that produces
    a matching output name with a matching type. Declared `outputs`
    must be a subset of the skill's `produces_outputs` (omit outputs
-   nothing downstream consumes).
+   nothing downstream consumes). **Exception — generated skills:** for an
+   invented (`generated=True`) subgraph there is no bundle schema, so the
+   `inputs` / `outputs` you declare ARE the contract; the upstream-producer
+   wiring constraint still applies.
 5. **Pick the right specialized variant.** When multiple variants of a
    role appear in Available Skills (e.g. `perceiving-objects-multiview`
    vs `perceiving-objects`, `grasping-with-planner` vs
    `grasping-direct-ik`), read each skill's *When to use* guidance and
    pick the best fit — default to the more robust / collision-aware
-   variant when both are listed. Only skills in the Available Skills
-   table exist; do not invent names.
+   variant when both are listed. Prefer a skill from the Available Skills
+   table whenever one fits. Do **not** GUESS or hallucinate a catalog
+   name — but when no existing skill covers a step, you MAY **invent a
+   new skill** instead of aborting (see "Inventing a new skill" below).
 
 ## Discovery via tools
 
@@ -283,9 +289,54 @@ You may call:
   rationale for a skill (the references listed in the skill's frontmatter).
 - `read_skill_example(skill_name, example_name)` to load a sample
   subgraph the per-skill subgraph_agent will start from.
-- `report_missing_capability(name, why)` if no skill in the catalog
-  covers a step the task requires. The build aborts with a structured
-  report.
+- `report_missing_capability(name, why)` **only as a last resort** —
+  when a step needs a physical primitive that no existing tool provides
+  AND cannot be composed from the available tools + Python (e.g. a
+  sensor/actuator the robot does not have). The build aborts with a
+  structured report. If the gap is a missing *skill* that could be
+  composed from existing tools + generated scripts, **invent the skill**
+  instead (see below); do not abort.
 
 Use these sparingly — the always-loaded catalog already shows skill
-descriptions, tags, exit_conditions, and produces_outputs.
+descriptions, tags, exit_conditions, and produces_outputs, plus the flat
+tool catalog shows every connector/bundle tool you can compose.
+
+## Inventing a new skill (fallback)
+
+When **no** skill in the Available Skills table fits a step the task
+requires — but the step CAN be built from the tools in the flat tool
+catalog plus some custom Python — declare a **generated** subgraph
+instead of aborting. You define the skill's *contract* (its fixed
+`inputs` / `outputs` / `exit_success_values` / `on_error`); the
+`subgraph_agent` then implements it from scratch by composing tool nodes
+and authoring `type="script"` nodes. Nothing is added to the registry —
+the invented skill lives only in this workflow.
+
+Pass `generated=True` and a fresh, descriptive `skill` name (kebab-case,
+not in the catalog):
+
+```python
+spec.declare_subgraph(
+    "insert_peg",
+    skill="insert-peg-in-hole",      # invented name — NOT from the catalog
+    generated=True,
+    description="Insert the held peg into the hole on the fixture",
+    inputs={"peg_pose": "Se3Pose", "hole_pose": "Se3Pose"},
+    outputs={"inserted": "bool"},
+    exit_success_values=["inserted"],
+    on_error="failed",
+)
+```
+
+Rules for an invented skill:
+
+- **Prefer existing skills.** Invent only when nothing in the catalog
+  fits. A registry skill is tested and canonical; an invented one is not.
+- The `inputs` / `outputs` you declare ARE the contract (there is no
+  bundle schema to subset against), but they still obey hard rule 4's
+  wiring constraint: every input needs an upstream subgraph that produces
+  a matching output name + type.
+- `inputs` / `outputs` type names must be `gap.schema` types (you cannot
+  invent new data types, only new behavior).
+- Everything else (edges, conditional_edges, end nodes, entry edge) is
+  wired exactly as for a normal subgraph.

@@ -90,22 +90,22 @@ def test_run_no_trace(tmp_path, monkeypatch):
     assert not (tmp_path / "outputs").exists()
 
 
-def test_record_video_requires_sim_and_trace(tmp_path, monkeypatch, capsys):
+def test_video_skipped_gracefully_without_sim(tmp_path, monkeypatch, capsys):
+    """Video is ON by default, but a tools-only run (no --sim) has nothing to
+    render, so it's silently skipped rather than erroring. The `--no-video`
+    opt-out and the deprecated `--record-video` no-op are both accepted."""
     wf_dir = tmp_path / "wf"
     wf_dir.mkdir()
     (wf_dir / "workflow.json").write_text(json.dumps(_valid_workflow()))
+    monkeypatch.chdir(tmp_path)
 
-    code = _run_cli(monkeypatch, ["run", str(wf_dir), "--record-video"])
-    assert code == 2
-    assert "--sim" in capsys.readouterr().out
+    code = _run_cli(monkeypatch, ["run", str(wf_dir)])
+    assert code == 0
+    assert "video:" not in capsys.readouterr().out  # no sim → nothing recorded
 
-    code = _run_cli(
-        monkeypatch,
-        ["run", str(wf_dir), "--record-video", "--sim", "libero_object/0",
-         "--no-trace"],
-    )
-    assert code == 2
-    assert "trace" in capsys.readouterr().out
+    # Both flags are accepted on a tools-only run and don't change the outcome.
+    assert _run_cli(monkeypatch, ["run", str(wf_dir), "--no-video"]) == 0
+    assert _run_cli(monkeypatch, ["run", str(wf_dir), "--record-video"]) == 0
 
 
 def test_parse_inputs():

@@ -53,6 +53,9 @@ Compose the minimal sequence of nodes and edges that:
 5. Calls only tools in the filtered catalog and scripts in the skill's
    `canonical_scripts` list. If you need a primitive that's missing,
    call `report_missing_capability(name, why)`.
+   **Generated (invented) skills are different** — see below: there is no
+   canonical-script list, the full tool catalog is available, and you
+   author the implementation as `type="script"` nodes yourself.
 
 Postcondition checkpoints (`sg.add_checkpoint(...)`) are authored by a
 separate `checkpoint_agent` in a follow-on pass. **Do not** declare
@@ -182,6 +185,31 @@ the canonical alone.
 Inline-script blocks are distinguished from the subgraph-builder block
 by their fence info: ``` ```python:scripts/... ``` (with a path) is an
 inline script, ``` ```python ``` (no path) is the subgraph builder.
+
+### Generated (invented) skills
+
+If your "Skill in scope" section says you are implementing an **invented
+skill** (the coordinator declared it with `generated=True`), the rules
+above flip in three ways:
+
+1. **There are no canonical scripts.** The "Canonical scripts" table is
+   empty, so the canonical-override warning does not apply — every
+   `scripts/<sg>/<file>.py` you emit is your own, and you should emit as
+   many as the skill needs. Inline scripts are the **primary**
+   implementation surface here, not a rare fallback.
+2. **The full tool catalog is available** (not a per-skill whitelist).
+   Use any `type="tool"` node from the catalog for steps a registered
+   tool already covers, and author `type="script"` nodes for the rest.
+3. **The contract is the coordinator's spec.** Implement exactly the
+   declared `inputs` → `outputs`, name your success exits to match the
+   declared `exit_success_values`, and use the declared `on_error`
+   symbol. Bind every declared output via `sg.set_outputs(...)`.
+
+Keep `Subgraph(skill="<the invented skill name>")` exactly as the
+coordinator named it — the runtime treats it as metadata and runs your
+`type="script"` nodes directly (no bundle lookup). Only call
+`report_missing_capability` if a step needs a primitive that genuinely
+cannot be composed from the catalog + Python.
 
 ## Patterns
 

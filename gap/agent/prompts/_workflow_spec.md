@@ -65,6 +65,13 @@ registry — e.g. `"OrientedBoundingBox"`, `"Mask"`, `"PointCloud"`,
 `"Se3Pose"`, `"Observation"`, `"Trajectory"`, plus the scalars `"str"` /
 `"int"` / `"float"` / `"bool"`.
 
+`skill` usually names a registered bundle, but for an **invented
+(generated) skill** it names a brand-new skill the coordinator defined
+that has no bundle. Such a subgraph is fully self-contained: its
+behavior lives entirely in its own `type: script` / `type: tool` nodes,
+and the runtime never resolves the `skill` name against any registry
+(it is metadata only).
+
 Scripts go in separate fenced blocks, namespaced under
 `scripts/<subgraph_name>/`:
 
