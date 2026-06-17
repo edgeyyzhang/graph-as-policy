@@ -10,6 +10,8 @@ to restrict to one of them.
 from __future__ import annotations
 
 import argparse
+import subprocess
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -279,6 +281,48 @@ def _handle_check(args: argparse.Namespace) -> int:
             if info is None:
                 print(f"{prefix}: skipped prefetch (import failed)")
                 continue
+
+            # Out-of-process (RPC) bundles never have `tools_module`
+            # populated — the engine skips `tools.py` for them on purpose
+            # (the bundle's torch / sam3 / etc. live in its own venv).
+            # For those bundles, look for `prefetch` BY STATIC SOURCE-LEVEL
+            # CHECK and shell into the bundle's own venv to run it. Only
+            # then does the engine have a fighting chance to call
+            # `huggingface_hub.snapshot_download` inside the right place.
+            serving = getattr(info.meta, "serving", None)
+            is_rpc = (
+                serving is not None
+                and getattr(serving, "protocol", "in-process") != "in-process"
+            )
+
+            if is_rpc:
+                tools_py = Path(info.bundle_dir) / "tools.py"
+                if not tools_py.is_file() or "def prefetch(" not in tools_py.read_text():
+                    print(f"{prefix}: declares no weights (no prefetch())")
+                    continue
+                cmd = [
+                    "uv", "run", "--project", str(info.bundle_dir),
+                    "--", "python", "-c",
+                    "import tools; tools.prefetch()",
+                ]
+                try:
+                    subprocess.run(
+                        cmd, check=True, cwd=info.bundle_dir,
+                        capture_output=True, text=True,
+                    )
+                    print(f"{prefix}: prefetch OK")
+                except subprocess.CalledProcessError as exc:
+                    failures += 1
+                    err = (exc.stderr or "").strip().splitlines()
+                    msg = err[-1] if err else f"exit {exc.returncode}"
+                    print(f"{prefix}: prefetch FAILED: {msg}")
+                except FileNotFoundError:
+                    failures += 1
+                    print(f"{prefix}: prefetch FAILED: `uv` not on PATH")
+                continue
+
+            # In-process bundle: call `prefetch` directly through the
+            # already-imported module.
             prefetch = None
             for module in (info.tools_module, info.module):
                 fn = getattr(module, "prefetch", None) if module is not None else None
