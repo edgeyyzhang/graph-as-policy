@@ -6,6 +6,17 @@ script-fix loop) and comes out as a typed, verified workflow directory —
 the **same artifact** [gap.builder](build-a-graph.md) authors by hand and
 `gap run` executes.
 
+:::{tip} End-to-end
+`gap generate "<task>"` + `gap run --sim` works end-to-end on the
+public quickstart task. The coordinator picks
+`perceiving-objects` + `grasping-with-planner` + `transporting-objects`
+from the registry without any prompt hinting; the runtime then runs the
+generated workflow in sim against LLM-authored postcondition
+checkpoints. `gemini-3.1-flash-lite-preview` on Vertex is the
+default and the fastest path; other providers work too — see
+[Providers](#providers).
+:::
+
 :::{note} Requirements
 An LLM credential (`ANTHROPIC_API_KEY` by default — see
 [Providers](#providers)) plus the engine install (`uv sync`) and the

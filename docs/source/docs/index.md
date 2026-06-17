@@ -96,15 +96,23 @@ One plugin install teaches AI coding agents to drive the whole workflow.
   grocery-fulfillment acceptance config must clear **≥90% success** for a
   release.
 
-## Measured results
+## Two ways in
 
-Every number is measured on the engine repo at the committed `uv.lock`:
+GaP runs the same workflow artifact however you produce it — by hand or
+from language:
 
-| Benchmark | Result |
-|---|---|
-| [Quickstart](../examples/libero-quickstart.md) — 10 seeded LIBERO trials | **9/10 grasp**, 7/10 end-to-end (~25–55 s/trial, one A100) |
-| [Acceptance](../examples/grocery-fulfillment.md) — 10-task development gate | **10/10**, graphs LLM-generated per task |
-| [Release gate](../examples/benchmark.md) — 10 tasks × 50 trials | must clear **≥90%** before any release |
+- **[Hand-curated quickstart](../examples/libero-quickstart.md)** — the
+  reference graph for `libero_object_all_variance/0`. Open a sim,
+  perceive, grasp with in-process IK, transport, verify against
+  ground truth.
+- **[Generate from language](../authoring/generation.md)** — one
+  sentence to a validated graph. The coordinator → subgraph-agents →
+  checkpoint-agent pipeline picks `perceiving-objects`,
+  `grasping-with-planner`, and `transporting-objects` from the skill
+  registry; the result runs end-to-end in sim with LLM-authored
+  postcondition checkpoints enforced at every subgraph exit.
+- **[Release gate](../examples/benchmark.md)** — a grid harness with
+  `--gate` for batch evaluation across modes × families × seeds.
 
 ## Architecture
 

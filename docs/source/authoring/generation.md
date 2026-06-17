@@ -8,6 +8,18 @@ LLM pipeline against your skill registries, validates the result with the
 same validator the runtime uses, and writes every prompt and response to
 disk for debugging.
 
+:::{tip} End-to-end
+The full loop **`gap generate "<task>"` → `gap run --sim`** works
+end-to-end on the public quickstart task today: the codegen picks
+`perceiving-objects` + `grasping-with-planner` + `transporting-objects`
+from the registry, vendors their canonical scripts into a fresh graph
+directory, and the runtime evaluates LLM-authored postcondition
+checkpoints (`target_obb_is_plausible`, `target_held`,
+`target_in_container`, …) against sim ground truth. With
+`gemini-3.1-flash-lite-preview` on Vertex, codegen is on the order of
+~20 s and the sim trial on the order of ~2 min.
+:::
+
 :::{note} Requirements
 An LLM API key (`ANTHROPIC_API_KEY` for the default provider — see
 [LLM providers](llm-providers.md)) and at least one skill registry (an
