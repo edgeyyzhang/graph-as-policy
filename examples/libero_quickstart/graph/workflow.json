@@ -290,8 +290,8 @@
           }
         },
         "rotate_align": {
-          "type": "tool",
-          "tool": "robot.go_to_pose",
+          "type": "script",
+          "script": "scripts/grasp/move_linear.py",
           "inputs": {
             "pose": {
               "$ref": "compute_align.align_pose"
@@ -299,8 +299,8 @@
           }
         },
         "descend": {
-          "type": "tool",
-          "tool": "robot.go_to_pose",
+          "type": "script",
+          "script": "scripts/grasp/move_linear.py",
           "inputs": {
             "pose": {
               "$ref": "compute_grasp.candidates.poses.0"

@@ -11,7 +11,7 @@ verified workflow directory — the **same artifact**
 ## CLI
 
 Generation needs only the engine (`uv sync`), the open-robot-skills checkout next
-to this repo, and an LLM credential — no GPU, no sim:
+to this repo, and an LLM credential:
 
 ```bash
 export ANTHROPIC_API_KEY=...    # default provider; see "Providers" below

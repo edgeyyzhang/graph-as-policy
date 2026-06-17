@@ -722,7 +722,12 @@ def make_env(
         action_mode="velocity_joints",
         control_freq=float(getattr(env, "_control_freq", 20.0)),
         home_joints=_FRANKA_HOME_JOINTS,
-        tcp_offset=(0.0, 0.0, -0.1),
+        # Ground truth measured from MuJoCo at home pose: hand
+        # ``robot0_right_hand`` -> site ``gripper0_grip_site`` is +0.0970 m
+        # along hand z (robosuite's canonical TCP). gap stores the negated
+        # value (PyRoKi convention). The historical -0.1 was 3 mm too long
+        # and the curobo bundle's 0.1029 comment is 5.9 mm too long.
+        tcp_offset=(0.0, 0.0, -0.097),
         tcp_rotation_z=None,
         arm_bases=None,
         robot_urdf_path="panda_description",

@@ -38,6 +38,8 @@ __all__ = [
     "probe_bundle_import",
     "probe_gpu",
     "probe_llm_providers",
+    "probe_vlm_providers",
+    "resolve_vlm_env",
 ]
 
 ProbeStatus = Literal["ok", "missing", "unknown", "error"]
@@ -107,8 +109,13 @@ def _adc_path() -> Path:
     return base / "application_default_credentials.json"
 
 
-def probe_llm_providers() -> dict[str, ProbeResult]:
-    """Key/credential presence per LLM provider, as gap.agent.llm reads them.
+def _envstr(name: str) -> str:
+    return os.environ.get(name, "").strip()
+
+
+def probe_llm_providers(*, probe: bool = False) -> dict[str, ProbeResult]:
+    """Credential presence (and, when ``probe=True``, a 1-token API ping)
+    per LLM provider, as :mod:`gap.agent.llm` reads them.
 
     - ``anthropic`` (default provider): the SDK reads ``ANTHROPIC_API_KEY``.
     - ``openai``: ``OPENAI_API_KEY`` (custom OpenAI-compatible ``endpoint:``
@@ -116,10 +123,16 @@ def probe_llm_providers() -> dict[str, ProbeResult]:
     - ``vertex``: native Google SDKs authenticate via Application Default
       Credentials (``$GOOGLE_APPLICATION_CREDENTIALS`` or the gcloud ADC
       file); project/region come from the llm config, not env vars.
+
+    When ``probe`` is true, every provider that *looks* configured gets a
+    1-token API call (5 s timeout). The dev-era static check was a poor
+    proxy: a stale-but-present key still reported ``ok``. The probe path
+    catches that (and the dev-era milk-vs-soup misconfig: VLM bundle
+    routed to anthropic with no API key would now surface here).
     """
     results: dict[str, ProbeResult] = {}
 
-    if os.environ.get("ANTHROPIC_API_KEY", "").strip():
+    if _envstr("ANTHROPIC_API_KEY"):
         results["anthropic"] = ProbeResult("ok", "ANTHROPIC_API_KEY set")
     else:
         results["anthropic"] = ProbeResult(
@@ -127,7 +140,7 @@ def probe_llm_providers() -> dict[str, ProbeResult]:
             fix_hint="export ANTHROPIC_API_KEY=...",
         )
 
-    if os.environ.get("OPENAI_API_KEY", "").strip():
+    if _envstr("OPENAI_API_KEY"):
         results["openai"] = ProbeResult("ok", "OPENAI_API_KEY set")
     else:
         results["openai"] = ProbeResult(
@@ -136,7 +149,7 @@ def probe_llm_providers() -> dict[str, ProbeResult]:
             fix_hint="export OPENAI_API_KEY=...",
         )
 
-    gac = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    gac = _envstr("GOOGLE_APPLICATION_CREDENTIALS")
     if gac:
         if Path(gac).expanduser().is_file():
             results["vertex"] = ProbeResult(
@@ -164,7 +177,254 @@ def probe_llm_providers() -> dict[str, ProbeResult]:
                 "; google-genai not installed (gemini-* models need "
                 "`pip install 'graph-as-policy[vertex]'`)"
             )
+
+    if probe:
+        for name, res in results.items():
+            if not res.ok:
+                continue
+            ping = _ping_provider(
+                name,
+                model=_envstr("GAP_LLM_MODEL"),
+                project_id=(
+                    _envstr("GOOGLE_CLOUD_PROJECT")
+                    or _envstr("ANTHROPIC_VERTEX_PROJECT_ID")
+                ),
+                region=(
+                    _envstr("GOOGLE_CLOUD_REGION")
+                    or _envstr("GOOGLE_CLOUD_LOCATION")
+                    or "global"
+                ),
+            )
+            # Preserve the cred-source detail; append the ping verdict.
+            results[name] = ProbeResult(
+                ping.status,
+                detail=(f"{res.detail}; {ping.detail}" if res.detail else ping.detail),
+                fix_hint=ping.fix_hint,
+            )
     return results
+
+
+@dataclass
+class ResolvedVlmEnv:
+    """The post-inheritance VLM config the vlm tool bundle will actually
+    use, mirroring ``open-robot-skills/tools/vlm/tools.py`` resolvers.
+    Surfaced in ``gap check`` so misconfigs (e.g. VLM defaulting to
+    anthropic in a vertex-configured shell) are obvious before a run."""
+
+    provider: str
+    model: str
+    vertex_project: str
+    vertex_region: str
+    provider_source: str
+    """``"explicit"`` (``GAP_VLM_PROVIDER`` set), ``"inherited"`` (from
+    ``GAP_LLM_PROVIDER``), or ``"default"`` (fell through to anthropic)."""
+
+
+def resolve_vlm_env() -> ResolvedVlmEnv:
+    """Mirror the vlm tool bundle's resolution chain (see
+    ``open-robot-skills/tools/vlm/tools.py``). Kept in gap so ``gap check``
+    can report what the bundle would resolve to without spawning the
+    bundle subprocess."""
+    if _envstr("GAP_VLM_PROVIDER"):
+        provider, source = _envstr("GAP_VLM_PROVIDER").lower(), "explicit"
+    elif _envstr("GAP_LLM_PROVIDER"):
+        provider, source = _envstr("GAP_LLM_PROVIDER").lower(), "inherited"
+    else:
+        provider, source = "anthropic", "default"
+    model = _envstr("GAP_VLM_MODEL") or _envstr("GAP_LLM_MODEL")
+    project = (
+        _envstr("GAP_VLM_PROJECT_ID")
+        or _envstr("GOOGLE_CLOUD_PROJECT")
+        or _envstr("ANTHROPIC_VERTEX_PROJECT_ID")
+    )
+    region = (
+        _envstr("GAP_VLM_REGION")
+        or _envstr("GOOGLE_CLOUD_REGION")
+        or _envstr("GOOGLE_CLOUD_LOCATION")
+        or "global"
+    )
+    return ResolvedVlmEnv(provider, model, project, region, source)
+
+
+def probe_vlm_providers(*, probe: bool = False) -> dict[str, ProbeResult]:
+    """Credential presence (and, when ``probe=True``, a 1-token API ping)
+    for the resolved VLM provider.
+
+    Unlike :func:`probe_llm_providers` (which reports ALL providers' cred
+    presence so the user can pick), the VLM bundle dispatches to ONE
+    provider per run — the one :func:`resolve_vlm_env` settles on. The
+    report key is that resolved provider name; the detail string includes
+    the resolution source (explicit / inherited / default) and resolved
+    model/project/region so misconfigs are obvious. The dev-era
+    milk-vs-soup run logged success because nothing surfaced that the
+    VLM bundle had silently fallen through to the anthropic default with
+    no API key — this probe makes that visible."""
+    env = resolve_vlm_env()
+
+    if env.provider == "anthropic":
+        if _envstr("ANTHROPIC_API_KEY"):
+            res = ProbeResult("ok", "ANTHROPIC_API_KEY set")
+        else:
+            res = ProbeResult(
+                "missing", "ANTHROPIC_API_KEY not set",
+                fix_hint=(
+                    "export ANTHROPIC_API_KEY=..., or route the vlm bundle "
+                    "elsewhere (export GAP_VLM_PROVIDER=vertex or set "
+                    "GAP_LLM_PROVIDER — VLM inherits when unset)"
+                ),
+            )
+    elif env.provider == "openai":
+        base_url = _envstr("GAP_VLM_BASE_URL")
+        if not base_url:
+            res = ProbeResult(
+                "missing", "GAP_VLM_BASE_URL not set",
+                fix_hint=(
+                    "export GAP_VLM_BASE_URL=<openai-compatible endpoint>"
+                ),
+            )
+        elif not env.model:
+            res = ProbeResult(
+                "missing", "no VLM model resolved",
+                fix_hint=(
+                    "export GAP_VLM_MODEL=..., or GAP_LLM_MODEL (VLM "
+                    "inherits when unset)"
+                ),
+            )
+        else:
+            res = ProbeResult(
+                "ok",
+                f"base_url={base_url}, model={env.model}"
+                + ("" if _envstr("GAP_VLM_API_KEY") else "; no GAP_VLM_API_KEY"),
+            )
+    elif env.provider == "vertex":
+        if not env.vertex_project:
+            res = ProbeResult(
+                "missing", "no vertex project resolved",
+                fix_hint=(
+                    "export GAP_VLM_PROJECT_ID=..., or GOOGLE_CLOUD_PROJECT "
+                    "(VLM inherits when unset)"
+                ),
+            )
+        elif not env.model:
+            res = ProbeResult(
+                "missing", "no VLM model resolved",
+                fix_hint=(
+                    "export GAP_VLM_MODEL=..., or GAP_LLM_MODEL (VLM "
+                    "inherits when unset)"
+                ),
+            )
+        elif _adc_path().is_file() or _envstr("GOOGLE_APPLICATION_CREDENTIALS"):
+            res = ProbeResult(
+                "ok",
+                f"project={env.vertex_project}, region={env.vertex_region}, "
+                f"model={env.model}",
+            )
+        else:
+            res = ProbeResult(
+                "missing", "no Application Default Credentials",
+                fix_hint="gcloud auth application-default login",
+            )
+    else:
+        res = ProbeResult(
+            "error", f"unknown provider {env.provider!r}",
+            fix_hint="set GAP_VLM_PROVIDER to anthropic | openai | vertex",
+        )
+
+    # Prefix the detail with the resolution source so the misconfig
+    # narrative ("vlm fell through to anthropic by default") is loud.
+    src_label = {
+        "explicit": "from GAP_VLM_PROVIDER",
+        "inherited": "from GAP_LLM_PROVIDER",
+        "default": "default (no GAP_VLM_PROVIDER or GAP_LLM_PROVIDER set)",
+    }[env.provider_source]
+    res = ProbeResult(
+        res.status,
+        detail=f"{src_label}" + (f" — {res.detail}" if res.detail else ""),
+        fix_hint=res.fix_hint,
+    )
+
+    if probe and res.ok:
+        ping = _ping_provider(
+            env.provider, model=env.model,
+            project_id=env.vertex_project, region=env.vertex_region,
+        )
+        res = ProbeResult(
+            ping.status,
+            detail=f"{res.detail}; {ping.detail}" if res.detail else ping.detail,
+            fix_hint=ping.fix_hint,
+        )
+    return {env.provider: res}
+
+
+def _ping_provider(
+    provider: str, *, model: str, project_id: str, region: str,
+    timeout_s: float = 5.0,
+) -> ProbeResult:
+    """1-token API call to ``provider`` — returns ``ok`` on a 2xx, ``error``
+    with the exception string on anything else. Imports the SDK lazily
+    so a non-installed provider degrades to a clear error, not an import
+    error at module load."""
+    try:
+        if provider == "anthropic":
+            import anthropic
+            client = anthropic.Anthropic(timeout=timeout_s)
+            client.messages.create(
+                model=model or "claude-opus-4-8",
+                max_tokens=1,
+                messages=[{"role": "user", "content": "x"}],
+            )
+            return ProbeResult("ok", f"ping ok (model={model or 'claude-opus-4-8'})")
+        if provider == "openai":
+            import httpx
+            base_url = _envstr("GAP_VLM_BASE_URL") or _envstr("GAP_LLM_ENDPOINT") \
+                or "https://api.openai.com/v1"
+            key = _envstr("GAP_VLM_API_KEY") or _envstr("OPENAI_API_KEY")
+            headers = {"Authorization": f"Bearer {key}"} if key else {}
+            with httpx.Client(timeout=timeout_s) as c:
+                r = c.post(
+                    base_url.rstrip("/") + "/chat/completions",
+                    json={
+                        "model": model or "gpt-4o-mini",
+                        "messages": [{"role": "user", "content": "x"}],
+                        "max_tokens": 1,
+                    },
+                    headers=headers,
+                )
+                r.raise_for_status()
+            return ProbeResult("ok", f"ping ok (model={model or 'gpt-4o-mini'})")
+        if provider == "vertex":
+            if model and "claude" in model.lower():
+                from anthropic import AnthropicVertex
+                client = AnthropicVertex(
+                    project_id=project_id, region=region, timeout=timeout_s,
+                )
+                client.messages.create(
+                    model=model, max_tokens=1,
+                    messages=[{"role": "user", "content": "x"}],
+                )
+            else:
+                from google import genai
+                from google.genai import types
+                client = genai.Client(
+                    vertexai=True, project=project_id, location=region,
+                )
+                client.models.generate_content(
+                    model=model or "gemini-2.5-flash",
+                    contents="x",
+                    config=types.GenerateContentConfig(max_output_tokens=1),
+                )
+            return ProbeResult(
+                "ok",
+                f"ping ok (project={project_id}, region={region}, "
+                f"model={model or 'gemini-2.5-flash'})",
+            )
+    except Exception as exc:  # noqa: BLE001 — probe surface, all errors equal
+        msg = str(exc).splitlines()[0][:200]
+        return ProbeResult(
+            "error", f"ping failed: {msg}",
+            fix_hint="re-check credentials and model name; see provider docs",
+        )
+    return ProbeResult("error", f"unknown provider {provider!r}")
 
 
 @dataclass
@@ -173,6 +433,9 @@ class EnvironmentReport:
     gap_version: str
     gpu: ProbeResult
     llm_providers: dict[str, ProbeResult]
+    vlm_provider: dict[str, ProbeResult] = field(default_factory=dict)
+    """Single-entry ``{resolved_provider: ProbeResult}`` — the VLM bundle
+    dispatches to one provider per run (see :func:`resolve_vlm_env`)."""
 
     def to_json_dict(self) -> dict[str, Any]:
         return {
@@ -183,17 +446,22 @@ class EnvironmentReport:
                 name: probe.to_json_dict()
                 for name, probe in self.llm_providers.items()
             },
+            "vlm_provider": {
+                name: probe.to_json_dict()
+                for name, probe in self.vlm_provider.items()
+            },
         }
 
 
-def probe_environment() -> EnvironmentReport:
+def probe_environment(*, probe: bool = False) -> EnvironmentReport:
     import gap
 
     return EnvironmentReport(
         python_version=platform.python_version(),
         gap_version=getattr(gap, "__version__", "unknown"),
         gpu=probe_gpu(),
-        llm_providers=probe_llm_providers(),
+        llm_providers=probe_llm_providers(probe=probe),
+        vlm_provider=probe_vlm_providers(probe=probe),
     )
 
 
@@ -438,9 +706,17 @@ def _tool_owner(tool_name: str, owner_by_prefix: dict[str, str]) -> str:
     return owner_by_prefix.get(prefix, "unknown")
 
 
-def build_check_report(registry_set: RegistrySet) -> CheckReport:
-    """Probe every bundle of every active registry and roll up skills."""
-    environment = probe_environment()
+def build_check_report(
+    registry_set: RegistrySet, *, probe: bool = False,
+) -> CheckReport:
+    """Probe every bundle of every active registry and roll up skills.
+
+    ``probe=True`` makes :func:`probe_llm_providers` /
+    :func:`probe_vlm_providers` issue a real 1-token API call to each
+    configured provider; default is static (env-var / ADC presence
+    only). Bundle import + weights probes are always run regardless.
+    """
+    environment = probe_environment(probe=probe)
     gpu = environment.gpu
 
     bundles: list[BundleCapability] = []

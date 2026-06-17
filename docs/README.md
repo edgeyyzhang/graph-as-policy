@@ -50,7 +50,7 @@ directory and add it to the matching toctree in `source/docs/index.md`
   with `$ ` prompts only when commands and output are mixed (sphinx-copybutton
   strips the prompts on copy).
 - Link to repo sources with the custom URL schemes from `conf.py`:
-  `[examples/hello_graph](gh-engine:examples/hello_graph)` and
+  `[examples/build_a_graph](gh-engine:examples/build_a_graph)` and
   `[skills/sam3](gh-skills:tools/sam3)`.
 - Cross-page links are relative `.md` paths; heading anchors are
   auto-generated for h1–h3 (`myst_heading_anchors = 3`).

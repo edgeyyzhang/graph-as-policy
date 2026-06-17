@@ -1,31 +1,23 @@
 # Installation
 
-gap is two repos in one virtual environment: **graph-as-policy** (the
+GaP is two repos in one virtual environment: **graph-as-policy** (the
 engine) and **open-robot-skills** (the skill bundles, discovered by path).
 This page takes you from zero to a verified install: clone both repos side
-by side, pick an extras set, set your keys, and gate the result with
-`gap skills check` and `gap check`.
+by side, sync, install the skill bundles, set your keys, and gate the
+result with `gap skills check` and `gap check`.
 
 ## Requirements
 
-What you need depends on how much of the stack you want to run:
+What you need to run the stack:
 
 | Setup | Requirements |
 |---|---|
-| Engine only — validate, author, and render graphs | Python ≥ 3.10, [uv](https://docs.astral.sh/uv/) or pip. CPU is fine; runs anywhere. |
-| Simulation + perception (quickstart, benchmarks) | Linux, an NVIDIA GPU with **≥ ~10 GB VRAM**, EGL for headless rendering (`MUJOCO_GL=egl`), and an LLM API key (Anthropic / OpenAI-compatible / Vertex). |
-| CuRobo motion planning (`grocery` / `all` extras) | All of the above plus a CUDA toolkit matching your torch build (`CUDA_HOME`). |
+| Run the quickstart, sim, perception, motion planning | Linux + **1× NVIDIA RTX 4090 (≥24 GB VRAM)** + EGL, an LLM API key, [uv](https://docs.astral.sh/uv/). |
 | Real robots | See [Connectors](../real-robots/connectors.md) and read [Safety](../real-robots/safety.md) first. |
 
 The first simulation run downloads model weights (~3.5 GB total) from
 HuggingFace; `HF_TOKEN` is needed only for the gated SAM3 weights — see
 [Model weights](#model-weights) below.
-
-:::{tip}
-No GPU? You can still do real work — build, validate, and render
-workflow graphs on a laptop. Start with
-[gap in 2 minutes](quickstart-cpu.md).
-:::
 
 ## Clone the two repos
 
@@ -57,34 +49,28 @@ lockfile references them even for engine-only installs.
 
 ## Install with uv (recommended)
 
-One `uv sync` per setup, run from inside `graph-as-policy/`. Everything is
-declared in `pyproject.toml` and pinned by the committed `uv.lock` — the
-exact environment the acceptance benchmark was measured on.
+One `uv sync` plus one skills install, run from inside `graph-as-policy/`.
+Everything is declared in `pyproject.toml` and pinned by the committed
+`uv.lock` — the exact environment the acceptance benchmark was measured
+on.
 
 ```bash
 cd graph-as-policy
-uv sync --extra quickstart
+CUDA_HOME=/usr/local/cuda uv sync && uv run gap skills install --all
 ```
 
-| Command | What you get |
-|---|---|
-| `uv sync` | Engine only: runtime, validator, `gap.builder`, viz, in-process IK (pyroki), plus the dev group (pytest, ruff, mypy). CPU, any OS. |
-| `uv sync --extra quickstart` | + `[libero]` sim stack (`mujoco==3.6.0`, the vendored LIBERO fork and robosuite, `torch>=2.7`) + the open-robot-skills `quickstart` bundles: SAM3, Grounding DINO, geometry. |
-| `CUDA_HOME=/usr/local/cuda uv sync --extra grocery` | Everything in `quickstart` + the CuRobo motion-planning bundle (CUDA build at install time). The acceptance-benchmark set. |
-| `CUDA_HOME=/usr/local/cuda uv sync --extra all` | Everything in `grocery` + Ray workers (`ray[serve]`), the Vertex provider, the OpenPI policy client, and the Gemini-ER and learned-policy (`pi05-libero`, `molmoact-libero`) bundles. |
-
-The `quickstart`, `grocery`, and `all` extras are meta-extras spanning both
-repos: each combines the engine's `[libero]` sim stack with the matching
-bundle set from `open-robot-skills/pyproject.toml` (one extra per bundle),
-resolved from the side-by-side checkout. The vendored submodules are wired
-the same way, so a single sync builds the whole environment.
+`uv sync` installs the engine and the LIBERO sim stack (`mujoco==3.6.0`,
+the vendored LIBERO fork and robosuite, `torch>=2.7`, in-process IK via
+pyroki) plus the dev group (pytest, ruff, mypy). `gap skills install --all`
+then installs every bundle in the side-by-side `open-robot-skills`
+checkout — SAM3, Grounding DINO, geometry, CuRobo, Gemini-ER, the
+learned-policy bundles, and friends.
 
 :::{note}
 **CuRobo builds CUDA extensions at install time** against your
 environment's torch. The engine repo already declares it as a
 no-build-isolation package for uv; you only need `CUDA_HOME` to point at a
-CUDA toolkit matching torch's CUDA version when syncing
-`--extra grocery` or `--extra all`.
+CUDA toolkit matching torch's CUDA version.
 :::
 
 `uv run gap …` needs no venv activation; run
@@ -99,7 +85,8 @@ explicitly. From the parent directory of the two checkouts:
 pip install -e "graph-as-policy[libero]" \
   -e graph-as-policy/third_party/Variational-Automation-Benchmark \
   -e graph-as-policy/third_party/robosuite \
-  -e "open-robot-skills[quickstart]"
+  -e open-robot-skills
+gap skills install --all
 gap skills check --download
 ```
 
@@ -109,9 +96,9 @@ Two pip-specific caveats:
   a documented override (SAM3 runs fine on numpy 2.x); plain pip may
   downgrade numpy during resolution — fix it afterwards with
   `pip install "numpy>=2" --force-reinstall`.
-- **CuRobo.** When installing `open-robot-skills[curobo]` (or the `grocery`
-  / `all` sets), add `--no-build-isolation` and set `CUDA_HOME` to a
-  toolkit matching torch's CUDA.
+- **CuRobo.** The CuRobo bundle builds CUDA extensions at install time;
+  add `--no-build-isolation` to the install command and set `CUDA_HOME` to
+  a toolkit matching torch's CUDA.
 
 ## Model weights
 
@@ -163,27 +150,18 @@ install hint for anything missing (non-zero exit on FAIL). `gap check` is
 the capability report: environment (GPU, LLM credentials), active
 registries, per-bundle operational status, and the per-skill runnability
 rollup with a fix hint per failure. It exits 0 whenever it can produce a
-report — a laptop without a GPU is not an error; add `--strict` to turn
-any not-ready bundle into exit 1 for CI.
+report; add `--strict` to turn any not-ready bundle into exit 1 for CI.
 
-Then smoke-test with the CPU-only example:
+Then smoke-test the full stack:
 
 ```bash
-uv run python examples/hello_graph/hello.py
+MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph --sim libero_object_all_variance/0 --validate-only
 ```
 
-If that renders `outputs/hello_graph/graph.png`, the engine, the skills
-checkout, and the validation path all work. Continue with
-[gap in 2 minutes](quickstart-cpu.md) or jump straight to the
-[15-minute tour](quickstart.md).
+If that returns cleanly, the graph parses, every bundle is venv-ready, and
+the sim launches. Continue with the [15-minute tour](quickstart.md).
 
 ## Troubleshooting
-
-**`uv sync` removed my extras.**
-`uv sync` is *exact*: it makes the environment match exactly what you ask
-for, so a bare `uv sync` after `uv sync --extra quickstart` uninstalls the
-quickstart set again. Always repeat the `--extra` flag (or use
-`uv sync --inexact …` for additive installs).
 
 **`uv sync` fails with "does not appear to be a Python project".**
 You cloned without `--recurse-submodules`. Run
@@ -209,7 +187,6 @@ torch build's CUDA, and (pip only) that you passed `--no-build-isolation`.
 
 ## Next steps
 
-- [gap in 2 minutes](quickstart-cpu.md) — build and render a graph, no GPU.
 - [The 15-minute tour](quickstart.md) — run a real rollout on LIBERO.
 - [Concepts](concepts.md) — the vocabulary: workflows, subgraphs, skills, tools.
 - [Skill registries](../skills/registries.md) — how bundles are discovered and layered.

@@ -107,8 +107,12 @@ class Connector:
             ``default_cameras``, ``is_real``).
         camera_names: Camera override; defaults to
             ``config.default_cameras``.
-        ik: Optional pre-built IK backend (defaults to an in-process
-            :class:`gap.connector.ik.PyRokiBackend` built from *config*).
+        ik: Optional pre-built IK backend. Defaults to a
+            :class:`gap.connector.ik.CuRoboBackend` built from *config* (GPU,
+            v0.8 MotionPlanner — linear motion with IK fallback via
+            ``plan_to_pose``). Pass an explicit
+            :class:`gap.connector.ik.PyRokiBackend` to opt into the in-process
+            CPU-JAX path (e.g. for YAM/6-DOF or no-GPU machines).
     """
 
     def __init__(
@@ -153,7 +157,8 @@ class Connector:
         )
         self.is_real: bool = bool(getattr(config, "is_real", False))
 
-        # Pluggable IK backend (in-process pyroki by default; lazy).
+        # Pluggable IK backend (cuRobo by default; lazy). Pass ``ik=`` to
+        # opt into PyRoKi or any other backend implementing the same surface.
         self._ik = ik
 
         # Step-callback seam: the DataCollector (and anything else that
@@ -172,7 +177,7 @@ class Connector:
     @property
     def ik(self) -> Any:
         if self._ik is None:
-            from gap.connector.ik import PyRokiBackend
+            from gap.connector.ik import CuRoboBackend
 
             urdf_path = self._robot_urdf_path
             # "panda_description" is a robot_descriptions name, not a path.
@@ -181,14 +186,28 @@ class Connector:
                 kwargs["robot_urdf"] = urdf_path
             elif urdf_path:
                 kwargs["robot_urdf_path"] = urdf_path
-            self._ik = PyRokiBackend(
-                arm_dof=self._arm_dof,
-                tcp_offset=self._tcp_offset,
-                tcp_rotation=self._tcp_rotation,
-                home_joints=self._home_joints,
-                arm_bases=self._arm_bases,
-                **kwargs,
-            )
+            try:
+                self._ik = CuRoboBackend(
+                    arm_dof=self._arm_dof,
+                    tcp_offset=self._tcp_offset,
+                    tcp_rotation=self._tcp_rotation,
+                    home_joints=self._home_joints,
+                    arm_bases=self._arm_bases,
+                    **kwargs,
+                )
+                logger.info(
+                    "Connector.ik: using cuRobo backend (default; arm_dof=%d)",
+                    self._arm_dof,
+                )
+            except NotImplementedError as e:
+                # cuRobo doesn't bundle this arm (e.g. YAM 6-DOF). Surface a
+                # clear pointer rather than silently auto-falling-back: per
+                # the design decision, PyRoKi is opt-in only.
+                raise RuntimeError(
+                    f"Default IK backend (cuRobo) cannot serve this config: {e} "
+                    f"Construct the connector with ik=PyRokiBackend(...) to "
+                    f"opt into the in-process PyRoKi path."
+                ) from e
         return self._ik
 
     # ------------------------------------------------------------------
@@ -595,9 +614,14 @@ class Connector:
     def _default_tcp_offset(self) -> np.ndarray:
         """Fallback TCP offset used when the caller doesn't provide one.
 
-        Matches the historical default for panda (-0.1 m along Z for
-        fingertip). YAM's fixed TCP is applied inside the backend itself.
+        Prefer the value the env config supplied (``self._tcp_offset`` —
+        franka_real uses -0.157 m for the Robotiq tool, libero uses -0.1 m
+        for the panda hand). Fall back to the historical Panda fingertip
+        default of -0.1 m along Z only when no config offset is configured.
+        YAM's fixed TCP is applied inside the backend itself.
         """
+        if self._tcp_offset is not None:
+            return np.asarray(self._tcp_offset, dtype=np.float64).reshape(3)
         return np.array([0.0, 0.0, -0.1], dtype=np.float64)
 
     def _current_joints(self, arm_id: int) -> list[float] | None:
@@ -748,7 +772,11 @@ class Connector:
             raise ToolError("robot.go_to_pose", "pose required")
 
         if tcp_offset is None:
-            tcp_offset = {"x": 0.0, "y": 0.0, "z": -0.1}
+            # Use the env's configured TCP (franka_real: -0.157, libero: -0.1)
+            # rather than a hardcoded Panda default — the latter silently
+            # shifts the IK target by ~5.7 mm on the real Robotiq stack.
+            off = self._default_tcp_offset()
+            tcp_offset = {"x": float(off[0]), "y": float(off[1]), "z": float(off[2])}
         is_yam = self._arm_dof == 6
         tolerance = tolerance if tolerance > 0 else (0.03 if is_yam else 0.01)
         # nonblocking=True forces max_steps=0, which makes move_to_joints_blocking
@@ -807,8 +835,12 @@ class Connector:
         off = self._default_tcp_offset()
         is_yam = self._arm_dof == 6
         ee_pose = self.get_ee_pose(arm_id=arm_id)
+        # Pass the current joint config as the linear seed — cuRobo's
+        # MotionPlanner needs the actual start_config for FK; PyRoKi
+        # accepts and ignores it.
+        seed = self._current_joints(arm_id)
         trajectory = self.ik.plan_linear(
-            ee_pose, pose, arm_id=arm_id, tcp_offset=off,
+            ee_pose, pose, arm_id=arm_id, tcp_offset=off, seed_joints=seed,
         )
         if trajectory is None:
             raise ToolError("robot.go_to_pose_cartesian", "linear plan failed")

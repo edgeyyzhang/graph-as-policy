@@ -1,6 +1,6 @@
 # Overview
 
-**The policy is the graph.** gap compiles a natural-language task into a
+**The policy is the graph.** GaP compiles a natural-language task into a
 typed, verified execution graph of robot skills — and runs the graph, not a
 black-box policy, on simulators and real robots.
 
@@ -167,8 +167,7 @@ VLMs. Details in the [roadmap](../developers/roadmap.md).
 | If you want to… | Go to |
 |---|---|
 | Install the engine and skills | [Installation](installation.md) |
-| Try gap on a laptop — CPU only, no API key | [Quickstart (CPU)](quickstart-cpu.md) |
-| Run the full sim quickstart on a GPU | [Quickstart](quickstart.md) |
+| Run the sim quickstart | [Quickstart](quickstart.md) |
 | Learn the vocabulary (workflow, subgraph, tool, skill, …) | [Core Concepts](concepts.md) |
 | Browse runnable examples, hello-world to real robots | [Examples](../examples/index.md) |
 | Generate graphs from language | [Generation](../authoring/generation.md) |

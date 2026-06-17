@@ -32,11 +32,11 @@ this API serializes to.
 
 ## Worked example: perceive, then grasp
 
-The arc below builds the [hello_graph example](../examples/hello-graph.md)
-([source](gh-engine:examples/hello_graph)): two subgraphs, each owned by a
-real skill from open-robot-skills, wired into a workflow with success and
-failure ends. It is CPU-only — building and validating a graph needs no GPU,
-simulator, or API key.
+The arc below builds the [build_a_graph example](../examples/build-a-graph.md)
+([source](gh-engine:examples/build_a_graph)): a pick-and-place workflow
+whose subgraphs are each owned by a real skill from open-robot-skills, wired
+into a coordinator with success and failure ends. Builder runs without the
+simulator — just `uv sync` + the open-robot-skills checkout.
 
 ### 1. A perception subgraph
 
@@ -45,23 +45,25 @@ from gap.builder import Ref, Subgraph, Workflow
 
 target = "blue and yellow alphabet soup can"
 
-see = Subgraph(name="perceive_sg", skill="perceiving-objects")
+see = Subgraph(name="target_sg", skill="perceiving-objects")
 see.add_node("observe", type="tool", tool="robot.get_observation")
 see.add_node(
     "perceive", type="script", script="scripts/perceive_dino_vlm.py",
     inputs={"cameras": Ref("observe.cameras"), "object_name": target},
 )
 see.add_node(
-    "fit_obb", type="tool", tool="geometry.filter_and_compute_obb",
+    "filter_obb", type="tool", tool="geometry.filter_and_compute_obb",
     inputs={"points": Ref("perceive.cloud")},
 )
 see.add_exit("found")                      # noop success marker
 see.set_on_error("not_found")              # any raise → "not_found" exit
 for src, dst in [("START", "observe"), ("observe", "perceive"),
-                 ("perceive", "fit_obb"), ("fit_obb", "found"),
+                 ("perceive", "filter_obb"), ("filter_obb", "found"),
                  ("found", "END")]:
     see.add_edge(src, dst)
-see.set_outputs(target_obb=Ref("fit_obb.obb"))
+see.set_outputs(target_obb=Ref("filter_obb.obb"),
+                target_mask=Ref("perceive.mask"),
+                target_cloud=Ref("perceive.cloud"))
 ```
 
 Everything in a graph is one of two node forms here:
@@ -77,34 +79,48 @@ Everything in a graph is one of two node forms here:
   canonical recipe, copied verbatim into `scripts/` (step 4).
 
 Data flows only through `Ref`: `Ref("observe.cameras")` reads the `cameras`
-field of the `observe` node's output. Note `Ref("fit_obb.obb")`, not
-`Ref("fit_obb")` — `geometry.filter_and_compute_obb` returns a wrapping dict
-`{"obb": ...}`. The `object_name` input, by contrast, is a plain literal
-string. Both distinctions trip people up often enough to have their own
-sections in [Patterns and pitfalls](patterns.md).
+field of the `observe` node's output. Note `Ref("filter_obb.obb")`, not
+`Ref("filter_obb")` — `geometry.filter_and_compute_obb` returns a wrapping
+dict `{"obb": ...}`. The `object_name` input, by contrast, is a plain
+literal string. Both distinctions trip people up often enough to have their
+own sections in [Patterns and pitfalls](patterns.md).
 
 `add_exit("found")` creates a `noop` node named `found` and registers it as
 the subgraph's success value; `set_on_error("not_found")` declares the
 single failure exit any in-subgraph exception routes to. `set_outputs`
-publishes `target_obb` so a downstream subgraph can consume it *by name*.
+publishes `target_obb` (plus the mask and cloud) so a downstream subgraph
+can consume it *by name*. The full example reuses this builder twice — once
+with `prefix="target"`, once with `prefix="container"` — so the container
+subgraph publishes `container_obb` from the same structure.
 
 ### 2. A grasp subgraph with a typed input
 
 ```python
 grab = Subgraph(name="grasp_sg", skill="grasping-direct-ik")
 grab.add_input("target_obb", type_name="OrientedBoundingBox")
-grab.add_node("open", type="tool", tool="robot.open_gripper")
+grab.add_node("open", type="tool", tool="robot.open_gripper",
+              inputs={"settle_steps": 40})
 grab.add_node(
-    "candidates", type="tool", tool="geometry.top_down_grasp_candidates",
+    "compute_grasp", type="tool", tool="geometry.top_down_grasp_candidates",
     inputs={"obb": Ref("in.target_obb")},
 )
+grab.add_node(
+    "compute_align", type="script", script="scripts/compute_align_pose.py",
+    inputs={"grasp_pose": Ref("compute_grasp.candidates.poses.0"),
+            "target_obb": Ref("in.target_obb")},
+)
+grab.add_node("rotate_align", type="tool", tool="robot.go_to_pose",
+              inputs={"pose": Ref("compute_align.align_pose")})
 grab.add_node("descend", type="tool", tool="robot.go_to_pose",
-              inputs={"pose": Ref("candidates.candidates.poses.0")})
-grab.add_node("close", type="tool", tool="robot.close_gripper")
+              inputs={"pose": Ref("compute_grasp.candidates.poses.0")})
+grab.add_node("close", type="tool", tool="robot.close_gripper",
+              inputs={"settle_steps": 60})
 grab.add_exit("grasped")
 grab.set_on_error("failed")
-for src, dst in [("START", "open"), ("open", "candidates"),
-                 ("candidates", "descend"), ("descend", "close"),
+for src, dst in [("START", "open"), ("open", "compute_grasp"),
+                 ("compute_grasp", "compute_align"),
+                 ("compute_align", "rotate_align"),
+                 ("rotate_align", "descend"), ("descend", "close"),
                  ("close", "grasped"), ("grasped", "END")]:
     grab.add_edge(src, dst)
 ```
@@ -115,34 +131,47 @@ for src, dst in [("START", "open"), ("open", "candidates"),
 the subgraph you read it through the reserved `in` pseudostate:
 `Ref("in.target_obb")`.
 
-`Ref("candidates.candidates.poses.0")` reads node `candidates` → its
+`Ref("compute_grasp.candidates.poses.0")` reads node `compute_grasp` → its
 `candidates` output field (a `GraspCandidates`, best-first) → the `poses`
 list → integer index `0`. `$ref` paths support dotted dict keys, attributes,
 and integer indices — see [Patterns and pitfalls](patterns.md) for the full
-path syntax.
+path syntax. The align-then-descend split avoids twisting the gripper
+against the object while closing — `compute_align_pose.py` computes a
+pre-rotated pose at altitude, then `descend` drops straight down to the
+grasp pose without further yaw motion.
 
 ### 3. The top-level workflow
 
 ```python
-wf = Workflow(name="hello_graph",
-              description=f"Perceive the {target}, then grasp it.")
-wf.add_subgraph(see)
+wf = Workflow(name="pick_into_basket",
+              description=f"Pick the {target} and place it in the basket.")
+wf.add_subgraph(see)                 # target_sg
+wf.add_subgraph(container_sg)        # built the same way, prefix="container"
 wf.add_subgraph(grab)
-wf.add_node("perceive", type="subgraph", ref="perceive_sg")
+wf.add_subgraph(transport_sg)        # transporting-objects: drop pose → move → release
+wf.add_node("target", type="subgraph", ref="target_sg")
+wf.add_node("container", type="subgraph", ref="container_sg")
 wf.add_node("grasp", type="subgraph", ref="grasp_sg")
+wf.add_node("transport", type="subgraph", ref="transport_sg")
 wf.add_node("done", type="end", status="success")
 wf.add_node("abort", type="end", status="failure")
-wf.add_edge("START", "perceive")
+wf.add_edge("START", "target")
 wf.add_conditional_edges(
-    "perceive", {"found": "grasp", "not_found": "abort"},
+    "target", {"found": "container", "not_found": "abort"},
     router_field="exit")
 wf.add_conditional_edges(
-    "grasp", {"grasped": "done", "failed": "abort"},
+    "container", {"found": "grasp", "not_found": "abort"},
+    router_field="exit")
+wf.add_conditional_edges(
+    "grasp", {"grasped": "transport", "failed": "abort"},
+    router_field="exit")
+wf.add_conditional_edges(
+    "transport", {"placed": "done", "blocked": "abort"},
     router_field="exit")
 ```
 
 `add_subgraph(sg)` registers the `Subgraph` under its name;
-`add_node(..., type="subgraph", ref="perceive_sg")` places a node that runs
+`add_node(..., type="subgraph", ref="target_sg")` places a node that runs
 it. Conditional edges dispatch on a field of the source node's output: for
 subgraph nodes you always write `router_field="exit"` — the executor
 remaps it to the internal `_exit` key that carries the subgraph's exit value
@@ -152,9 +181,10 @@ or the run fails with a `PipelineError` at dispatch time.
 
 Note that `grasp_sg`'s declared input `target_obb` is never wired
 explicitly: at run time it binds to the most recent upstream subgraph that
-published an output of the same name — here `perceive_sg`'s
-`set_outputs(target_obb=...)`. This by-name binding is validation rule W8
-and has [sharp edges](patterns.md) worth knowing.
+published an output of the same name — here `target_sg`'s
+`set_outputs(target_obb=...)`. Likewise `transport_sg`'s `container_obb`
+input binds to `container_sg`'s published output. This by-name binding is
+validation rule W8 and has [sharp edges](patterns.md) worth knowing.
 
 End nodes terminate the workflow with `status="success"` or `"failure"`. A
 failure end can carry **recovery** tool calls — best-effort cleanup executed
@@ -189,10 +219,21 @@ sys.dont_write_bytecode = True
 from gap.skills import find_skills_path
 skills_root = find_skills_path(None, required=True)   # $GAP_SKILLS_PATH or sibling checkout
 
-out = Path("outputs/hello_graph")
+out = Path("my_graph")
 (out / "scripts").mkdir(parents=True, exist_ok=True)
-shutil.copy2(skills_root / "skills/perceiving-objects/scripts/perceive_dino_vlm.py",
-             out / "scripts/perceive_dino_vlm.py")
+for dest_rel, src_rel in [
+    ("scripts/perceive_dino_vlm.py",
+     "skills/perceiving-objects/scripts/perceive_dino_vlm.py"),
+    ("scripts/compute_align_pose.py",
+     "skills/grasping-direct-ik/scripts/compute_align_pose.py"),
+    ("scripts/compute_drop_pose.py",
+     "skills/transporting-objects/scripts/compute_drop_pose.py"),
+    ("scripts/waypoint_move.py",
+     "skills/transporting-objects/scripts/waypoint_move.py"),
+    ("scripts/descend_release.py",
+     "skills/transporting-objects/scripts/descend_release.py"),
+]:
+    shutil.copy2(skills_root / src_rel, out / dest_rel)
 
 wf.save(out / "workflow.json")             # parse + structural validation
 ```
@@ -221,18 +262,19 @@ issues = validate_workflow(load_workflow(out / "workflow.json"),
 
 The result renders like this (`gap.viz.render`):
 
-![Rendered hello_graph workflow: perceive and grasp subgraphs routing to done/abort end nodes](../_static/hello_graph.png)
+![Rendered build_a_graph workflow: target and container perception subgraphs feeding grasp and transport, routing to done/abort end nodes](../_static/build_a_graph.png)
 
 Run it like any other graph:
 
 ```bash
-gap run outputs/hello_graph --validate-only
+gap run my_graph --validate-only
 ```
 
 The [build_a_graph example](../examples/build-a-graph.md)
-([source](gh-engine:examples/build_a_graph)) extends this exact arc to the
-full quickstart pick-and-place — four subgraphs, a transport stage, recovery
-actions, a checkpoint sidecar, and optional `--execute` on the LIBERO sim.
+([source](gh-engine:examples/build_a_graph)) is the full program this
+walkthrough mirrors — including the `dump_checkpoints_module` sidecar, the
+recovery actions on `abort`, and an optional `--execute` flag that runs the
+built artifact on the LIBERO sim end-to-end.
 
 ## Exits: `add_exit` vs `set_exit_router`
 

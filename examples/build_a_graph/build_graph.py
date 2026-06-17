@@ -14,12 +14,12 @@ descend, close), then transport into the container with the
 ``transporting-objects`` scripts. A ground-truth ``target_held``
 postcondition checkpoint guards the grasp.
 
-Build + validate (CPU-only, no sim)::
+Build + validate (no sim)::
 
     python examples/build_a_graph/build_graph.py --out my_graph
 
-Execute on the LIBERO sim (needs ``[libero]``, ``open-robot-skills[quickstart]``
-with downloaded weights, a VLM credential, and ``MUJOCO_GL=egl``)::
+Execute on the LIBERO sim (needs ``uv run gap skills install --all`` with
+downloaded weights, a VLM credential, and ``MUJOCO_GL=egl``)::
 
     MUJOCO_GL=egl python examples/build_a_graph/build_graph.py \\
         --out my_graph --execute

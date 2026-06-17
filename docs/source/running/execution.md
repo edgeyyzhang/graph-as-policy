@@ -36,7 +36,7 @@ so always keep `workflow.json` next to its `scripts/`.
 
 By default `gap run` executes **tools-only**: no robot, no sim — nodes run against
 the resolved skill registries and gap's core tools. This is how you run pure
-codegen/test graphs like [hello_graph](../examples/hello-graph.md) on any machine.
+codegen/test graphs like [build_a_graph](../examples/build-a-graph.md) on any machine.
 
 `--sim SUITE/TASK` builds a LIBERO simulation connector, e.g.
 `--sim libero_object/0` or `--sim libero_object_all_variance/3`. The value is a

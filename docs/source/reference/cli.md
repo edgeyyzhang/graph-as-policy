@@ -77,19 +77,17 @@ directory.
 | `--validate-only` | flag | Validate the graph without executing it; prints each issue and an `OK`/`FAIL` summary. |
 | `--no-trace` | flag | Disable trace output. |
 | `--trace-dir DIR` | path; default: `outputs/run_<timestamp>` | Trace output directory. |
-| `--record-video` | flag | Sim only: save `<trace-dir>/run_video.mp4` plus per-camera videos when the env buffers them. |
+| `--no-video` | flag | Sim only: disable run-video recording. Video is **on by default** for sim runs (saved to `<trace-dir>/run_video.mp4` plus per-camera videos when the env buffers them); pass this to skip rendering. Silently a no-op for `--real` / tools-only runs, and skipped (with a `note:` line) when combined with `--no-trace`. |
 | `--checkpoints {off,warn,raise}` | choice; default: `warn` | Checkpoint enforcement mode. See [Checkpoints](../running/checkpoints.md). |
 | `--inputs K=V ...` | repeatable `k=v`; default: none | Initial workflow inputs. Values are parsed as JSON when possible, else kept as strings. An entry without `=` is an error. |
 | `-v, --verbose` | flag | Enable debug logging. |
 
 Exit codes: `0` run succeeded (or validation passed); `1` run failed,
 validation found error-severity issues, the workflow failed to load,
-`--sim` and `--real` were combined, or an `--inputs` entry was malformed;
-`2` `--record-video` without `--sim`, or `--record-video` together with
-`--no-trace`.
+`--sim` and `--real` were combined, or an `--inputs` entry was malformed.
 
 ```console
-$ gap run outputs/generated_20260612_101500 --sim libero_object/0 --record-video
+$ gap run outputs/generated_20260612_101500 --sim libero_object/0
 video: outputs/run_20260612_102014/run_video.mp4 (412 frames)
 SUCCESS (exit=success, 41.3s)
 trace: outputs/run_20260612_102014

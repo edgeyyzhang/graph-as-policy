@@ -1,20 +1,29 @@
-# gap — graph as policy
+# graph-as-policy
 
-**The policy is the graph.** gap compiles a natural-language task into a
+**The policy is the graph.** GaP compiles a natural-language task into a
 typed, verified execution graph of robot skills — and runs the graph, not a
 black-box policy, on simulators and real robots.
 
-```{image} ../_static/quickstart_rollout.gif
-:alt: quickstart rollout on LIBERO — perceive, grasp, transport
-:width: 49%
-```
-```{image} ../_static/quickstart_graph.png
-:alt: the executed workflow graph
-:width: 49%
-```
+<div class="gap-real-grid">
+  <figure>
+    <video src="../_static/grocery_packing_real.mp4" autoplay loop muted playsinline></video>
+    <figcaption>Pack grocery items — Franka, 10×.</figcaption>
+  </figure>
+  <figure>
+    <video src="../_static/popcorn_real.mp4" autoplay loop muted playsinline></video>
+    <figcaption>Make popcorn — long-horizon stove manipulation, 16×.</figcaption>
+  </figure>
+  <figure>
+    <video src="../_static/tool_packing_real.mp4" autoplay loop muted playsinline></video>
+    <figcaption>Pack tools &amp; chargers into tagged bins.</figcaption>
+  </figure>
+  <figure>
+    <video src="../_static/usb_insertion_real.mp4" autoplay loop muted playsinline></video>
+    <figcaption>USB-C cable insertion — UR5 with force feedback.</figcaption>
+  </figure>
+</div>
 
-*"pick up the soup can and put it in the basket" — the live rollout, and the
-graph that ran it.*
+*Real-robot rollouts of graphs generated from one-sentence task descriptions.*
 
 ```python
 import gap
@@ -32,7 +41,7 @@ gap.viz.serve("outputs")                                          # browse the t
 :::{grid-item-card} 🚀 Installation
 :link: ../getting-started/installation
 :link-type: doc
-One `uv sync` per setup — engine-only on any laptop, sim + perception on a GPU box.
+`uv sync` + `gap skills install --all` — engine, sim, perception, motion planning, each in its own venv.
 :::
 
 :::{grid-item-card} ⏱️ The 15-minute tour
@@ -44,7 +53,7 @@ Zero to a verified rollout on LIBERO, with the recorded trace open.
 :::{grid-item-card} 🧪 Examples
 :link: ../examples/index
 :link-type: doc
-Ten examples, from a CPU-only hello-world to the release gate and real robots.
+Ten examples, from the end-to-end quickstart to the release gate and real robots.
 :::
 
 :::{grid-item-card} 🧩 Skill catalog
@@ -66,7 +75,7 @@ One plugin install teaches AI coding agents to drive the whole workflow.
 :::
 ::::
 
-## Why gap
+## Why GaP
 
 - 🧭 **Language → typed graph.** A coordinator → subgraph-agents →
   checkpoint-agent pipeline compiles one instruction into a validated
@@ -77,9 +86,9 @@ One plugin install teaches AI coding agents to drive the whole workflow.
   [open-robot-skills](https://github.com/graph-robots/open-robot-skills) as
   Agent Skills bundles — one directory, one PR. The LLM composes them; you
   can too.
-- ⚡ **One process, no servers.** Env + vision models + IK in-process; plain
-  numpy + TypedDicts as the data contract. Ray is an opt-in extra, never a
-  prerequisite.
+- 📦 **Per-bundle isolation, no monolith venv.** Each tool bundle (sam3,
+  cuRobo, vlm, openpi, …) runs in its own venv via stdio-msgpack RPC; the
+  engine stays ~150 MB. Heavy ML stacks don't fight each other.
 - 🔍 **The trace is the product.** Every run records `workflow.json`,
   `dag_trace.json`, per-node I/O and assets; `gap viz` browses them,
   `gap trace-diff` compares them.
@@ -134,7 +143,6 @@ Read more in [Overview](../getting-started/overview.md), or jump straight to
 
 ../getting-started/overview
 ../getting-started/installation
-../getting-started/quickstart-cpu
 ../getting-started/quickstart
 ../getting-started/concepts
 ```

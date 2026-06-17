@@ -233,12 +233,11 @@ regression bar for every release:
 - **G3 — Steered policy works.** The hover-then-handover example (perceive
   → approach above the target → hand control to a learned policy) runs end
   to end — see [Steered policy](../examples/steered-policy.md).
-- **G4 — Quickstart is one command** on the stated hardware floor: Linux +
-  NVIDIA GPU (≥ ~10 GB VRAM) + EGL, an LLM API key, the two repos cloned
-  side by side, and a one-time multi-GB model-weight download on first use
-  (`HF_TOKEN` for the gated SAM3 weights). The floor is stated up front —
-  no pretending it runs on a laptop CPU (though the
-  [CPU quickstart](../getting-started/quickstart-cpu.md) covers what does).
+- **G4 — Quickstart is one command** on the stated hardware floor: **1×
+  NVIDIA RTX 4090 (≥24 GB VRAM) + Linux + EGL**, an LLM API key, the two
+  repos cloned side by side, and a one-time multi-GB model-weight download
+  on first use (`HF_TOKEN` for the gated SAM3 weights). The floor is stated
+  up front — no pretending it runs on a laptop CPU.
 
 ## Packaging
 

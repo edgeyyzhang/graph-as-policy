@@ -247,5 +247,4 @@ One sentence end to end: `gap generate` asks an LLM to compose **skills**
 into a **workflow** of **subgraphs** whose nodes call **tools**; you
 execute it against a **connector** with `gap run`, the executor enforces
 **checkpoints** at every subgraph exit, and the **trial trace** is what you
-debug with `gap viz`. Try it in the [CPU quickstart](quickstart-cpu.md) or
-the [full quickstart](quickstart.md).
+debug with `gap viz`. Try it in the [15-minute tour](quickstart.md).

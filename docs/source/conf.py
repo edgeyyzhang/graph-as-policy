@@ -11,9 +11,9 @@ from pathlib import Path
 
 # -- Project information -----------------------------------------------------
 
-project = "gap"
-copyright = "2026, the gap authors"
-author = "the gap authors"
+project = "graph-as-policy"
+copyright = "2026, the graph-as-policy authors"
+author = "the graph-as-policy authors"
 
 # Single-source the version from pyproject.toml (regex keeps this working on
 # Python 3.10, which has no tomllib).
@@ -64,15 +64,16 @@ myst_url_schemes = {
 # -- HTML output -------------------------------------------------------------
 
 html_theme = "pydata_sphinx_theme"
-html_title = "gap documentation"
+html_title = "graph-as-policy documentation"
+html_short_title = "GaP"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 html_favicon = "_static/favicon.svg"
 
 html_theme_options = {
     "logo": {
-        "text": "gap",
-        "alt_text": "gap — graph as policy",
+        "text": "GaP",
+        "alt_text": "GaP — graph-as-policy",
     },
     "show_toc_level": 2,
     "navigation_depth": 4,

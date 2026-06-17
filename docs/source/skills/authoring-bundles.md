@@ -9,6 +9,17 @@ pip entry-points. For how registries are resolved and layered, see
 [Skill Registries](registries.md); for testing your bundle, see
 [Testing Skill Bundles](testing-bundles.md).
 
+:::{note}
+**What is `gap_core`?** As of the `gap-core` / `gap-runtime` workspace
+split, bundle authors depend only on **`graph-as-policy-core`** (~150 MB)
+— a slim package with no fastapi, JAX, or MuJoCo. The stable authoring
+surface (`@tool`, types, errors, `Skill`/`SkillMeta`/`Param`/`Serving`)
+lives under `gap_core.*`; the heavy runtime (`gap.execute`,
+`gap.connector`, `gap.agent`) stays on the full `graph-as-policy`
+distribution. Your bundle's `pyproject.toml` should depend on
+`graph-as-policy-core` only.
+:::
+
 ## Tools vs skills — the two bundle kinds
 
 The folder a bundle lives in conveys its kind (`tools/` vs `skills/` —
@@ -154,6 +165,30 @@ gap:
 Tool bundles use the same shape with `gap.tools:` instead of
 `exit_conditions`/`canonical_scripts`.
 
+## Authoring a policy bundle
+
+A third bundle kind lives under `<registry>/policies/<name>/` and wraps
+a learned policy server (VLA, diffusion, IL) behind the connector. Pick
+this kind when the deliverable is *weights + a serving entrypoint*
+rather than scripts or `@tool` callables. The SKILL.md uses the usual
+shape with a `gap.serving:` block declaring how to launch the server:
+
+```yaml
+gap:
+  serving:
+    command: "uv run python -m my_policy.serve --port {port}"
+    protocol: websocket            # or stdio-msgpack
+    env: [HF_TOKEN, GAP_DEVICE]
+    requires_gpu: true
+    weights_uri: "hf://my-org/my-policy-libero@v0.3"
+```
+
+`gap.execute` spawns the command, dials the protocol, and routes
+observations/actions through the connector. See
+[policies/pi05-libero](gh-skills:policies/pi05-libero) and
+[policies/molmoact-libero](gh-skills:policies/molmoact-libero) in
+open-robot-skills for working examples.
+
 ## The authoring contract (stable import surface)
 
 Bundle code imports **only** from these modules; everything else in gap is
@@ -161,11 +196,12 @@ internal and may change without notice (see the [API reference](../reference/api
 
 ```python
 from gap import NodeContext, CancelToken
-from gap.types import (Se3Pose, OrientedBoundingBox, Mask, PointCloud,
-                       Observation, CameraFrame, Trajectory)
-from gap.errors import (PipelineError, PerceptionFailed, PlanningFailed,
-                        GraspFailed, ValidationFailed, ToolError)
-from gap.skills import tool, Skill, SkillMeta, load_prompt
+from gap_core.types import (Se3Pose, OrientedBoundingBox, Mask, PointCloud,
+                            Observation, CameraFrame, Trajectory)
+from gap_core.errors import (PipelineError, PerceptionFailed, PlanningFailed,
+                             GraspFailed, ValidationFailed, ToolError)
+from gap_core.tools import tool
+from gap_core.skills import Skill, SkillMeta, load_prompt
 from gap.testing import FakeContext, make_test_observation   # tests only
 ```
 
@@ -179,7 +215,7 @@ from gap.testing import FakeContext, make_test_observation   # tests only
   tag puts the tool under the corresponding
   `GAP_MAX_PERCEPTION_CALLS` / `GAP_MAX_PLANNING_CALLS` / `GAP_MAX_SIM_STEPS`
   budget (see [Environment Variables](../reference/environment-variables.md)).
-- **Stateful callable skills** subclass `gap.skills.Skill` and define
+- **Stateful callable skills** subclass `gap_core.skills.Skill` and define
   `run(self, ctx, ...)`. The runtime keeps one instance per skill per
   workflow execution — instance attributes persist across visits to the
   state and are discarded when the execution ends. Function-style

@@ -31,7 +31,7 @@ Distribution name `graph-as-policy`, import `gap`, Python ≥3.10 (isaaclab pin 
 - **G1 — Grocery fulfillment ≥90%.** `gap benchmark` in `llm_generation` mode on the variational-automation (posvar) grocery-fulfillment suites (`libero_object_all_variance`, `grocery_packing` families) achieves **>90% success** with CuRobo-only motion planning + grasping/transport skills in the prompt (the **curobo tool bundle is required for the gate**, even though the quickstart stays curobo-free).
 - **G2 — Correct generation.** `gap.agent.generate` on grocery-fulfillment instructions produces graphs that pass the equivalence suite and execute to success (the generated code, not just hand-ported graphs, clears G1).
 - **G3 — Steered policy works.** The hover-then-handover example (perceive → approach above target → hand control to the learned policy) runs end to end.
-- **G4 — Quickstart is one command** on the stated hardware floor: **Linux + NVIDIA GPU (≥ ~10 GB VRAM) + EGL**, `ANTHROPIC_API_KEY` (+ `HF_TOKEN` for gated weights), the two repos cloned side by side, and a one-time several-GB weight download (`gap skills check --download`). The README states this floor up front — no pretending it runs on a laptop CPU.
+- **G4 — Quickstart is one command** on the stated hardware floor: **1× NVIDIA RTX 4090 (≥24 GB VRAM) + Linux + EGL**, `ANTHROPIC_API_KEY` (+ `HF_TOKEN` for gated weights), the two repos cloned side by side, and a one-time several-GB weight download (`gap skills check --download`). The README states this floor up front — no pretending it runs on a laptop CPU.
 
 ## 2. Concepts
 
@@ -44,6 +44,8 @@ Distribution name `graph-as-policy`, import `gap`, Python ≥3.10 (isaaclab pin 
 | **Connector** | The embodiment: owns an env (sim) or robot link (real); registers `robot.*`/`sim.*` tools; exposes benchmark hooks and world snapshots. |
 | **Checkpoint** | LLM-authored postcondition predicate attached to a subgraph (`validate=True`), evaluated against sim ground truth at subgraph exit. |
 | **Trial / trace** | One execution with tracing: `workflow.json`, `dag_trace.json`, `node_data/<id>/` (inputs/outputs + PNG/NPZ assets). |
+
+**Two distributions, one workspace.** graph-as-policy is a uv workspace with two pip distributions: **`gap-core`** is the bundle-author surface (`gap_core.tools`/`types`/`errors`/`schema`/`skills`/`rpc`, ~150 MB installed) — the stable, narrow API that open-robot-skills bundles depend on — and **`graph-as-policy`** is the runtime (`gap.runtime`/`agent`/`connector`/`cli`/`builder`/`viz`/`benchmark`) that consumes gap-core and ships the agent/executor/viz stack. Bundles depend only on `gap-core`, so the heavy runtime stack (fastapi, JAX, MuJoCo, pyroki, opencv, anthropic) stays out of bundle venvs; bundle authors and CI install just `gap-core`, while end users running graphs install `graph-as-policy` (which pulls gap-core transitively).
 
 **Tools vs skills — a first-class split, mirrored in the repo layout.** open-robot-skills has two top-level categories:
 - **Tools** (`open-robot-skills/tools/<bundle>/`) = *what the robot can compute*: model-backed callables with no task strategy. **Tool bundles are named after the model**: `sam3`, `grounding-dino`, `gemini-er`, `molmo`, `vlm` (generic API VLM), `curobo` (motion planning), `geometry` (pure math). A tool bundle exposes typed functions via `@tool` in `tools.py`; its SKILL.md documents when to call them. (IK is NOT a tool bundle — it's built into the connector, see §7.)

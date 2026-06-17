@@ -50,6 +50,23 @@ wf2 = Workflow.load("my_graph/workflow.json")
   subgraph state flow" — the canonical scripts and wiring are the
   contract the skill was validated with.
 
+### Invented skills (`generated=True`)
+
+If no registry skill fits a step but it CAN be built from existing
+tools + custom Python, declare an **invented** skill inline via
+`Subgraph(name=..., skill="<new-name>", generated=True)` (the same flag
+that `spec.declare_subgraph(..., generated=True)` carries in the
+coordinator/codegen path). The `skill` name is a fresh kebab-case label
+NOT in the catalog; the `inputs` / `outputs` / `exit_success_values` /
+`on_error` you set ARE the skill's contract — there is no SKILL.md and
+no canonical scripts, so YOU emit both the subgraph and any
+`type="script"` files. The runtime synthesises a transient SkillInfo
+for it; structural validation (S1-S11, exit-condition consistency,
+input/output contract, allowed_tools) still runs. Use only for one-off
+task-specific micro-skills — prefer a registry skill whenever one fits.
+The headless-pipeline mirror of this is documented in
+`docs/source/authoring/generation.md` ("Generated (invented) skills").
+
 ## Validate → run loop
 
 ```bash

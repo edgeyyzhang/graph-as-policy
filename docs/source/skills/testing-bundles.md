@@ -160,7 +160,7 @@ def skills_registry():
 
 @pytest.fixture(scope="session")
 def tool_registry(skills_registry):
-    from gap.tools import ToolRegistry
+    from gap_core.tools import ToolRegistry
     reg = ToolRegistry()
     reg.discover_pending()
     return reg
@@ -183,7 +183,7 @@ ground truth. From the open-robot-skills suite
 
 ```python
 import pytest
-from gap.errors import PerceptionFailed
+from gap_core.errors import PerceptionFailed
 from gap.testing import FakeContext, make_test_observation
 
 

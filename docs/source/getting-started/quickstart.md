@@ -26,27 +26,15 @@ Zero to a verified rollout, with the trace open. You will:
 
 :::{note} Requirements
 Linux + an NVIDIA GPU (≥ ~10 GB VRAM) with EGL, the
-[two repos installed](installation.md) with `uv sync --extra quickstart`,
-and an LLM API key (`export ANTHROPIC_API_KEY=...`, or
+[two repos installed](installation.md) with
+`uv sync && uv run gap skills install --all`, and an LLM API key
+(`export ANTHROPIC_API_KEY=...`, or
 [another provider](../authoring/llm-providers.md)). The first run
 downloads ~3.5 GB of model weights; set `HF_TOKEN` for the gated SAM3
 weights — see [Model weights](installation.md#model-weights).
 :::
 
-## Minute 0–2: picture a graph (CPU)
-
-If you haven't already, run the no-GPU warm-up — it builds, validates, and
-renders a workflow graph and introduces the four ideas (workflow,
-subgraph, node, routes) in one picture:
-
-```bash
-uv run python examples/hello_graph/hello.py    # → outputs/hello_graph/graph.png
-```
-
-[gap in 2 minutes](quickstart-cpu.md) walks through what it draws. The
-rest of this tour executes that same kind of artifact for real.
-
-## Minute 2–8: run the quickstart graph
+## Minute 0–6: run the quickstart graph
 
 LIBERO sim + Grounding DINO + SAM3 + a hosted VLM + in-process IK,
 executing a perceive → grasp → transport graph:
@@ -103,11 +91,12 @@ what it was looking at when it failed. The full layout is specified in
 [Traces](../running/traces.md) — it is a stability guarantee, safe to
 build tooling against.
 
-Want a rollout video too? Re-run with `--record-video`: the sim run is
-saved as `run_video.mp4` inside the trace directory (plus per-camera
-videos when the env buffers them). Open it from disk with any player.
+A rollout video is recorded automatically for sim runs: the run is
+saved as `<trace-dir>/run_video.mp4` alongside the JSON for easy sharing
+(plus per-camera videos when the env buffers them). Open it from disk with
+any player. Pass `--no-video` if you want to skip rendering.
 
-## Minute 8–10: browse it
+## Minute 6–8: browse it
 
 ```bash
 uv run gap viz                        # browse the recorded trial at localhost:9432
@@ -119,7 +108,7 @@ outputs, timings, and assets — the same `node_data/` you just saw, with
 images inline. When two runs disagree,
 `gap trace-diff <trial_a> <trial_b>` diffs them structurally.
 
-## Minute 10–15: generate your own
+## Minute 8–15: generate your own
 
 ```bash
 uv run gap generate "pick up the alphabet soup can and place it in the basket"

@@ -40,6 +40,15 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         "--strict", action="store_true",
         help="Exit 1 when any non-shadowed bundle is not ready (CI gating)",
     )
+    p.add_argument(
+        "--probe", action="store_true",
+        help="Issue a 1-token API ping to each configured LLM and VLM "
+             "provider (default is a static env-var/ADC presence check). "
+             "Use this to catch stale creds and wrong model names without "
+             "running a full job — the dev-era milk-vs-soup misconfig "
+             "(VLM bundle silently fell through to the anthropic default "
+             "with no API key) would surface here.",
+    )
     p.set_defaults(func=_handle_check)
 
 
@@ -73,7 +82,7 @@ def _handle_check(args: argparse.Namespace) -> int:
             print(f"error: {exc.args[0]}")
             return 2
 
-    report = build_check_report(registry_set)
+    report = build_check_report(registry_set, probe=args.probe)
 
     if args.format == "json":
         import json
@@ -106,9 +115,26 @@ def _print_pretty(report) -> None:
     providers = " · ".join(
         f"{name} {_STATUS_LABEL[probe.status]}"
         + (f" ({probe.fix_hint})" if probe.fix_hint and not probe.ok else "")
+        + (
+            # On --probe failures, surface the actual error inline so the
+            # user doesn't need to re-run with --format json to see it.
+            f" — {probe.detail}" if not probe.ok and probe.detail
+            and probe.detail.startswith("ping ") else ""
+        )
         for name, probe in env.llm_providers.items()
     )
     print(f"  llm: {providers}")
+    # VLM dispatches to ONE resolved provider per run (see resolve_vlm_env);
+    # show that single line with the resolution detail so a vlm bundle
+    # silently falling through to the anthropic default in a vertex shell
+    # is loud here, not at "perceive selected box 0" runtime.
+    for name, probe in env.vlm_provider.items():
+        line = f"  vlm: {name} {_STATUS_LABEL[probe.status]}"
+        if probe.detail:
+            line += f" — {probe.detail}"
+        if probe.fix_hint and not probe.ok:
+            line += f"  ({probe.fix_hint})"
+        print(line)
 
     if not report.registries:
         print(

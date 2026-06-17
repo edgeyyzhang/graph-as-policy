@@ -12,6 +12,13 @@ A bundle is one directory in a registry. The folder conveys the kind:
 Scaffold both kinds with `gap skills new <name> --kind tool|skill
 [--registry NAME]` — it also writes `tests/test_<name>.py`.
 
+> **What is `gap_core`?** As of the `gap-core` / `gap-runtime` workspace
+> split, bundle authors depend only on **`graph-as-policy-core`** (~150
+> MB) — no fastapi, JAX, or MuJoCo. The stable authoring surface
+> (`@tool`, types, errors, `Skill`/`SkillMeta`/`Param`/`Serving`) lives
+> under `gap_core.*`; runtime symbols (`gap.execute`, `gap.connector`,
+> `gap.agent`) stay on the full `graph-as-policy` distribution.
+
 ## SKILL.md contract
 
 Frontmatter (Agent Skills spec + gap extensions under one `gap:` key):
@@ -75,7 +82,7 @@ Skill script (`scripts/*.py`) — a pure function the executor calls:
 
 ```python
 from typing import TypedDict
-from gap.skills import load_prompt
+from gap_core.skills import load_prompt
 
 class Output(TypedDict):
     found: bool
@@ -92,14 +99,14 @@ def run(ctx, *, cameras, object_name: str, min_score: float = 0.0) -> Output:
 `ctx` provides `ctx.tool(name, **kwargs)`, `ctx.publish(value)`
 (streaming), `ctx.cancel_token.raise_if_set()`,
 `ctx.observation_stream.latest(timeout)`. Long-running/stateful skills
-subclass `gap.skills.Skill` (instance persists across visits within one
-execution; set `gap.streaming: true` and `ctx.publish` per tick).
+subclass `gap_core.skills.Skill` (instance persists across visits within
+one execution; set `gap.streaming: true` and `ctx.publish` per tick).
 
 Tool function (`tools.py`):
 
 ```python
 from typing import TypedDict
-from gap.tools import tool
+from gap_core.tools import tool
 
 class DetectResult(TypedDict):
     detections: list[dict]
@@ -114,6 +121,29 @@ def detect(image, query: str, threshold: float = 0.3) -> DetectResult:
 never import torch/transformers/cuda libs. Load models on first call via
 a locked singleton. Typed signatures matter — gap introspects them into
 the tool schema that `gap tools show` and the codegen prompts render.
+
+## Authoring a policy bundle
+
+A third kind, `kind=policy`, lives under `<registry>/policies/<name>/`
+and wraps a learned-policy server (VLA, diffusion, IL) behind the
+connector. Use it when the deliverable is *weights + a serving
+entrypoint* rather than scripts or `@tool` callables. The SKILL.md adds
+a `gap.serving:` block:
+
+```yaml
+gap:
+  serving:
+    command: "uv run python -m my_policy.serve --port {port}"
+    protocol: websocket            # or stdio-msgpack
+    env: [HF_TOKEN, GAP_DEVICE]
+    requires_gpu: true
+    weights_uri: "hf://my-org/my-policy-libero@v0.3"
+```
+
+`gap.execute` spawns the command, dials the protocol, and routes
+observations/actions through the connector. See
+`policies/pi05-libero` and `policies/molmoact-libero` in
+open-robot-skills for working examples.
 
 ## Dependencies
 

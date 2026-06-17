@@ -1,7 +1,7 @@
 # Examples
 
-Ten examples, ordered as a learning path — from a CPU-only hello-world to
-the release acceptance gate and real robots. Install per
+Examples ordered as a learning path — from the end-to-end quickstart to
+the release gate and real robots. Install per
 [Installation](../getting-started/installation.md); the **Needs** column
 names the `uv sync --extra …` set, plus any credential or hardware.
 **Measured** lists only numbers measured on this repo at the committed
@@ -16,7 +16,6 @@ Zero to a verified rollout.
 
 | Example | What it shows | Needs | Time | Measured |
 |---|---|---|---|---|
-| [hello_graph](hello-graph.md) | Build → validate → **render** your first graph; the same artifact the LLM emits | `uv sync` (any OS, no GPU, no API key) | ~2 min | — |
 | [libero_quickstart](libero-quickstart.md) | The end-to-end hero: DINO + SAM3 + VLM perception → OBB grasp → transport, verified against sim ground truth | `quickstart` + GPU + LLM key | ~25–55 s/trial | **9/10 grasp · 7/10 task** (10 seeds) |
 
 ## Author & generate graphs
@@ -27,7 +26,7 @@ the same `gap run`.
 
 | Example | What it shows | Needs | Time | Measured |
 |---|---|---|---|---|
-| [build_a_graph](build-a-graph.md) | The full authoring example: 4 subgraphs, a ground-truth checkpoint, recovery actions, optional `--execute` | `uv sync` (CPU to build) | ~1 min | — |
+| [build_a_graph](build-a-graph.md) | The full authoring example: 4 subgraphs, a ground-truth checkpoint, recovery actions, optional `--execute` | `uv sync` | ~1 min | — |
 | [generate_a_graph](generate-a-graph.md) | Instruction → validated workflow dir; CLI + Python, all providers | `uv sync` + LLM key | minutes | — |
 | [agent_quickstart](agent-quickstart.md) | Step-by-step: Claude Code (one skill) generates a graph from a sentence → validate → sim run → video | `quickstart` + GPU + LLM key + Claude Code | ~10 min | sentence → **task success in sim, 75 s, on video** |
 
@@ -64,7 +63,6 @@ anything else.**
 :maxdepth: 1
 :hidden:
 
-hello-graph
 libero-quickstart
 build-a-graph
 generate-a-graph

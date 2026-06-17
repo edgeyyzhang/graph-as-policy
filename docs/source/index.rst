@@ -2,8 +2,8 @@
    redirects to the real landing page (docs/index) and hosts the hidden
    toctree whose entries become the top navbar.
 
-gap documentation
-=================
+graph-as-policy documentation
+=============================
 
 .. raw:: html
 
@@ -17,5 +17,5 @@ gap documentation
    :hidden:
 
    Docs <docs/index>
-   gap on GitHub <https://github.com/graph-robots/graph-as-policy>
+   graph-as-policy on GitHub <https://github.com/graph-robots/graph-as-policy>
    open-robot-skills <https://github.com/graph-robots/open-robot-skills>

@@ -35,13 +35,12 @@ results table. Architecture diagram (ASCII from README, styled code block).
 **Getting Started** (`getting-started/`)
 1. `overview` — what is gap; thesis; two-repo model; tools vs skills; architecture
 2. `installation` — hardware floor; uv/pip; extras matrix; submodules; CUDA/curobo; weights/HF_TOKEN; install verification (`gap skills check`); troubleshooting (uv-sync-is-exact, numpy/sam3, recurse-submodules)
-3. `quickstart-cpu` — gap in 2 minutes, no GPU (hello_graph: build → validate → render)
-4. `quickstart` — the 15-minute tour (run quickstart graph in LIBERO → read trace → gap viz → generate from language)
-5. `concepts` — glossary: workflow/graph, node types, subgraph, tool vs skill, connector, checkpoint, trial/trace, registry
+3. `quickstart` — the 15-minute tour (run quickstart graph in LIBERO → read trace → gap viz → generate from language)
+4. `concepts` — glossary: workflow/graph, node types, subgraph, tool vs skill, connector, checkpoint, trial/trace, registry
 
 **Examples** (`examples/`)
 6. `index` — gallery: learning-path tables w/ needs + measured results (cards)
-7–16. one page per example: `hello-graph`, `libero-quickstart`, `build-a-graph`, `generate-a-graph`,
+7–16. one page per example: `libero-quickstart`, `build-a-graph`, `generate-a-graph`,
 `agent-quickstart`, `grocery-fulfillment`, `benchmark`, `steered-policy`, `collect-and-train`,
 `cable-ur`, `real-franka-pick-place` — each adapted from its README: what it shows, commands, results, link to source
 

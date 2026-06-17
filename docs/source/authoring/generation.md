@@ -11,8 +11,8 @@ disk for debugging.
 :::{note} Requirements
 An LLM API key (`ANTHROPIC_API_KEY` for the default provider — see
 [LLM providers](llm-providers.md)) and at least one skill registry (an
-open-robot-skills checkout). No GPU and no simulator: generation is pure
-LLM calls plus static validation.
+open-robot-skills checkout). Generation is pure LLM calls plus static
+validation — no simulator is needed.
 :::
 
 ## CLI
@@ -191,6 +191,49 @@ If an agent calls the `report_missing_capability` meta-tool — the task
 needs a skill or tool the registries do not provide — the build **aborts**
 after the subgraph stage with a structured list of the gaps, rather than
 emitting a graph that cannot work.
+
+### Generated (invented) skills
+
+When **no** skill in the resolved registries fits a step the task requires — but the step can
+still be built from existing tools plus some custom Python — the coordinator can **invent a skill
+inline** instead of aborting via `report_missing_capability`. It does this by passing
+`generated=True` to `spec.declare_subgraph(...)` in the workflow spec (the same flag is also
+available on `gap.builder.Subgraph` for hand-authored graphs). The subgraph_agent then implements
+the invented skill from scratch by composing `type: tool` nodes and authoring `type: script`
+nodes:
+
+```python
+spec.declare_subgraph(
+    "insert_peg",
+    skill="insert-peg-in-hole",      # invented name — NOT from the catalog
+    generated=True,
+    description="Insert the held peg into the hole on the fixture",
+    inputs={"peg_pose": "Se3Pose", "hole_pose": "Se3Pose"},
+    outputs={"inserted": "bool"},
+    exit_success_values=["inserted"],
+    on_error="failed",
+)
+```
+
+There is **no canonical bundle on disk** and **no canonical script** for these skills — the LLM
+emits both the skill declaration and its scripts as part of codegen, all in the workflow folder.
+The runtime synthesises a transient `SkillInfo` (a minimal `SkillMeta` carrying the agent-declared
+contract) so the rest of the pipeline can treat the invented skill uniformly: structural
+validation still runs in full (the input/output contract, `exit_success_values` / `on_error`
+consistency, the subgraph S1-S11 rules, and `allowed_tools` against the flat tool catalog), and
+validation errors flow back to the authoring agent in the same self-repair feedback loop used for
+registered-skill subgraphs.
+
+Use this for a **one-off, task-specific micro-skill** that isn't worth promoting to the canonical
+skill library — e.g. a `compute_target_drop_zone` step that's specific to one layout, or a
+`insert-peg-in-hole` segment with bespoke fixture geometry. For anything you expect to reuse, ship
+it as a proper bundle ([Authoring bundles](../skills/authoring-bundles.md)): an invented skill is
+implemented from scratch every run, where a registry skill is tested and canonical. The coordinator
+prompt enforces this preference: invent only when nothing in the Available Skills table fits.
+
+The agent-side mirror of this rule lives in
+[agent/skills/gap/references/authoring-graphs.md](gh-engine:agent/skills/gap/references/authoring-graphs.md)
+(the authoring digest the in-IDE skill loads when you build graphs by hand).
 
 ### Canonical scripts always win
 

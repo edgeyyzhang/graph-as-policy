@@ -24,7 +24,7 @@ positional arguments:
                         aggregate agreement.
     benchmark           Run a benchmark sweep (families x variations x modes) or an acceptance
                         gate
-    policy              Manage learned-policy servers (serve a preset, list presets)
+    policy              Manage learned-policy servers (serve a bundle, list known bundles)
 
 options:
   -h, --help            show this help message and exit
@@ -35,7 +35,7 @@ options:
 ```text
 usage: gap run [-h] [--sim SUITE/TASK] [--real {franka,ur_zed}] [--rr-config YAML]
                [--no-rr-autostart] [--skills PATH] [--validate-only] [--no-trace]
-               [--trace-dir TRACE_DIR] [--record-video] [--checkpoints {off,warn,raise}]
+               [--trace-dir TRACE_DIR] [--no-video] [--checkpoints {off,warn,raise}]
                [--inputs [K=V ...]] [-v]
                graph
 
@@ -61,8 +61,9 @@ options:
   --no-trace            Disable trace output (default: traces into ./outputs/run_<timestamp>)
   --trace-dir TRACE_DIR
                         Trace output directory (overrides the default outputs/run_<timestamp>)
-  --record-video        Sim only: record the run and save <trace-dir>/run_video.mp4 (plus per-
-                        camera videos when the env buffers them)
+  --no-video            Sim only: disable run-video recording. Video is ON by default for sim runs
+                        (saved to <trace-dir>/run_video.mp4, plus per-camera videos when the env
+                        buffers them); pass this to skip it (faster, no rendering).
   --checkpoints {off,warn,raise}
                         Checkpoint enforcement mode (default: warn)
   --inputs [K=V ...]    Initial workflow inputs as k=v pairs (values parsed as JSON when possible,
@@ -74,6 +75,7 @@ options:
 
 ```text
 usage: gap check [-h] [--skills PATH] [--registry NAME] [--format {pretty,json}] [--strict]
+                 [--probe]
 
 options:
   -h, --help            show this help message and exit
@@ -84,15 +86,20 @@ options:
   --format {pretty,json}
                         Output format (json is a stable machine-readable schema)
   --strict              Exit 1 when any non-shadowed bundle is not ready (CI gating)
+  --probe               Issue a 1-token API ping to each configured LLM and VLM provider (default
+                        is a static env-var/ADC presence check). Use this to catch stale creds and
+                        wrong model names without running a full job — the dev-era milk-vs-soup
+                        misconfig (VLM bundle silently fell through to the anthropic default with
+                        no API key) would surface here.
 ```
 
 ## gap skills
 
 ```text
-usage: gap skills [-h] {list,check,table,new,test} ...
+usage: gap skills [-h] {list,check,table,new,test,install} ...
 
 positional arguments:
-  {list,check,table,new,test}
+  {list,check,table,new,test,install}
     list                List discovered bundles across registries
     check               Validate every bundle: SKILL.md format + import probe (PASS/WARN/FAIL per
                         bundle; non-zero exit on FAIL)
@@ -101,6 +108,9 @@ positional arguments:
     test                Run bundle unit tests from the owning registry's tests/ dir (no bundle
                         names = every registry's full suite). Put flags first; pass pytest args
                         after `--`, e.g. `gap skills test sam3 -- -m gpu -x`
+    install             Sync per-bundle venvs via `uv sync --project <bundle_dir>`. No-op for
+                        bundles without a pyproject.toml. To wipe a venv later, just `rm -rf
+                        <bundle>/.venv`.
 
 options:
   -h, --help            show this help message and exit
@@ -180,6 +190,27 @@ positional arguments:
 
 options:
   -h, --help       show this help message and exit
+  --skills PATH    Registry checkout root(s); repeatable. Overrides $GAP_SKILLS_PATH and
+                   configured registries (default: the resolved registry set — see `gap registry
+                   list`)
+  --registry NAME  Restrict to one active registry by name
+```
+
+### gap skills install
+
+```text
+usage: gap skills install [-h] [--all] [--workflow DIR] [--skills PATH] [--registry NAME]
+                          [bundles ...]
+
+positional arguments:
+  bundles          Bundle names to install (default: nothing — pair with --all or --workflow)
+
+options:
+  -h, --help       show this help message and exit
+  --all            Install every bundle with a pyproject.toml across active registries (skips
+                   bundles that have none)
+  --workflow DIR   Install just the bundles a workflow references (same discovery as the
+                   launcher's boot_policies)
   --skills PATH    Registry checkout root(s); repeatable. Overrides $GAP_SKILLS_PATH and
                    configured registries (default: the resolved registry set — see `gap registry
                    list`)
@@ -391,8 +422,8 @@ usage: gap policy [-h] {serve,list} ...
 
 positional arguments:
   {serve,list}
-    serve       Spawn a policy server from a named preset and block until Ctrl-C
-    list        List the known policy presets
+    serve       Spawn a policy server from a bundle and block until Ctrl-C
+    list        List the policy bundles discovered in active registries
 
 options:
   -h, --help    show this help message and exit
@@ -401,10 +432,12 @@ options:
 ### gap policy serve
 
 ```text
-usage: gap policy serve [-h] [--port PORT] [--startup-timeout SECS] preset
+usage: gap policy serve [-h] [--port PORT] [--startup-timeout SECS] [--skills PATH]
+                        [--registry NAME]
+                        bundle
 
 positional arguments:
-  preset                Preset name (see `gap policy list`), e.g. pi05-libero
+  bundle                Policy bundle name (see `gap policy list`), e.g. pi05-libero
 
 options:
   -h, --help            show this help message and exit
@@ -412,13 +445,21 @@ options:
   --startup-timeout SECS
                         How long to wait for the server port to open (default 900; first run
                         downloads checkpoints)
+  --skills PATH         Registry checkout root(s); repeatable. Overrides $GAP_SKILLS_PATH and
+                        configured registries (default: the resolved registry set — see `gap
+                        registry list`)
+  --registry NAME       Restrict to one active registry by name
 ```
 
 ### gap policy list
 
 ```text
-usage: gap policy list [-h]
+usage: gap policy list [-h] [--skills PATH] [--registry NAME]
 
 options:
-  -h, --help  show this help message and exit
+  -h, --help       show this help message and exit
+  --skills PATH    Registry checkout root(s); repeatable. Overrides $GAP_SKILLS_PATH and
+                   configured registries (default: the resolved registry set — see `gap registry
+                   list`)
+  --registry NAME  Restrict to one active registry by name
 ```

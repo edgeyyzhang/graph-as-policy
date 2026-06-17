@@ -368,6 +368,44 @@ class PyRokiBackend:
 
     # --- Panda path --------------------------------------------------------
 
+    def _panda_tcp_to_link(self, pose: Se3Pose) -> Se3Pose:
+        """Convert a TCP-frame target into a ``panda_hand``-link target.
+
+        gap stores ``tcp_offset`` in the *negated* link-to-TCP convention
+        (e.g. ``(0, 0, -0.097)`` for the Franka grip_site). Adding
+        ``R_link @ tcp_offset`` to the TCP target yields the link position
+        whose tool tip, after FK, lands at the requested TCP. Identity
+        operation when no offset / rotation is configured.
+        """
+        if self._tcp_offset is None and self._tcp_rotation is None:
+            return pose
+        q = pose["rotation"]
+        R = Rotation.from_quat([q["x"], q["y"], q["z"], q["w"]]).as_matrix()
+        if self._tcp_rotation is not None:
+            R_link = R @ self._tcp_rotation.inv().as_matrix()
+            link_quat_xyzw = Rotation.from_matrix(R_link).as_quat()
+            link_rot = {
+                "x": float(link_quat_xyzw[0]),
+                "y": float(link_quat_xyzw[1]),
+                "z": float(link_quat_xyzw[2]),
+                "w": float(link_quat_xyzw[3]),
+            }
+        else:
+            R_link = R
+            link_rot = dict(pose["rotation"])
+        if self._tcp_offset is None:
+            return {"position": dict(pose["position"]), "rotation": link_rot}
+        tcp_world = R_link @ self._tcp_offset
+        p = pose["position"]
+        return {
+            "position": {
+                "x": p["x"] + float(tcp_world[0]),
+                "y": p["y"] + float(tcp_world[1]),
+                "z": p["z"] + float(tcp_world[2]),
+            },
+            "rotation": link_rot,
+        }
+
     def _solve_panda(
         self,
         pose: Se3Pose,
@@ -383,32 +421,8 @@ class PyRokiBackend:
         configuration; without it the basic solve runs from the internal
         default seed (which can jump branches between phases).
         """
-        solve_pose = pose
-        if self._tcp_offset is not None:
-            q = pose["rotation"]
-            R = Rotation.from_quat([q["x"], q["y"], q["z"], q["w"]]).as_matrix()
-            if self._tcp_rotation is not None:
-                R_link = R @ self._tcp_rotation.inv().as_matrix()
-                link_quat_xyzw = Rotation.from_matrix(R_link).as_quat()
-                link_rot = {
-                    "x": float(link_quat_xyzw[0]),
-                    "y": float(link_quat_xyzw[1]),
-                    "z": float(link_quat_xyzw[2]),
-                    "w": float(link_quat_xyzw[3]),
-                }
-            else:
-                R_link = R
-                link_rot = dict(pose["rotation"])
-            tcp_world = R_link @ self._tcp_offset
-            p = pose["position"]
-            solve_pose = {
-                "position": {
-                    "x": p["x"] + float(tcp_world[0]),
-                    "y": p["y"] + float(tcp_world[1]),
-                    "z": p["z"] + float(tcp_world[2]),
-                },
-                "rotation": link_rot,
-            }
+        del tcp_offset  # configured offset governs; per-call kwarg ignored
+        solve_pose = self._panda_tcp_to_link(pose)
 
         target_position, target_wxyz = _pose_to_numpy(solve_pose)
         n_actuated = self.robot.joints.num_actuated_joints
@@ -497,16 +511,25 @@ class PyRokiBackend:
         *,
         arm_id: int = 0,
         tcp_offset: np.ndarray | None = None,
+        seed_joints: list[float] | None = None,
         num_waypoints: int = 40,
         ik_refinement_iters: int = 40,
         jump_threshold: float = 0.5,
     ) -> Trajectory | None:
-        """Plan a Cartesian straight-line trajectory.
+        """Plan a Cartesian straight-line trajectory in TCP frame.
+
+        Both ``start_world_pose`` and ``end_world_pose`` are TCP-frame poses:
+        the backend converts them to the IK link frame using ``self._tcp_offset``
+        before per-waypoint IK, matching ``solve_ik``'s contract. ``seed_joints``
+        is accepted for interface parity with CuRoboBackend (PyRoKi's per-
+        waypoint solver chains its own previous-config seed).
 
         Waypoints are in backend-native joint order; see
         ``trajectory_needs_joint_reverse``. Defaults match the source's
         ``PyRoKIPlanRequest(num_waypoints=40, ik_refinement_iters=40)``.
         """
+        del seed_joints  # unused; PyRoKi seeds per-waypoint internally
+        del tcp_offset  # configured offset governs; per-call kwarg ignored
         if self._is_yam():
             start_pose = self.world_pose_to_base_frame(start_world_pose, arm_id)
             end_pose = self.world_pose_to_base_frame(end_world_pose, arm_id)
@@ -524,8 +547,12 @@ class PyRokiBackend:
                 )
             start_pose, end_pose = adjusted
         else:
-            start_pose = start_world_pose
-            end_pose = end_world_pose
+            # Panda: convert both endpoints from TCP frame to panda_hand link
+            # frame using the configured TCP offset / rotation. Matches
+            # _solve_panda's per-call shift so solve_ik and plan_linear share
+            # one user-facing convention (the caller passes TCP poses).
+            start_pose = self._panda_tcp_to_link(start_world_pose)
+            end_pose = self._panda_tcp_to_link(end_world_pose)
 
         start_position, start_wxyz = _pose_to_numpy(start_pose)
         end_position, end_wxyz = _pose_to_numpy(end_pose)
@@ -554,6 +581,370 @@ class PyRokiBackend:
             "PyRokiBackend does not support collision-aware single-pose planning; "
             "use the open-robot-skills curobo bundle for world-aware planning."
         )
+
+
+# ---------------------------------------------------------------------------
+# Backend — cuRobo v0.8 (GPU): linear motion + IK fallback via plan_to_pose
+# ---------------------------------------------------------------------------
+
+
+_CUROBO_INSTALL_HINT = (
+    "cuRobo bundle is not importable (gap_skills.tools.curobo._curobo_impl). "
+    "Install with:  pip install -e 'open-robot-skills[curobo]' "
+    "--no-build-isolation  with CUDA_HOME set, or construct the connector "
+    "with ik=PyRokiBackend(...) to opt back into the in-process PyRoKi path."
+)
+
+
+class CuRoboBackend:
+    """cuRobo-backed IK + linear-motion backend (default in the connector).
+
+    Mirrors :class:`PyRokiBackend`'s public surface so the connector can
+    swap them through the ``ik=`` kwarg without touching call sites.
+
+    ``plan_linear``
+        Tries the v0.8 ``MotionPlanner``-based cartesian linear plan
+        (``_curobo_impl.plan_linear`` → ``plan_directed_linear``). On failure
+        — the linear-constraint plan has no feasible straight-line solution —
+        falls back to ``_curobo_impl.plan_to_pose``, the v0.8 single-pose
+        collision-aware planner. Both reuse the same cached MotionPlanner
+        machinery and already report ``(success, trajectory, ...)``.
+
+    ``solve_ik``
+        Delegates to ``plan_to_pose`` and returns the endpoint joints of the
+        returned trajectory. cuRobo v0.8 deliberately dropped the standalone
+        v0.7 ``IKSolver`` API, and ``_curobo_impl.solve_ik`` raises on v0.8;
+        ``plan_to_pose`` is the supported v0.8-native single-pose solver.
+
+    cuRobo is CUDA-only. The implementation module is imported lazily, so
+    constructing this backend on a CPU-only box succeeds — only an actual
+    ``solve_ik`` / ``plan_linear`` call hits the import. The error surfaced
+    on import failure points the user at the install line and the opt-in
+    PyRoKi fallback.
+
+    Robot coverage: 7-DOF Franka via the bundled ``franka.yml``. Pass
+    ``robot_file=`` for other v0.8 robot configs. 6-DOF (YAM) is not yet
+    bundled in cuRobo and raises ``NotImplementedError`` in ``__init__`` —
+    construct the connector with ``ik=PyRokiBackend(...)`` for YAM.
+    """
+
+    def __init__(
+        self,
+        *,
+        arm_dof: int = 7,
+        tcp_offset: np.ndarray | None = None,
+        tcp_rotation: Rotation | None = None,
+        home_joints: list[float] | None = None,
+        arm_bases: list[tuple[float, float, float]] | None = None,
+        robot_file: str = "franka.yml",
+        robot_urdf: str | None = None,
+        robot_urdf_path: str | None = None,
+        target_link: str | None = None,
+    ) -> None:
+        if int(arm_dof) != 7:
+            raise NotImplementedError(
+                f"CuRoboBackend currently supports 7-DOF Franka only "
+                f"(arm_dof=7); got arm_dof={arm_dof}. For YAM/6-DOF "
+                f"construct the connector with ik=PyRokiBackend(...) "
+                f"explicitly."
+            )
+        self._arm_dof = int(arm_dof)
+        self._tcp_offset = (
+            np.asarray(tcp_offset, dtype=np.float64) if tcp_offset is not None else None
+        )
+        self._tcp_rotation = tcp_rotation
+        self._home_joints = list(home_joints) if home_joints is not None else None
+        self._arm_bases = list(arm_bases) if arm_bases is not None else None
+        self._robot_file = robot_file
+        # robot_urdf / robot_urdf_path / target_link accepted for interface
+        # parity with PyRokiBackend but unused: cuRobo resolves the model from
+        # robot_file. Stash for diagnostics.
+        self._robot_urdf = robot_urdf
+        self._robot_urdf_path = robot_urdf_path
+        self._target_link = target_link
+
+    # -- model -------------------------------------------------------------
+
+    @staticmethod
+    def _import_impl():
+        """Lazy import of the curobo bundle's impl module.
+
+        Raises ImportError with an actionable message if the bundle isn't
+        installed or CUDA is missing.
+        """
+        try:
+            from gap_skills.tools.curobo import _curobo_impl  # noqa: PLC0415
+            return _curobo_impl
+        except ImportError as e:
+            raise ImportError(f"{_CUROBO_INSTALL_HINT} ({e})") from e
+
+    @property
+    def trajectory_needs_joint_reverse(self) -> bool:
+        return False  # Franka kinematic order matches simulator order
+
+    def supports_world_aware_plan(self) -> bool:
+        return True
+
+    # -- frames ------------------------------------------------------------
+
+    def world_pose_to_base_frame(self, pose: Se3Pose, arm_id: int) -> Se3Pose:
+        """Same arm-base translation PyRokiBackend uses."""
+        if self._arm_bases is None or arm_id >= len(self._arm_bases):
+            return pose
+        bx, by, bz = self._arm_bases[arm_id]
+        p = pose["position"]
+        return {
+            "position": {"x": p["x"] - bx, "y": p["y"] - by, "z": p["z"] - bz},
+            "rotation": dict(pose["rotation"]),
+        }
+
+    def _tcp_to_link(self, pose: Se3Pose) -> Se3Pose:
+        """Convert a TCP-frame target into a ``panda_hand``-link target.
+
+        Mirrors :meth:`PyRokiBackend._panda_tcp_to_link`: gap stores
+        ``tcp_offset`` in the *negated* link-to-TCP convention (e.g.
+        ``(0, 0, -0.097)`` for the Franka grip_site). Adding
+        ``R_link @ tcp_offset`` to the TCP target yields the link position
+        whose tool tip, after FK, lands at the requested TCP. When a TCP
+        rotation is configured (Robotiq at pi/4), apply
+        ``R_link = R_world @ R_tcp.inv()`` first. Identity operation when
+        no offset / rotation is configured.
+
+        After this conversion we pass ``tcp_offset=None`` to
+        ``_curobo_impl.plan_to_pose`` / ``plan_linear`` so the impl performs
+        no further offset math — keeping a single sign convention.
+        """
+        if self._tcp_offset is None and self._tcp_rotation is None:
+            return pose
+        q = pose["rotation"]
+        R = Rotation.from_quat([q["x"], q["y"], q["z"], q["w"]]).as_matrix()
+        if self._tcp_rotation is not None:
+            R_link = R @ self._tcp_rotation.inv().as_matrix()
+            link_quat_xyzw = Rotation.from_matrix(R_link).as_quat()
+            link_rot = {
+                "x": float(link_quat_xyzw[0]),
+                "y": float(link_quat_xyzw[1]),
+                "z": float(link_quat_xyzw[2]),
+                "w": float(link_quat_xyzw[3]),
+            }
+        else:
+            R_link = R
+            link_rot = dict(pose["rotation"])
+        if self._tcp_offset is None:
+            return {"position": dict(pose["position"]), "rotation": link_rot}
+        tcp_world = R_link @ self._tcp_offset
+        p = pose["position"]
+        return {
+            "position": {
+                "x": p["x"] + float(tcp_world[0]),
+                "y": p["y"] + float(tcp_world[1]),
+                "z": p["z"] + float(tcp_world[2]),
+            },
+            "rotation": link_rot,
+        }
+
+    def _pose_for_curobo(
+        self, pose: Se3Pose, arm_id: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """TCP-frame world Se3Pose -> (position xyz, quaternion wxyz) in robot
+        base frame at the IK link.
+
+        Pipeline: world → base (``world_pose_to_base_frame``) → TCP→link
+        (``_tcp_to_link``). The impl receives a pure link-frame target and
+        is called with ``tcp_offset=None`` — sign convention lives entirely
+        in :meth:`_tcp_to_link`.
+        """
+        base = self.world_pose_to_base_frame(pose, arm_id)
+        link = self._tcp_to_link(base)
+        return _pose_to_numpy(link)
+
+    def _resolve_seed(
+        self, seed_joints: list[float] | None
+    ) -> np.ndarray:
+        """Coerce the seed/home/zero fallback to a (arm_dof,) float64 array."""
+        if seed_joints is not None:
+            arr = np.asarray(list(seed_joints)[: self._arm_dof], dtype=np.float64)
+        elif self._home_joints is not None:
+            arr = np.asarray(self._home_joints[: self._arm_dof], dtype=np.float64)
+        else:
+            arr = np.zeros(self._arm_dof, dtype=np.float64)
+        if arr.shape[0] < self._arm_dof:
+            arr = np.concatenate(
+                [arr, np.zeros(self._arm_dof - arr.shape[0], dtype=np.float64)]
+            )
+        return arr
+
+    # -- IK ----------------------------------------------------------------
+
+    def solve_ik(
+        self,
+        target_world_pose: Se3Pose,
+        *,
+        arm_id: int = 0,
+        seed_joints: list[float] | None = None,
+        tcp_offset: np.ndarray | None = None,
+    ) -> list[float] | None:
+        """Solve IK by running ``plan_to_pose`` and returning its endpoint.
+
+        ``target_world_pose`` is a TCP-frame pose. ``_pose_for_curobo`` does
+        the world→base + TCP→link conversion using ``self._tcp_offset`` /
+        ``self._tcp_rotation``, so we pass ``tcp_offset=None`` to the impl —
+        all offset math lives in the backend, with a single sign convention.
+        The per-call ``tcp_offset`` kwarg is accepted for interface parity
+        with PyRokiBackend but is ignored (configured offset governs).
+
+        cuRobo v0.8 dropped the standalone IK API; the v0.8-native single-
+        pose planner already runs IK internally and returns a trajectory
+        whose last waypoint is the solution. Returns simulator-order joints
+        or None on failure (matches PyRokiBackend's contract).
+        """
+        del tcp_offset  # configured offset governs; per-call kwarg ignored
+        impl = self._import_impl()
+        target_pos, target_quat_wxyz = self._pose_for_curobo(target_world_pose, arm_id)
+        seed_arr = self._resolve_seed(seed_joints)
+
+        try:
+            success, trajectory = impl.plan_to_pose(
+                target_position=target_pos,
+                target_quat_wxyz=target_quat_wxyz,
+                start_joint_position=seed_arr,
+                robot_file=self._robot_file,
+                tcp_offset=None,  # already applied in _pose_for_curobo
+            )
+        except Exception:
+            logger.exception("CuRoboBackend.solve_ik: plan_to_pose raised")
+            return None
+        if not success or trajectory is None:
+            logger.warning("CuRoboBackend.solve_ik: no IK solution")
+            return None
+        arr = np.asarray(trajectory)
+        if arr.size == 0:
+            return None
+        return [float(v) for v in arr[-1, : self._arm_dof]]
+
+    # --- Linear plan + IK fallback ----------------------------------------
+
+    def plan_linear(
+        self,
+        start_world_pose: Se3Pose,
+        end_world_pose: Se3Pose,
+        *,
+        arm_id: int = 0,
+        tcp_offset: np.ndarray | None = None,
+        seed_joints: list[float] | None = None,
+        num_waypoints: int = 40,
+        ik_refinement_iters: int = 40,
+        jump_threshold: float = 0.5,
+    ) -> Trajectory | None:
+        """Plan a TCP-frame straight-line cartesian motion, falling back to
+        IK on failure.
+
+        ``start_world_pose`` and ``end_world_pose`` are TCP-frame poses
+        (matching ``solve_ik``'s contract). ``_pose_for_curobo`` applies the
+        world→base + TCP→link conversion before handing off to the impl,
+        whose internals plan in the IK link frame. The per-call
+        ``tcp_offset`` kwarg is ignored (configured offset governs).
+
+        Step 1 — linear: call ``_curobo_impl.plan_linear`` (delegates to v0.8
+        ``plan_directed_linear`` with all three axes free, orientation locked
+        at the target). Returns ``(success, traj, failure_reason)``.
+
+        Step 2 — IK fallback: if linear couldn't find a path, call
+        ``_curobo_impl.plan_to_pose`` for the endpoint. Same MotionPlanner
+        machinery without the per-axis hold constraint, so it can route
+        around obstacles the straight line couldn't.
+
+        Returns None only when both stages fail. ``num_waypoints`` /
+        ``ik_refinement_iters`` / ``jump_threshold`` are accepted for
+        interface parity with PyRokiBackend but ignored — cuRobo's
+        MotionPlanner controls its own interpolation density and seeding.
+        """
+        del num_waypoints, ik_refinement_iters, jump_threshold  # interface parity
+        del tcp_offset  # configured offset governs; per-call kwarg ignored
+        impl = self._import_impl()
+        start_pos, start_wxyz = self._pose_for_curobo(start_world_pose, arm_id)
+        end_pos, end_wxyz = self._pose_for_curobo(end_world_pose, arm_id)
+        seed_arr = self._resolve_seed(seed_joints)
+
+        # ── Step 1: linear cartesian plan ───────────────────────────────
+        success = False
+        traj_arr: np.ndarray | None = None
+        failure_reason = "not_attempted"
+        try:
+            success, traj_arr, failure_reason = impl.plan_linear(
+                start_pose=(start_pos, start_wxyz),
+                end_pose=(end_pos, end_wxyz),
+                start_joint_position=seed_arr,
+                robot_file=self._robot_file,
+            )
+        except Exception as e:
+            logger.exception("CuRoboBackend.plan_linear: plan_linear raised")
+            failure_reason = f"exception:{e}"
+
+        if success and traj_arr is not None and len(traj_arr) > 0:
+            arr = np.asarray(traj_arr)
+            return _trajectory_from_array(arr[:, : self._arm_dof])
+
+        logger.info(
+            "CuRoboBackend.plan_linear failed (reason=%s); "
+            "falling back to plan_to_pose for the endpoint.",
+            failure_reason,
+        )
+
+        # ── Step 2: IK fallback via single-pose plan_to_pose ────────────
+        try:
+            success_ik, traj_ik = impl.plan_to_pose(
+                target_position=end_pos,
+                target_quat_wxyz=end_wxyz,
+                start_joint_position=seed_arr,
+                robot_file=self._robot_file,
+                tcp_offset=None,  # already applied in _pose_for_curobo
+            )
+        except Exception:
+            logger.exception(
+                "CuRoboBackend.plan_linear: plan_to_pose fallback raised"
+            )
+            return None
+        if not success_ik or traj_ik is None or len(traj_ik) == 0:
+            logger.warning(
+                "CuRoboBackend.plan_linear: linear failed AND plan_to_pose "
+                "fallback failed; returning None."
+            )
+            return None
+        return _trajectory_from_array(np.asarray(traj_ik)[:, : self._arm_dof])
+
+    def plan_to_pose(
+        self,
+        target_world_pose: Se3Pose,
+        *,
+        arm_id: int = 0,
+        seed_joints: list[float] | None = None,
+        tcp_offset: np.ndarray | None = None,
+    ) -> Trajectory | None:
+        """Expose cuRobo's v0.8 single-pose collision-aware planner directly.
+
+        ``target_world_pose`` is a TCP-frame pose. Per-call ``tcp_offset`` is
+        ignored (configured offset governs); offset math lives in
+        ``_pose_for_curobo``.
+        """
+        del tcp_offset  # configured offset governs; per-call kwarg ignored
+        impl = self._import_impl()
+        target_pos, target_quat_wxyz = self._pose_for_curobo(target_world_pose, arm_id)
+        seed_arr = self._resolve_seed(seed_joints)
+        try:
+            success, traj = impl.plan_to_pose(
+                target_position=target_pos,
+                target_quat_wxyz=target_quat_wxyz,
+                start_joint_position=seed_arr,
+                robot_file=self._robot_file,
+                tcp_offset=None,  # already applied in _pose_for_curobo
+            )
+        except Exception:
+            logger.exception("CuRoboBackend.plan_to_pose raised")
+            return None
+        if not success or traj is None or len(traj) == 0:
+            return None
+        return _trajectory_from_array(np.asarray(traj)[:, : self._arm_dof])
 
 
 # ---------------------------------------------------------------------------
@@ -617,6 +1008,7 @@ def plan_linear(
 
 
 __all__ = [
+    "CuRoboBackend",
     "PyRokiBackend",
     "load_robot",
     "plan_linear",

@@ -275,9 +275,14 @@ Every probe is fast and offline:
 
 Each bundle rolls up to `READY`, `NOT READY`, or `SHADOWED`, with
 per-probe detail lines and fix hints — dependency failures hint
-`uv sync --extra <bundle>` when the registry has a `uv.lock`, else
+`uv run gap skills install <bundle>` when the registry has a `uv.lock`, else
 `pip install '<dist>[<bundle>]'` using the registry's own
-`[project].name`. Skills then roll up to ready or `BLOCKED`: a skill is
+`[project].name`. Tool and policy bundles that own their own
+`pyproject.toml` (an isolated per-bundle venv) are installed via
+`uv run gap skills install <name>` (or `--all` for the whole registry);
+`gap skills check` annotates each row with `(venv-ready)` or
+`(venv missing — run gap skills install <name>)` so the missing step is
+obvious before you reach `gap check`. Skills then roll up to ready or `BLOCKED`: a skill is
 blocked by any not-ready tool bundle that owns one of its
 `gap.allowed_tools` (ownership by name prefix; `robot.*`/`sim.*` tools
 are satisfied by the live connector at run time, and tools whose prefix

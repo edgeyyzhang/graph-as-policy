@@ -1,6 +1,6 @@
 # build_a_graph — author a workflow in Python with `gap.builder`
 
-> **What:** The full authoring example: checkpoints, recovery, `--execute` · **Needs:** `uv sync` (CPU to build) · **Time:** ~1 min
+> **What:** The full authoring example: checkpoints, recovery, `--execute` · **Needs:** `uv sync` to build · **Time:** ~1 min
 
 LLM generation is one producer of graphs, not the only one. This example
 builds the complete quickstart-style pick-and-place workflow by hand with
@@ -11,7 +11,7 @@ parser and structural validation as agent output, and runs with the same
 `gap run` / `gap.execute`.
 
 ```bash
-uv run python examples/build_a_graph/build_graph.py --out my_graph   # build + validate (CPU-only)
+uv run python examples/build_a_graph/build_graph.py --out my_graph   # build + validate
 ```
 
 prints the validation report and leaves a runnable artifact:

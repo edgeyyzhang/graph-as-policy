@@ -5,7 +5,7 @@ Author a complete pick-and-place workflow in Python with `gap.builder` —
 `--execute` that runs it on the LIBERO sim.
 
 :::{note} Requirements
-Building and validating is CPU-only (`uv sync`, ~1 min). The optional
+Building and validating runs without the sim (`uv sync`, ~1 min). The optional
 `--execute` step has the same requirements as the
 [LIBERO quickstart](libero-quickstart.md): `uv sync --extra quickstart`,
 a GPU, and a VLM credential.

@@ -9,8 +9,9 @@ the **same artifact** [gap.builder](build-a-graph.md) authors by hand and
 :::{note} Requirements
 An LLM credential (`ANTHROPIC_API_KEY` by default — see
 [Providers](#providers)) plus the engine install (`uv sync`) and the
-open-robot-skills checkout. No GPU and no simulator are needed to
-*generate*; running the result in sim has the usual
+open-robot-skills checkout. Generation runs without the simulator — only an
+LLM credential and the open-robot-skills checkout are required; running
+the result in sim has the usual
 [quickstart requirements](../getting-started/quickstart.md).
 :::
 
