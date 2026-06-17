@@ -1,6 +1,6 @@
-# gap documentation site — design
+# graph-as-policy documentation site — design
 
-Deliverable: a SkyPilot-style documentation website for **gap (graph as policy)** + **open-robot-skills**,
+Deliverable: a SkyPilot-style documentation website for **GaP (graph-as-policy)** + **open-robot-skills**,
 living in the engine repo at `graph-as-policy/docs/`, built with Sphinx.
 
 ## 1. Stack (mirrors docs.skypilot.co)
@@ -12,7 +12,7 @@ living in the engine repo at `graph-as-policy/docs/`, built with Sphinx.
 | Source format | MyST Markdown (`myst-parser`, `colon_fence` + `linkify`) | Repo docs are already markdown; writers produce md |
 | Components | `sphinx-design` (grids/cards/tabs), `sphinx-copybutton` (`$ `-strip), `sphinx-togglebutton`, `sphinx-notfound-page`, `sphinx.ext.autosectionlabel` (prefixed), `intersphinx` | SkyPilot's exact extension set minus analytics |
 | API reference | **Hand-curated pages** (no autodoc) | Avoids importing gap + GPU deps at build time; deterministic builds; accuracy enforced by adversarial review against source |
-| CLI reference | Hand-written from `gap/cli/` source (argparse, so sphinx-click N/A) | gap uses argparse with lazy subcommand registration; `build_parser()` exists for future autogen |
+| CLI reference | Hand-written from `gap/cli/` source (argparse, so sphinx-click N/A) | GaP uses argparse with lazy subcommand registration; `build_parser()` exists for future autogen |
 | Build | `docs/Makefile` + `docs/build.sh` (fails on warnings), `requirements-docs.txt`, `.readthedocs.yml` | SkyPilot conventions |
 
 Layout: `docs/source/` (conf.py + pages), existing `docs/*.md` files left untouched (README links keep working);
@@ -26,14 +26,14 @@ defines the top navbar (`Docs`, external GitHub links); the real landing page is
 
 Hero: "**The policy is the graph.**" + one-paragraph value prop; the quickstart rollout GIF + rendered graph
 side by side (existing assets); 6-line Python hero snippet; `sphinx-design` card grid linking to: Installation,
-15-minute tour, Examples, Skill catalog, CLI reference, Use with Claude Code. "Why gap" bullets (typed graphs,
+15-minute tour, Examples, Skill catalog, CLI reference, Use with Claude Code. "Why GaP" bullets (typed graphs,
 verified checkpoints, contributable skills, one process, trace-is-the-product, gated benchmarks) + measured
 results table. Architecture diagram (ASCII from README, styled code block).
 
 ## 3. Navigation (left-sidebar sections → source dirs)
 
 **Getting Started** (`getting-started/`)
-1. `overview` — what is gap; thesis; two-repo model; tools vs skills; architecture
+1. `overview` — what is GaP; thesis; two-repo model; tools vs skills; architecture
 2. `installation` — hardware floor; uv/pip; extras matrix; submodules; CUDA/curobo; weights/HF_TOKEN; install verification (`gap skills check`); troubleshooting (uv-sync-is-exact, numpy/sam3, recurse-submodules)
 3. `quickstart` — the 15-minute tour (run quickstart graph in LIBERO → read trace → gap viz → generate from language)
 4. `concepts` — glossary: workflow/graph, node types, subgraph, tool vs skill, connector, checkpoint, trial/trace, registry
@@ -69,10 +69,10 @@ results table. Architecture diagram (ASCII from README, styled code block).
 
 **Real Robots** (`real-robots/`)
 32. `connectors` — franka (rr-session/msgpack bridge, autostart, heartbeat) + ur_zed (perception-only, ZED SDK, calibration); capabilities model; what's structurally disabled on real
-33. `safety` — adapted safety.md: pre-session checklist, what gap enforces (guards, go_home no-op, gated agent commands), what it does NOT, reporting
+33. `safety` — adapted safety.md: pre-session checklist, what GaP enforces (guards, go_home no-op, gated agent commands), what it does NOT, reporting
 
 **AI Agents** (`agents/`)
-34. `claude-code` — plugin marketplace install, what the gap skill teaches, example prompts, safety gating, other agents + no-install path, agent_quickstart pointer
+34. `claude-code` — plugin marketplace install, what the GaP skill teaches, example prompts, safety gating, other agents + no-install path, agent_quickstart pointer
 
 **Reference** (`reference/`)
 35. `cli` — every command: run, generate, check, registry ×4, tools ×2, skills ×5, benchmark, viz, policy serve, trace-diff; all flags, defaults, exit-code conventions (0/1/2)

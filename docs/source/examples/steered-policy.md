@@ -161,4 +161,4 @@ hand-off; their docstrings carry the full rationale.
 - [Benchmark Grids](benchmark.md) — running these graphs as the
   `llm_plus_policy` / `policy_only` benchmark modes.
 - [Collect and Train](collect-and-train.md) — train the policy these graphs
-  steer, from data collected by a gap graph.
+  steer, from data collected by a GaP graph.

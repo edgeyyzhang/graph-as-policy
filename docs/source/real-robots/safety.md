@@ -1,7 +1,7 @@
 # Safety
 
 :::{warning}
-gap can drive real hardware (`gap.connector.real(...)`, `gap run --real`).
+GaP can drive real hardware (`gap.connector.real(...)`, `gap run --real`).
 Graphs may be LLM-generated, and even hand-authored graphs execute
 perception-derived motions. **Treat every run as capable of unexpected
 motion.** Read this page before connecting a robot.
@@ -11,7 +11,7 @@ motion.** Read this page before connecting a robot.
 
 - **Hardware E-stop in hand.** Keep the physical emergency stop within reach
   for the entire session, and know your robot's software stop (e.g. the
-  Franka user-stop). Software-level guards in gap are *not* a substitute —
+  Franka user-stop). Software-level guards in GaP are *not* a substitute —
   they run in the same process they are trying to stop.
 - **Clear the workspace.** Remove people, pets, cables, and anything fragile
   from the arm's full reachable envelope — not just the tabletop. Perception
@@ -27,7 +27,7 @@ motion.** Read this page before connecting a robot.
   [Call-count guards](#call-count-guards)) so a runaway perceive/plan loop
   halts the workflow instead of hammering the robot.
 
-## What gap itself enforces
+## What GaP itself enforces
 
 These mitigations ship in the connector and runtime — understand them, don't
 rely on them:
@@ -98,7 +98,7 @@ task config's `safety_limits:` block on every trial (defaults:
 environment variables — **unset means unlimited**, so set them explicitly for
 hardware sessions.
 
-## What gap does NOT do
+## What GaP does NOT do
 
 - No force/torque limiting, no speed scaling, no collision detection on real
   hardware — those belong to your robot's controller configuration (e.g.
@@ -113,7 +113,7 @@ hardware sessions.
 
 - The realtime loops run in the vendored `robots_realtime` subprocess
   (`rr-session`), spawned in a process group and killed on connector close. If
-  gap crashes hard, verify the rr-session process is gone before re-launching
+  GaP crashes hard, verify the rr-session process is gone before re-launching
   — two clients fighting over one arm is undefined.
 - `rr_autostart=False` (or `gap run --no-rr-autostart`) restores the
   two-terminal debug flow so you can watch the realtime log directly.

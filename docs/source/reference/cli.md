@@ -150,7 +150,7 @@ gap check [--skills PATH] [--registry NAME] [--format {pretty,json}] [--strict]
 
 The capability report: which tool bundles are operational on this
 machine, and which skills are therefore runnable. It probes the
-environment (Python and gap versions, GPU, LLM credentials for all three
+environment (Python and GaP versions, GPU, LLM credentials for all three
 providers), lists active registries, reports each bundle as
 `READY` / `NOT READY` / `SHADOWED` with dependency, requirement, and
 weights probes plus fix hints, and rolls blocked skills up to the tools
@@ -565,7 +565,7 @@ gap policy {serve,list} ...
 Manage learned-policy servers: spawn a server from a named preset, or
 list the presets. The server process runs inside your openpi/MolmoAct
 checkout (pointed to by `$GAP_OPENPI_DIR`, shell-expanded at spawn) — the
-GPU lives there. On the gap side, learned-policy graph nodes need the
+GPU lives there. On the GaP side, learned-policy graph nodes need the
 `[policy]` extra (a thin openpi websocket client, no JAX). See
 [Policies](../benchmarks/policies.md).
 

@@ -27,7 +27,7 @@ resolved in precedence order:
    (paths relative to that file; walking up from the cwd);
 4. user config `~/.config/gap/registries.toml`, managed by
    `gap registry add/remove`;
-5. an `open-robot-skills` checkout next to the gap checkout
+5. an `open-robot-skills` checkout next to the GaP checkout
    (auto-discovered — the documented side-by-side layout).
 
 The merged catalog is the union; a bundle name claimed by a
@@ -52,7 +52,7 @@ The folder a bundle lives in conveys its kind; both use the same format.
 | **LLM context** | flat tool catalog (name + summary + typed schema) | the coordinator sees name+description; the subgraph agent gets the full SKILL.md plus the schemas of its `gap.allowed_tools` |
 
 Tool names come from exactly two registries: **connector tools**
-(`robot.*` / `sim.*` — shipped by gap core, reserved prefixes) and **bundle
+(`robot.*` / `sim.*` — shipped by GaP core, reserved prefixes) and **bundle
 tools** (`<bundle>.<func>`). The loader rejects collisions. All skills are
 flat — there is no atomic/composite distinction.
 
@@ -84,7 +84,7 @@ One bundle = one directory = one pyproject extra = one PR.
 Frontmatter is YAML between `---` delimiters; everything after the closing
 `---` is the **body**, which is handed verbatim to the subgraph agent (for
 skills) or shown as tool-bundle documentation. The frontmatter follows the
-Agent Skills spec at the top level, with **all gap extensions nested under
+Agent Skills spec at the top level, with **all GaP extensions nested under
 one `gap:` key** so spec fields are never overloaded.
 
 ### 3.1 Spec-core fields (top level)
@@ -94,13 +94,13 @@ one `gap:` key** so spec fields are never overloaded.
 | `name` | yes | must equal the bundle directory name; ≤64 chars; lowercase letters/digits with single hyphens |
 | `description` | yes | ≤1024 chars; third-person, ends with a "Use when …" sentence — this is the coordinator's entire view of the bundle |
 | `license` | no | SPDX-ish string |
-| `compatibility` | no | e.g. `requires gap>=0.1`; the loader warns when the installed gap doesn't satisfy it |
+| `compatibility` | no | e.g. `requires gap>=0.1`; the loader warns when the installed GaP doesn't satisfy it |
 | `metadata` | no | free-form mapping; the loader reads `metadata.category` and `metadata.tags` for catalog grouping |
 
 Legacy keys are hard errors with migration hints: `runtime`/`shape`/
 `composes`/`category`/`tags`/`contract` at the top level are removed (the
 tools-vs-skills folder split replaces `shape`; `category`/`tags` move under
-`metadata:`), and any gap-extension key found at the top level instead of
+`metadata:`), and any GaP-extension key found at the top level instead of
 under `gap:` is rejected.
 
 ### 3.2 The `gap:` extension block — every field the loader consumes
@@ -169,7 +169,7 @@ Tool bundles use the same shape with `gap.tools:` instead of
 
 ## 4. The authoring contract (stable import surface)
 
-Bundle code imports **only** from these modules; everything else in gap is
+Bundle code imports **only** from these modules; everything else in GaP is
 internal and may change without notice:
 
 ```python
@@ -260,7 +260,7 @@ the user's back.
 
 ## 7. Testing with `gap.testing`
 
-`gap.testing` exports the same fakes gap's own suite uses, so a bundle is
+`gap.testing` exports the same fakes GaP's own suite uses, so a bundle is
 unit-testable without a robot, a GPU, or an LLM:
 
 ```python
@@ -365,7 +365,7 @@ connector-satisfied). `gap skills check` = "is the bundle well-formed";
 Before opening the PR (one bundle per PR):
 
 - [ ] `SKILL.md` frontmatter passes the loader: `name` == directory name,
-      description ≤1024 chars ending in "Use when …", gap extensions under
+      description ≤1024 chars ending in "Use when …", GaP extensions under
       `gap:`.
 - [ ] Skills declare `gap.exit_conditions` (+ `produces_outputs` /
       `required_inputs` as applicable); tool bundles declare `gap.tools`

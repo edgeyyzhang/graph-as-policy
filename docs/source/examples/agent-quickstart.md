@@ -7,7 +7,7 @@ GPU, the `quickstart` extra, and an LLM API key — plus
 Budget about 10 minutes.
 :::
 
-This walkthrough has Claude Code, armed with one skill, drive gap
+This walkthrough has Claude Code, armed with one skill, drive GaP
 end-to-end: it generates a pick-and-place graph from a single sentence,
 validates it, and the graph then runs in LIBERO sim. Every command and
 output below comes from a real recorded session — **the generated graph put
@@ -26,7 +26,7 @@ Claude Code ──(the `gap` skill)──▶ drives the CLI: gap check / generat
 ```
 
 Claude Code needs **only the `gap` skill**. The robot bundles in
-[open-robot-skills](gh-skills:.) are consumed by gap's *internal* codegen
+[open-robot-skills](gh-skills:.) are consumed by GaP's *internal* codegen
 agent as files on disk — they do not need to be installed into Claude Code.
 
 ## 0. Prerequisites (once)

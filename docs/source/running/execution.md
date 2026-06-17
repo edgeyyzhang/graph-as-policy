@@ -1,6 +1,6 @@
 # Executing Graphs
 
-A gap graph is a directory: a `workflow.json` plus optional `scripts/` (script-node
+A GaP graph is a directory: a `workflow.json` plus optional `scripts/` (script-node
 bodies) and `checkpoints/` (postcondition sidecars). You execute one of two ways —
 `gap run` from the shell, or `gap.execute()` from Python. Both drive the same
 executor; the CLI is a thin wrapper that builds a connector, parses inputs, and
@@ -35,7 +35,7 @@ so always keep `workflow.json` next to its `scripts/`.
 ### Choosing a connector
 
 By default `gap run` executes **tools-only**: no robot, no sim — nodes run against
-the resolved skill registries and gap's core tools. This is how you run pure
+the resolved skill registries and GaP's core tools. This is how you run pure
 codegen/test graphs like [build_a_graph](../examples/build-a-graph.md) on any machine.
 
 `--sim SUITE/TASK` builds a LIBERO simulation connector, e.g.
@@ -51,7 +51,7 @@ for headless rendering — see [Installation](../getting-started/installation.md
 `--real {franka,ur_zed}` builds a real-hardware connector instead:
 
 - `franka` — full motion control over the robots_realtime msgpack bridge. By
-  default gap spawns the `rr-session` client itself; `--no-rr-autostart` restores
+  default GaP spawns the `rr-session` client itself; `--no-rr-autostart` restores
   the two-terminal debug flow, and `--rr-config YAML` picks an rr-session config
   (relative to `third_party/robots_realtime`; default
   `configs/franka/franka_robotiq_client.yaml`).
@@ -117,9 +117,9 @@ renders the trace's image assets, not the mp4.
 ### Skill registries
 
 `--skills PATH` (repeatable, precedence-ordered) overrides the resolved registry
-set entirely. Without it, gap resolves registries via `$GAP_SKILLS_PATH`, the
+set entirely. Without it, GaP resolves registries via `$GAP_SKILLS_PATH`, the
 project's `[tool.gap]` table, the user config, or an `open-robot-skills` checkout
-next to the gap checkout — see [Registries](../skills/registries.md).
+next to the GaP checkout — see [Registries](../skills/registries.md).
 
 ### Flag reference
 

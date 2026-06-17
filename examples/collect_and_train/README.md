@@ -2,9 +2,9 @@
 
 > **What:** Graph as scripted expert → HDF5/LeRobot dataset → train externally → policy back in a graph · **Needs:** `quickstart` + `policy` + LLM key · **Time:** collection: s/episode
 
-The full data loop: a verified gap graph acts as a **scripted expert**, its
+The full data loop: a verified GaP graph acts as a **scripted expert**, its
 rollouts become a demonstration dataset, an external recipe trains a VLA
-policy on them, and the trained policy comes back into gap as its own
+policy on them, and the trained policy comes back into GaP as its own
 **policy-skill** node (like the shipped `pi05-libero` / `molmoact-libero`
 skills) — steered by the same perception that collected the data (see
 [`../steered_policy/`](../steered_policy)).
@@ -33,7 +33,7 @@ loaders or a ~30-line custom `LeRobotDataset.from_raw` adapter, filter to
 `success=True` episodes, then train with your recipe of choice — e.g.
 [LeRobot](https://github.com/huggingface/lerobot) ACT/diffusion baselines, or
 [OpenPI](https://github.com/Physical-Intelligence/openpi) fine-tuning
-(`pi05` configs). Model hosting is your responsibility — gap only needs a
+(`pi05` configs). Model hosting is your responsibility — GaP only needs a
 websocket policy server.
 
 ## 3. Serve + run the trained policy

@@ -84,7 +84,7 @@ MUJOCO_GL=egl uv run gap run outputs/generated_<timestamp>/task_00 \
 
 | You want to | Go to |
 |---|---|
-| See everything gap can do | [examples gallery](../examples/README.md) |
+| See everything GaP can do | [examples gallery](../examples/README.md) |
 | Author graphs in Python | [examples/build_a_graph](../examples/build_a_graph/) |
 | Write or contribute a skill | [skills.md](skills.md) + [open-robot-skills](https://github.com/graph-robots/open-robot-skills) |
 | Run the benchmark gate | [examples/benchmark](../examples/benchmark/) |

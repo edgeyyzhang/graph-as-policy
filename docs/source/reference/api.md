@@ -43,7 +43,7 @@ Execute a workflow graph and return an `ExecutionResult`.
   sequence. When omitted, registries resolve via
   `gap.skills.resolve_registries` (`$GAP_SKILLS_PATH` list > project
   `[tool.gap]` > user config > the open-robot-skills checkout next to the
-  gap checkout); if none are found, execution proceeds without a skill
+  GaP checkout); if none are found, execution proceeds without a skill
   registry.
 - **inputs** — initial inputs, addressable at the top level as
   `{"$ref": "in.<name>"}` and as base producers for subgraph input binding.
@@ -573,7 +573,7 @@ Source: [gap/testing/\_\_init\_\_.py](gh-engine:gap/testing/__init__.py)
 `FakeConnector` and no `connector_contract_suite`.
 :::
 
-These are the same fixtures gap's own suite uses, exported so a skill
+These are the same fixtures GaP's own suite uses, exported so a skill
 bundle can be unit-tested without a robot, a GPU, or an LLM. See
 [Testing bundles](../skills/testing-bundles.md) for the workflow.
 
@@ -657,7 +657,7 @@ Plain `TypedDict`s carrying numpy arrays — no protobuf. Traces serialize
 them directly and `$ref` dataflow walks them as plain dicts.
 
 :::{important}
-**Quaternions are wxyz (scalar-first) everywhere in gap.** LIBERO/MuJoCo
+**Quaternions are wxyz (scalar-first) everywhere in GaP.** LIBERO/MuJoCo
 and scipy use xyzw internally; env classes convert at the boundary with
 `quat_xyzw_to_wxyz`. And **`OrientedBoundingBox.extent` holds
 half-extents** along the box's local axes — not full sizes.
@@ -760,7 +760,7 @@ parse_skill_md(path: Path) -> SkillMeta
 
 Reads a bundle's `SKILL.md` and produces a `SkillMeta`. Required
 frontmatter: `name` (must equal the bundle directory name) and
-`description`; all gap extensions live under one `gap:` key. `params` and
+`description`; all GaP extensions live under one `gap:` key. `params` and
 `outputs` are *not* frontmatter — they come from Python introspection of
 the bundle's callables. Raises `FileNotFoundError` for a missing file and
 `ValueError` for malformed frontmatter.

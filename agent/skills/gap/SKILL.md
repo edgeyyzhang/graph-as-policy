@@ -1,8 +1,8 @@
 ---
 name: gap
-description: Program robots with gap (graph as policy) — compile natural-language
+description: Program robots with GaP (graph-as-policy) — compile natural-language
   tasks into typed, verified robot skill graphs and run them on simulators or
-  real robots. Use when the user mentions gap or graph-as-policy, robot
+  real robots. Use when the user mentions GaP or graph-as-policy, robot
   manipulation, robot skills, robot tools or capabilities, skill registries,
   open-robot-skills, LIBERO or MuJoCo manipulation sims, pick-and-place,
   grasping or perception strategies, generating or hand-authoring robot task
@@ -19,9 +19,9 @@ metadata:
   tags: [robotics, manipulation, simulation, skills]
 ---
 
-# gap — graph as policy
+# graph-as-policy — GaP
 
-gap compiles robot tasks into **typed, verified skill graphs** and executes
+GaP compiles robot tasks into **typed, verified skill graphs** and executes
 them. The policy *is* the graph: nodes call tools (perception models,
 planners, robot motions) or run skill scripts; postcondition checkpoints
 verify progress against the simulator state. Two kinds of repos exist:
@@ -222,7 +222,7 @@ a unit-test skeleton `tests/test_my_skill.py`. Then:
 
 1. Fill SKILL.md: `name` == dirname; description **must contain a
    "Use when …" sentence** (it is the planner's entire view of the
-   bundle); gap extensions only under the `gap:` key; declare
+   bundle); GaP extensions only under the `gap:` key; declare
    `gap.requires:` (`{gpu: true, env: [KEY], env_any: [...], weights: true}`,
    or `{}`) so `gap check` can vouch for it.
 2. Implement. Skill scripts: `def run(ctx, *, typed_kwargs) -> TypedDict`,

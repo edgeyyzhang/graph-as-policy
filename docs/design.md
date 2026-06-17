@@ -1,12 +1,12 @@
-# gap + open-robot-skills: Design
+# graph-as-policy + open-robot-skills: Design
 
-The architecture of gap and open-robot-skills: what the pieces are, how they fit, and
+The architecture of GaP and open-robot-skills: what the pieces are, how they fit, and
 the contracts (graph schema, tool layer, connector, skill format, testing)
 that the two repos hold stable.
 
 ## 1. Overview & principles
 
-**gap** ("graph as policy"): a natural-language task is compiled by an LLM agent pipeline into a typed, verified execution graph of robot skills; the graph — not a monolithic policy — is what runs, on simulators or real robots.
+**GaP** ("graph-as-policy"): a natural-language task is compiled by an LLM agent pipeline into a typed, verified execution graph of robot skills; the graph — not a monolithic policy — is what runs, on simulators or real robots.
 
 ```python
 import gap
@@ -51,7 +51,7 @@ Distribution name `graph-as-policy`, import `gap`, Python ≥3.10 (isaaclab pin 
 - **Tools** (`open-robot-skills/tools/<bundle>/`) = *what the robot can compute*: model-backed callables with no task strategy. **Tool bundles are named after the model**: `sam3`, `grounding-dino`, `gemini-er`, `molmo`, `vlm` (generic API VLM), `curobo` (motion planning), `geometry` (pure math). A tool bundle exposes typed functions via `@tool` in `tools.py`; its SKILL.md documents when to call them. (IK is NOT a tool bundle — it's built into the connector, see §7.)
 - **Skills** (`open-robot-skills/skills/<bundle>/`) = *what the robot can do*: manipulation strategies that own subgraphs in generated graphs — perceive an object, grasp, transport, track, run a learned policy. A learned policy is itself a skill, one bundle per model checkpoint (`pi05-libero`, `molmoact-libero`), so the coordinator picks the model by its capability description rather than via a generic runner + `policy_id`. Skills keep capability names. **All skills are flat** — no atomic/composite distinction; a skill bundles LLM guidance (SKILL.md) + canonical scripts, and *may* also expose a callable via `tools.py` when it is invocable as a single unit (pi05-libero, molmoact-libero, tracking-objects).
 
-So tools come from exactly two registries: **connector tools** (`robot.*`, `sim.*` — embodiment surface shipped by gap core, not in open-robot-skills) and **tool bundles** (`<model>.<func>`, e.g. `curobo.plan_to_pose`, `sam3.segment_text`). Model-named prefixes deliberately match the old gRPC service short names, so the tool-name migration is mostly `Method` → `snake_case` with the prefix unchanged. Graph `script` nodes are per-graph generated code — neither tool nor skill; they call tools.
+So tools come from exactly two registries: **connector tools** (`robot.*`, `sim.*` — embodiment surface shipped by GaP core, not in open-robot-skills) and **tool bundles** (`<model>.<func>`, e.g. `curobo.plan_to_pose`, `sam3.segment_text`). Model-named prefixes deliberately match the old gRPC service short names, so the tool-name migration is mostly `Method` → `snake_case` with the prefix unchanged. Graph `script` nodes are per-graph generated code — neither tool nor skill; they call tools.
 
 ## 3. Architecture
 
@@ -133,7 +133,7 @@ class RealConnector(Connector):
 Registered connector tools (absorbing the four gRPC servicer method bodies from `services/sim_bridge/server.py` — GoToPose IK orchestration, gripper settle loops, trajectory execution): `robot.get_observation`, `robot.get_ee_pose`, `robot.go_to_pose`, `robot.go_to_pose_cartesian`, `robot.move_to_joints`, `robot.execute_trajectory`, `robot.go_home`, `robot.solve_ik`, `robot.open_gripper`/`close_gripper`/`get_gripper`, and sim-only `sim.reset`, `sim.check_success`, `sim.step`, `sim.apply_policy_action` (envs that support direct VLA actions). All take `arm_id=0` (multi-arm-ready); bimanual `*Both` variants are post-v1.
 
 - **Env registry** (`gap/envs/registry.py`) replaces the 280-line if/elif (`server.py:463-742`): `register_env(name, "gap.envs.libero_env:make_env", prefix=False)`; factories are lazy dotted paths (registry imports without mujoco/pyzed); factory returns `(BaseEnv, EnvConfig)`. `GAP_*` env vars replace `VOS_*`.
-- **IK — built into the connector, always in-process, deliberately simple.** `gap/connector/ik.py` ports `ik_backend.py`'s pyroki path (JAX, in-process — pyroki ships as a gap core dependency); it powers `robot.go_to_pose`/`go_to_pose_cartesian`/`robot.solve_ik`. No pluggable backend, no `ik_backend:` config (the YAM 6-DOF case that needed CuRobo-IK is cut). **Motion planning is a separate concern**: the `curobo` tool bundle produces collision-aware trajectories that skills execute via `robot.execute_trajectory` — it is not IK plumbing.
+- **IK — built into the connector, always in-process, deliberately simple.** `gap/connector/ik.py` ports `ik_backend.py`'s pyroki path (JAX, in-process — pyroki ships as a GaP core dependency); it powers `robot.go_to_pose`/`go_to_pose_cartesian`/`robot.solve_ik`. No pluggable backend, no `ik_backend:` config (the YAM 6-DOF case that needed CuRobo-IK is cut). **Motion planning is a separate concern**: the `curobo` tool bundle produces collision-aware trajectories that skills execute via `robot.execute_trajectory` — it is not IK plumbing.
 - **Franka (streamlined)**: `robots_realtime` vendored as a submodule, **never imported** (own pinned env, realtime loops). `rr_launcher.py` (~100L) spawns `uv run --directory third_party/robots_realtime rr-session <config>` in a process group with log tee + kill-on-close. Order: `FrankaRealEnv` binds the msgpack server (port 9000) pre-seeded with hold-home → spawn client (it retries until the server is up) → `wait_ready()` blocks on first RGB, surfacing the existing `_diagnose_missing_rgb` diagnostics on timeout. `rr_autostart=False` restores the two-terminal debug flow. GoHome safety keys off `config.is_real`. The 50 Hz republish + heartbeat threads port unchanged.
 - **UR+ZED**: `ur_zed_env.py` from master, dexnet `sys.path` hacks removed, `pyzed`/`rtde_receive` imports lazy with pip-hint errors. Perception-only (no motion tools registered).
 - **Data collector** (`gap/connector/collector.py`, NEW ~150L): wraps env stepping to record synchronized obs/action/reward per control step → HDF5 (LeRobot-convertible). Nothing equivalent exists today (only video frames) — required by the collect_and_train example.
@@ -191,7 +191,7 @@ open-robot-skills/
 
 Both categories use the same Agent Skills bundle format (SKILL.md + resources); the folder conveys the kind. Each is one directory = one bundle = one PR for contributors.
 
-**Frontmatter** = Agent Skills spec core (`name` ≤64 lowercase-hyphen == dirname; `description` ≤1024, third-person "use when…"; optional `license`, `compatibility: "requires gap>=0.1"` — loader warns on mismatch; `metadata` for category/tags) **plus all gap extensions nested under one `gap:` key** so spec fields are never overloaded (notably `allowed-tools`, whose Claude Code semantics differ):
+**Frontmatter** = Agent Skills spec core (`name` ≤64 lowercase-hyphen == dirname; `description` ≤1024, third-person "use when…"; optional `license`, `compatibility: "requires gap>=0.1"` — loader warns on mismatch; `metadata` for category/tags) **plus all GaP extensions nested under one `gap:` key** so spec fields are never overloaded (notably `allowed-tools`, whose Claude Code semantics differ):
 
 ```yaml
 ---
@@ -227,7 +227,7 @@ from gap.testing import FakeContext, make_test_observation     # unit-test witho
 - Bundle tools live in `tools.py`, lazy-load model weights on first call (module-level cached loader), honor per-bundle `device` config.
 - `load_prompt(__package__, name, **vars)` + synthetic packages kept (legacy prefix → `gap_skills.*`) — skill scripts depend on bundle-relative prompt loading.
 - Class-based stateful tools (`Skill` base, one instance per workflow — pi05-libero, molmoact-libero, tracking-objects) keep working. The policy skills subclass `gap.runtime.policy_skill.PolicyLoopSkill`, which wraps the unchanged closed-loop body `gap.runtime.policy.run_policy_loop`; each sets `preset` to its bundle name (== preset == policy id) and takes no `policy_id` argument.
-- open-robot-skills has a **one-way runtime dependency on gap** (ctx/types/errors/load_prompt — verified: every existing skill script imports these). "Standalone" means discovery and contribution are path-based (`gap.skills.find_skills_path`: explicit path > `GAP_SKILLS_PATH` > the side-by-side checkout), not pip-coupled.
+- open-robot-skills has a **one-way runtime dependency on GaP** (ctx/types/errors/load_prompt — verified: every existing skill script imports these). "Standalone" means discovery and contribution are path-based (`gap.skills.find_skills_path`: explicit path > `GAP_SKILLS_PATH` > the side-by-side checkout), not pip-coupled.
 
 Cut from the dev tree: grasp_moe, grasp_multi (graspgen), bimanual_crate_lift (yam).
 
@@ -281,7 +281,7 @@ FastAPI + React 19 trial browser ports as-is (backup branch's redesigned swimlan
 
 ## 14. Packaging
 
-- **gap core deps**: numpy, scipy, pyyaml, httpx, anthropic, fastapi, uvicorn, pillow, opencv-python-headless, robot_descriptions, yourdfpy, **pyroki + jax (CPU — the connector's in-process IK)**, matplotlib, h5py, msgpack(+numpy), viser. No grpcio/protobuf/protoc/cargo anywhere.
+- **GaP core deps**: numpy, scipy, pyyaml, httpx, anthropic, fastapi, uvicorn, pillow, opencv-python-headless, robot_descriptions, yourdfpy, **pyroki + jax (CPU — the connector's in-process IK)**, matplotlib, h5py, msgpack(+numpy), viser. No grpcio/protobuf/protoc/cargo anywhere.
 - **Extras**: `[libero]` mujoco/robosuite/posvar-fork/bddl/robomimic/imageio[ffmpeg]; `[ray]`; `[real]` ur-rtde (pyzed = documented manual ZED SDK install, lazy import); `[vertex]` anthropic[vertex] + google-genai; `[dev]` pytest/ruff/mypy.
 - **open-robot-skills dependency mechanism (clean by construction)**: open-robot-skills is one pip distribution; **each bundle = one extra** (extra name == bundle name: `[sam3]`, `[grounding-dino]`, `[curobo]`, `[gemini-er]`, `[pi05-libero]`, `[molmoact-libero]` — the last two both pull `openpi-client`, …) plus meta-extras `[quickstart]` (sam3+grounding-dino+geometry), `[grocery]` (quickstart+curobo — the G1 set), `[all]` (now including both policy skills). Non-PyPI deps (the sam3 fork, nvidia-curobo) are **pinned `git+https` entries inside those extras** — one resolver run surfaces cross-bundle conflicts at install time, and CI installs `[all]` to prove co-installability (dev's docker venv already proved these deps coexist). `uv.lock` pins the exact G1-gate environment. **Ownership split: pip owns code; `gap skills check` only verifies** (import probe + weight presence per bundle, mapping bundle→extra by name); `--download` prefetches **weights only** (HF_TOKEN documented) — nothing ever pip-installs behind the user's back. Quickstart is literally `pip install -e gap -e "open-robot-skills[quickstart]"` → `gap skills check --download` → `gap run …`. The one documented wart: curobo's CUDA JIT (`--no-build-isolation`, `CUDA_HOME`) lives on that extra alone. P2 task: diff the dev tree's vendored sam3 against upstream — if patched, publish the fork (or vendor under `tools/sam3/_vendor/`) and pin that.
 - Submodules: `robots_realtime`, `Variational-Automation-Benchmark` (both pinned). `py.typed` shipped. uv-first docs, pip supported.
@@ -310,7 +310,7 @@ FastAPI + React 19 trial browser ports as-is (backup branch's redesigned swimlan
 - `connector_contract_suite(connector_factory)` — parametrized ABC-compliance tests any connector must pass: observation shapes/dtypes (`u8[H,W,3]`, `f32[H,W]`, intrinsics 3×3), tool names registered, capabilities consistent with type (Sim ⇒ reset/success/world_state), `reset(seed)` determinism for sims, `close()` idempotent. Exported so third-party connectors (the cable/ROS-style path) get a conformance test for free.
 - `assert_graph_valid(graph)`, `golden_trace(tmp_path)` helpers; `gap/testing/equivalence.py` (below).
 
-### 15.3 gap unit tests by subsystem (deterministic suite)
+### 15.3 GaP unit tests by subsystem (deterministic suite)
 
 - **types/schema** (new): quaternion wxyz↔xyzw boundary conversion; numpy dtype/shape invariants; `gap/schema.py` registry resolves every type-name string used by shipped graphs' `inputs:`/`outputs:` declarations; unknown-type error message.
 - **tools** (new): `@tool` registration + TypedDict schema extraction (port the dev tree's schema tests); name-collision rejection (`robot.*` reserved); dispatch through stub tools incl. kwargs filtering; **guards**: tag→category classification, limit decrement, `GuardLimitExceeded` escapes a skill's bare `except Exception`; `NodeExecutionError` wrapping preserves cause.
@@ -343,7 +343,7 @@ FastAPI + React 19 trial browser ports as-is (backup branch's redesigned swimlan
 ### 15.5 open-robot-skills repo tests
 
 - **Repo-level (CI, no GPU)**: every bundle in both `tools/` and `skills/` — frontmatter spec validation (name==dirname, description ≤1024 + "use when" heuristic, `gap:` block against a published JSON schema — tool bundles must declare `gap.tools`, skills must declare exit_conditions; `compatibility` parses); all referenced paths exist (canonical_scripts/prompts/references/examples); **the pyproject extras table covers every bundle (extra name == bundle name) and `[all]` resolves**; catalog load + tool-name collision check; schema extraction on every declared tool; **lazy-import proof**: importing every `tools.py` must not pull torch/transformers into `sys.modules`.
-- **Per-bundle units** (using `gap.testing`): skill scripts run against `FakeContext` with canned tool responses (e.g. perceiving-objects: canned detections + VLM letter answer + mask + synthetic depth → assert OBB/mask outputs and exit condition; error path → `not_found`); tool bundles' pure-math layers CPU-tested on `make_test_observation` geometry (geometry-bundle OBB/points numerics); model-touching paths behind `gpu` (one tiny smoke input per tool bundle). Connector IK tested in gap core (pyroki solve vs known Franka poses, CPU JAX).
+- **Per-bundle units** (using `gap.testing`): skill scripts run against `FakeContext` with canned tool responses (e.g. perceiving-objects: canned detections + VLM letter answer + mask + synthetic depth → assert OBB/mask outputs and exit condition; error path → `not_found`); tool bundles' pure-math layers CPU-tested on `make_test_observation` geometry (geometry-bundle OBB/points numerics); model-touching paths behind `gpu` (one tiny smoke input per tool bundle). Connector IK tested in GaP core (pyroki solve vs known Franka poses, CPU JAX).
 - **Cross-repo nightly**: quickstart end-to-end (`sim`+`gpu`+`llm`); recorded-observation replay proxies for hardware examples (cable: stored ZED frames through the perception graph).
 
 ### 15.6 What ports vs what's new

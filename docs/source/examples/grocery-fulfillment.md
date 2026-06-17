@@ -7,7 +7,7 @@ reference runs used Vertex (`gemini-3.1-flash-lite-preview`); `anthropic` works
 by switching the config's `llm:` block.
 :::
 
-This is gap's flagship acceptance family — and its release gate. The task:
+This is GaP's flagship acceptance family — and its release gate. The task:
 pick a *described* grocery item ("the alphabet soup can with a blue and yellow
 label") and place it in the basket, under the benchmark's baked pose,
 permutation, and basket-swap variations. Every graph is **generated per task**
@@ -95,7 +95,7 @@ The parts worth knowing:
   reuses it across that task's 50 trials; seeds select the suite's baked
   initial-state variations.
 - **`skills:` is optional.** Omit it to auto-discover the open-robot-skills
-  checkout (`$GAP_SKILLS_PATH`, or a checkout next to the gap repo); explicit
+  checkout (`$GAP_SKILLS_PATH`, or a checkout next to the GaP repo); explicit
   relative paths resolve against the config file's directory.
 
 [grocery_acceptance_smoke.yaml](gh-engine:examples/benchmark/grocery_acceptance_smoke.yaml)

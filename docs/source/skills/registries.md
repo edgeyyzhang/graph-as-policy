@@ -14,7 +14,7 @@ model-backed tool bundles ([sam3](gh-skills:tools/sam3),
 ([perceiving-objects](gh-skills:skills/perceiving-objects),
 [grasping-direct-ik](gh-skills:skills/grasping-direct-ik),
 [transporting-objects](gh-skills:skills/transporting-objects), …) under
-[skills/](gh-skills:skills). gap treats it as exactly
+[skills/](gh-skills:skills). GaP treats it as exactly
 that — an example, not a special case. Labs and projects bring their own
 registries and layer them on top.
 
@@ -39,7 +39,7 @@ bundle name, the higher-precedence one wins (see
 override one public skill with a lab fork without forking the whole
 registry.
 
-This page covers how gap finds registries, how they merge, the
+This page covers how GaP finds registries, how they merge, the
 `gap registry` lifecycle commands, and the `gap check` capability report.
 For what goes *inside* a bundle, see
 [Authoring bundles](authoring-bundles.md); for the catalogs themselves,
@@ -82,7 +82,7 @@ set through the same five layers, implemented in
    `$XDG_CONFIG_HOME`), managed by `gap registry add/remove`. Entry
    order is precedence order. A missing or unparseable file is treated
    as empty; malformed entries are skipped with a warning so one typo
-   does not take every gap command down.
+   does not take every GaP command down.
 
    ```toml
    [[registry]]
@@ -94,7 +94,7 @@ set through the same five layers, implemented in
    path = "/home/you/open-robot-skills"
    ```
 
-5. **Sibling auto-discovery** — walking up from the gap package
+5. **Sibling auto-discovery** — walking up from the GaP package
    directory and the current directory, the first directory named
    exactly `open-robot-skills` that has a populated bundle root. This is
    the documented side-by-side layout from
@@ -244,7 +244,7 @@ and the same single-line-array limitation applies.
 
 ## Capability report: `gap check`
 
-`gap check` answers "what can run *here*?" — the `sky check` of gap. It
+`gap check` answers "what can run *here*?" — the `sky check` of GaP. It
 reports the environment, every active registry, per-bundle operational
 status, and which skills are therefore runnable, with a fix hint per
 failure.
@@ -339,7 +339,7 @@ gap check
 sibling). `gap check` reports your fork as the active
 `perceiving-objects` and the public copy as `SHADOWED by registry
 'lab-skills'`; loading logs a shadowing warning so the override is never
-silent. Every gap command — `gap generate`, `gap run`, the catalogs —
+silent. Every GaP command — `gap generate`, `gap run`, the catalogs —
 now sees the lab fork wherever the bundle name `perceiving-objects` is
 referenced, and the rest of the public registry is untouched.
 

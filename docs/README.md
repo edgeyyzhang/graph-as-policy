@@ -1,4 +1,4 @@
-# gap documentation site
+# GaP documentation site
 
 This directory contains both the **legacy standalone docs** (`*.md` at this
 level — still linked from the repo README) and the **documentation website**

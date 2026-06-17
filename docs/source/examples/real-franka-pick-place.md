@@ -9,7 +9,7 @@ ZED camera, driven through the vendored
 
 :::{note} Requirements
 A Franka Panda with a Robotiq gripper, a ZED camera, the
-`third_party/robots_realtime` submodule (own process and environment — gap
+`third_party/robots_realtime` submodule (own process and environment — GaP
 never imports it), a GPU with weights for the `grounding-dino` and `sam3` tool
 bundles, and a VLM provider credential (`ANTHROPIC_API_KEY` or a Vertex
 setup). The graph validates with no hardware at all.
@@ -40,7 +40,7 @@ task.yaml                  task metadata (prompt, suite, cameras)
 ## Hardware setup (rr-session)
 
 The robots_realtime stack is vendored as a pinned submodule and runs in its
-**own** process and environment — gap talks to it over a TCP socket and never
+**own** process and environment — GaP talks to it over a TCP socket and never
 imports it:
 
 ```bash
@@ -51,14 +51,14 @@ cd third_party/robots_realtime && uv sync   # one-time
 The session config is
 `third_party/robots_realtime/configs/franka/franka_robotiq_client.yaml`: a
 `RobotNode` (Franka + Robotiq), a ZED `CameraNode`, and the
-`FrankaOscClientCartesianAgent` client that connects back to gap's msgpack
+`FrankaOscClientCartesianAgent` client that connects back to GaP's msgpack
 server on `127.0.0.1:9000`. Adjust the camera `device_id`, extrinsics file,
 and robot config for your cell.
 
 Both directions of the wire are framed as a 4-byte big-endian length plus a
 msgpack payload with numpy support: the client sends observations
 `{left: {joint_pos[8]}, <camera>: {images, depth_data, intrinsics, pose_mat}}`
-and receives actions `{timestamp, left: {joint_pos[7], gripper}}`, which gap
+and receives actions `{timestamp, left: {joint_pos[7], gripper}}`, which GaP
 republishes at 50 Hz. The details live in
 [Real-Robot Connectors](../real-robots/connectors.md#the-franka-connector).
 
@@ -122,7 +122,7 @@ START → perceive_container ─ found ──→ perceive_target ─ found ─�
   never rotate during the descent) → `robot.close_gripper`
   (`settle_steps: 60`).
 - `transport` re-observes the container, computes the drop pose
-  (`approach_height: 0.2`, `drop_clearance: 0.15` — note that gap OBB
+  (`approach_height: 0.2`, `drop_clearance: 0.15` — note that GaP OBB
   `extent` values are **half-extents**), approaches, descends, releases, and
   retracts.
 
@@ -153,7 +153,7 @@ metadata for this example. Two of its details still matter:
 
 - The camera name `robot0_robotview` under `environment.cameras` must match
   the `CameraNode` published by your rr-session config. The env auto-discovers
-  the wire-level camera key; this is just gap's name for it.
+  the wire-level camera key; this is just GaP's name for it.
 - When a task config of this shape is consumed by the codegen/benchmark
   pipeline (`gap generate`, `gap benchmark`), its `policies:` block is read by
   the PolicyManager to boot or locate learned-policy servers — see
@@ -183,7 +183,7 @@ full v3 format.
 ## Next steps
 
 - [Safety](../real-robots/safety.md) — the full pre-session checklist and what
-  gap does and does not enforce.
+  GaP does and does not enforce.
 - [Real-Robot Connectors](../real-robots/connectors.md) — startup ordering,
   heartbeat diagnostics, and the msgpack bridge in detail.
 - [Cable UR](cable-ur.md) — the perception-only counterpart of this example.

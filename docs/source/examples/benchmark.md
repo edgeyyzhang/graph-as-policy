@@ -66,7 +66,7 @@ The acceptance gate uses this shape — see
 
 In both shapes, `skills:` may be omitted entirely: the harness auto-discovers
 the open-robot-skills checkout via `$GAP_SKILLS_PATH` or a checkout next to
-the gap repo. Explicit relative paths resolve against the config file's
+the GaP repo. Explicit relative paths resolve against the config file's
 directory.
 
 ## Gate semantics

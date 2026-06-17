@@ -1,4 +1,4 @@
-# gap examples
+# GaP examples
 
 Examples ordered as a learning path — from the end-to-end quickstart to
 the release gate and real robots. Install per

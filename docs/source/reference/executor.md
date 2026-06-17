@@ -1,6 +1,6 @@
 # Executor Semantics
 
-This page specifies how the gap runtime executes a loaded v3 workflow. The
+This page specifies how the GaP runtime executes a loaded v3 workflow. The
 implementation is `WorkflowExecutor` in
 [gap/runtime/executor.py](gh-engine:gap/runtime/executor.py); the schema it
 consumes is specified in [Workflow JSON Schema](workflow-schema.md), and the

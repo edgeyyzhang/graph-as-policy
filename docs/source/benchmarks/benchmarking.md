@@ -2,7 +2,7 @@
 
 `gap benchmark` sweeps a grid of evaluation cells — pipeline ablation *modes* ×
 task suite *variations* × learned *policies* — and folds every cell into one
-`summary.tsv` you can eyeball, plus a pass/fail gate you can wire into CI. gap
+`summary.tsv` you can eyeball, plus a pass/fail gate you can wire into CI. GaP
 itself is released against this harness: the grocery acceptance config must
 clear **≥90% success over 10 tasks × 50 trials** (500 trials) before any
 release, and the 10-task development gate scored 10/10 on 2026-06-11.

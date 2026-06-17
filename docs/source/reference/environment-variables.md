@@ -1,13 +1,13 @@
 # Environment Variables
 
-This page lists every environment variable the gap engine and the
+This page lists every environment variable the GaP engine and the
 open-robot-skills bundles read, grouped by subsystem. Variables are
 optional unless marked required; "unset" means the documented in-code
 default applies.
 
 :::{tip}
 Explicit function arguments and config-file values beat environment
-variables throughout gap. Use env vars for per-shell or per-worker
+variables throughout GaP. Use env vars for per-shell or per-worker
 configuration; use config files for anything you want recorded with a
 run.
 :::
@@ -83,7 +83,7 @@ Read by the env layer and the parallel benchmark workers
 | `GAP_UR_ZED_CALIB` | path to a 4×4 camera→wrist `.npy`; default: unset | Hand-eye calibration for the UR+ZED connector. Missing calibration degrades **silently to identity** (warning only) — camera poses then equal the wrist pose. |
 
 :::{note}
-Two variables in this area are **set by gap itself**, not by you:
+Two variables in this area are **set by GaP itself**, not by you:
 
 - Spawned benchmark workers export `CUDA_VISIBLE_DEVICES` and
   `MUJOCO_EGL_DEVICE_ID` to their assigned GPU id from

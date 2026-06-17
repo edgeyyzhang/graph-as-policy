@@ -15,7 +15,7 @@ hardware at all.
 :::
 
 This is the **standalone-connector** story: the `ur_zed` connector wires real
-sensors into a gap graph **without any motion stack**. Source:
+sensors into a GaP graph **without any motion stack**. Source:
 [examples/cable_ur](gh-engine:examples/cable_ur).
 
 ## Why motion is structurally impossible

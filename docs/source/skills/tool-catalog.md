@@ -184,7 +184,7 @@ configured. Six env vars:
 | `GAP_VLM_PROJECT_ID` | GCP project (vertex provider) | — |
 | `GAP_VLM_REGION` | Vertex region | `global` |
 
-The `anthropic` provider uses gap core's bundled SDK
+The `anthropic` provider uses GaP core's bundled SDK
 (`ANTHROPIC_API_KEY`); the `vertex` provider routes `claude-*` models
 through AnthropicVertex and others through google-genai, and needs the
 engine's vertex extra (`pip install "graph-as-policy[vertex]"`). An
@@ -205,7 +205,7 @@ keeps the verbatim substring rule, is still subject to).
 NVIDIA cuRobo motion planning: collision-free trajectories, attached-
 object transport, constrained linear moves, IK, batch feasibility, and
 trajectory validation. Source: [tools/curobo](gh-skills:tools/curobo).
-Trajectories in/out are gap `Trajectory` dicts; worlds are `WorldConfig`
+Trajectories in/out are GaP `Trajectory` dicts; worlds are `WorldConfig`
 dicts built with `geometry.build_world_config`.
 
 **Requirements.** `gap.requires: {gpu: true}`. cuRobo JIT-compiles CUDA
@@ -342,7 +342,7 @@ curobo.validate_joint_trajectory_grasped(
 Pure-math CPU geometry: back-projection, transforms, OBB fitting, grasp
 derivation, and collision-world reconstruction. No GPU, no weights.
 Source: [tools/geometry](gh-skills:tools/geometry). Extra `geometry`
-installs `open3d>=0.18` and `scikit-learn>=1.3` (cv2/scipy come with gap
+installs `open3d>=0.18` and `scikit-learn>=1.3` (cv2/scipy come with GaP
 core); the module imports lazily, so light tools work without the extra.
 
 | Tool | Signature | Returns |

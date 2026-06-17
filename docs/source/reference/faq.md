@@ -247,7 +247,7 @@ make any not-ready bundle (or zero resolved registries) fail the command
 **`gap skills test` skips my GPU tests / my pytest flags are ignored.**
 The default registry pytest config deselects `gpu` and `llm` markers, so
 GPU smokes need an explicit `gap skills test <bundle> -- -m gpu`. Flag
-ordering matters: gap's own flags go *before* the `--`, pytest arguments
+ordering matters: GaP's own flags go *before* the `--`, pytest arguments
 after it. The command also runs the *current* interpreter's pytest with
 cwd at the registry — registries with their own venv should run
 `uv run pytest` there instead. See
@@ -348,6 +348,6 @@ manually from Stereolabs. The `[real]` extra covers the rest (e.g.
 **How do I tell whether the Franka stack is hung, stuck, or dead?**
 Read the heartbeat fields: `obs_age` growing means the realtime side is
 hung; `joint_max_diff ≈ 0` with fresh observations means the robot is
-physically stuck; `republish_hz → 0` means the gap-side republisher died;
+physically stuck; `republish_hz → 0` means the GaP-side republisher died;
 `obs_stale` flips after 2 s of silence. See
 [Connectors](../real-robots/connectors.md).

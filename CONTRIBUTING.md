@@ -1,4 +1,4 @@
-# Contributing to gap
+# Contributing to GaP
 
 Thanks for helping! This page covers the engine repo. **Skill and tool
 bundles** are contributed to the sibling

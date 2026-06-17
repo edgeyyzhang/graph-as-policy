@@ -1,6 +1,6 @@
 # Traces and the Trial Browser
 
-Every gap run records a full trace by default: the executed workflow, every
+Every GaP run records a full trace by default: the executed workflow, every
 node's resolved inputs and outputs, every tool sub-call, and auto-extracted
 visual assets (camera frames, masks, point clouds). The on-disk layout is a
 stability contract consumed by two tools — the `gap viz` browser and

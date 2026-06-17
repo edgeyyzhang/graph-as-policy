@@ -6,7 +6,7 @@ VLM (Anthropic by default — [alternatives below](#vlm-provider)). Each trial
 takes ~25–55 s on an A100.
 :::
 
-This is gap's end-to-end hero example: a static, fully-authored workflow
+This is GaP's end-to-end hero example: a static, fully-authored workflow
 graph that perceives a target object and a container with real vision models
 (Grounding DINO + SAM3 + a hosted VLM), derives a top-down grasp from the
 fused 3D oriented bounding box, picks the object with a direct-IK
@@ -27,7 +27,7 @@ does it.
 
 ## Run it
 
-From the gap checkout, with [open-robot-skills](gh-skills:.) cloned next to
+From the GaP checkout, with [open-robot-skills](gh-skills:.) cloned next to
 it (see [Installation](../getting-started/installation.md)):
 
 ```bash

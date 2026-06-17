@@ -1,4 +1,4 @@
-# The gap runtime — v3 workflow schema & execution semantics
+# The GaP runtime — v3 workflow schema & execution semantics
 
 **Scope:** the canonical specification of the v3 `workflow.json` schema
 (`gap/runtime/workflow.py`), the structural validator
@@ -12,7 +12,7 @@ extending the runtime.
 
 ## 1. Abstract
 
-A gap workflow is a **dual control/data graph of subgraphs**. The top level
+A GaP workflow is a **dual control/data graph of subgraphs**. The top level
 is a DAG-with-loops of `subgraph` and `end` nodes wired by edges and
 conditional edges; each subgraph is a self-contained inner graph of
 `tool` / `script` / `router` / `noop` nodes with the same edge vocabulary,

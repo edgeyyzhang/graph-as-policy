@@ -1,6 +1,6 @@
 # Use with Claude Code and AI Agents
 
-gap is built to be driven by coding agents, not just humans. The engine repo
+GaP is built to be driven by coding agents, not just humans. The engine repo
 ships an **agent skill** — a plain-markdown playbook
 ([agent/skills/gap/SKILL.md](gh-engine:agent/skills/gap/SKILL.md)) plus five
 reference deep-dives — that teaches an agent to search skill registries, check
@@ -11,7 +11,7 @@ every other agent it is a directory of markdown you symlink or paste.
 
 :::{note}
 **Requirements:** the `claude` CLI (Claude Code) for the plugin route, and a
-working gap install ([Installation](../getting-started/installation.md)) so the
+working GaP install ([Installation](../getting-started/installation.md)) so the
 commands the agent runs actually succeed. No GPU or API key is needed to
 install the skill itself.
 :::
@@ -36,8 +36,8 @@ skill should be listed — or invoke it directly with `/gap:gap`.
 The optional `open-robot-skills@gap` plugin surfaces the registry's bundle
 contracts (each bundle's `SKILL.md`) as Claude Code skills. You rarely need it,
 because robot bundles are not consumed by Claude Code — they are consumed by
-**gap's internal codegen agent as files on disk**. When you ask the agent to
-generate a graph, it runs `gap generate`, and gap's own LLM pipeline reads the
+**GaP's internal codegen agent as files on disk**. When you ask the agent to
+generate a graph, it runs `gap generate`, and GaP's own LLM pipeline reads the
 active registries from the filesystem ([Registries](../skills/registries.md)).
 For discovery, the engine skill already teaches `gap skills list` and
 `gap tools show`, which report the same contracts with live schemas. Install
@@ -174,7 +174,7 @@ the skill links to. Update with `git pull`.
 ## No install at all
 
 The CLI is self-describing, so an agent with shell access needs nothing
-beyond gap itself:
+beyond GaP itself:
 
 ```bash
 gap --help                # full command tree

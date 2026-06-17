@@ -145,7 +145,7 @@ generated code that calls tools.
 A **skill** is the unit of packaging, discovery, and LLM context: a bundle
 directory in the Agent Skills format. Its `SKILL.md` carries YAML
 frontmatter (`name` must equal the directory name; `description` says when
-to use it) plus gap extensions under a single `gap:` key — allowed tools,
+to use it) plus GaP extensions under a single `gap:` key — allowed tools,
 exit conditions, typed `required_inputs`/`produces_outputs`, canonical
 scripts, prompts, and runtime requirements. The markdown body is guidance
 the generating LLM reads verbatim.

@@ -226,7 +226,7 @@ does not mean "skip settling" — it falls back to the connector's default.
 
 ## Units and conventions that bite
 
-| Convention | gap | Elsewhere |
+| Convention | GaP | Elsewhere |
 |---|---|---|
 | Quaternion order | `{w, x, y, z}` — **scalar-first (wxyz)** everywhere in `gap.types` | scipy, MuJoCo, LIBERO use xyzw |
 | OBB `extent` | **Half**-extents along local axes | many libraries use full extents |

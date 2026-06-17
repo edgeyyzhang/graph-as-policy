@@ -1,4 +1,4 @@
-# Drive gap with an AI coding agent (Claude Code)
+# Drive GaP with an AI coding agent (Claude Code)
 
 The step-by-step loop this example documents was run for real — every
 command and output below comes from an actual session: **Claude Code,
@@ -12,7 +12,7 @@ Two agent layers are involved — don't conflate them:
 Claude Code ──(the `gap` skill)──▶ drives the CLI: gap check / generate / run / skills …
                                          │
                                          ▼
-                            gap's own codegen agent (`gap generate`)
+                            GaP's own codegen agent (`gap generate`)
                                          │  reads bundle SKILL.mds from disk
                                          ▼
                        skill registries (e.g. ../open-robot-skills)
@@ -20,7 +20,7 @@ Claude Code ──(the `gap` skill)──▶ drives the CLI: gap check / generat
 
 Claude Code needs **only the `gap` skill**. The robot bundles in
 [open-robot-skills](https://github.com/graph-robots/open-robot-skills)
-are consumed by gap's *internal* codegen agent as files on disk — they
+are consumed by GaP's *internal* codegen agent as files on disk — they
 do not need to be installed into Claude Code.
 
 ## 0. Prerequisites (once)

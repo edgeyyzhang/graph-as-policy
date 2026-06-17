@@ -1,6 +1,6 @@
 # Learned Policies
 
-gap does not replace learned policies — it gives them structure. A vision-language-action (VLA) model
+GaP does not replace learned policies — it gives them structure. A vision-language-action (VLA) model
 is one **node** in a graph, not the whole program: the graph perceives, pre-positions the arm, hands
 control to the policy for the dexterous segment, decides when the policy is done, and verifies the
 outcome. This page covers the full surface: a learned policy as a first-class **`kind='policy'`
@@ -16,7 +16,7 @@ Serving a VLA needs a GPU. Each policy bundle is **self-contained**: it ships it
 `gap skills install <bundle>` (which runs `uv sync` inside the bundle dir). There is no shared
 openpi checkout and no `GAP_OPENPI_DIR` to point at — the bundle's pyproject pins its model deps
 (e.g. `openpi` as a git dep) and the launcher activates that venv automatically via
-`uv run --project <bundle_dir>`. The gap-side websocket client is thin (no JAX): install it with
+`uv run --project <bundle_dir>`. The GaP-side websocket client is thin (no JAX): install it with
 the `policy` extra in the engine repo (`pip install "graph-as-policy[policy]"`).
 :::
 
@@ -91,7 +91,7 @@ gap:
 | `protocol` | `websocket` for policies. (`stdio-msgpack` is the tool-bundle RPC path; `in-process` is the no-server default for in-process tools.) |
 | `env` | Extra env vars passed to the spawned process, merged over `os.environ`. |
 | `requires_gpu` | Surfaced by `gap check`; the server needs a GPU at the spawn host. |
-| `weights_uri` | Informational — where the server downloads weights from on first run (the server, not gap, performs the fetch). |
+| `weights_uri` | Informational — where the server downloads weights from on first run (the server, not GaP, performs the fetch). |
 
 You do not normally wire this up: when a workflow references a `kind='policy'` bundle, the
 launcher scans for it and **auto-boots its server** by reading `info.meta.serving` and running
@@ -139,9 +139,9 @@ recipe. The block is consumed by the engine's `PolicyManager`
 ```yaml
 policies:
   pi05-libero:
-    url: ws://127.0.0.1:9100        # external: you run the server; gap only records the URL
+    url: ws://127.0.0.1:9100        # external: you run the server; GaP only records the URL
   molmoact-libero:
-    command: ["python", "serve.py", "--port", "{port}"]   # managed: gap spawns and tears down
+    command: ["python", "serve.py", "--port", "{port}"]   # managed: GaP spawns and tears down
     env:
       CUDA_VISIBLE_DEVICES: "1"
 
@@ -279,8 +279,8 @@ angles. Skip any of this and the policy "looks lost" even with the action space 
 
 ## Collecting data and training your own policy
 
-The loop closes in the other direction too: run a gap graph as a scripted expert, record
-demonstrations, train a policy externally, and bring it back into gap — either as its own
+The loop closes in the other direction too: run a GaP graph as a scripted expert, record
+demonstrations, train a policy externally, and bring it back into GaP — either as its own
 `kind='policy'` bundle (the path the two shipped bundles take; see
 [Adding a new policy bundle](#adding-a-new-policy-bundle) and
 [Authoring bundles](../skills/authoring-bundles.md)) or, for a one-off, as a managed `policies:`
@@ -343,7 +343,7 @@ The end-to-end walkthrough is [Collect and train](../examples/collect-and-train.
 
 ## Adding a new policy bundle
 
-Adding a new policy no longer needs a gap PR. Drop a `kind='policy'` bundle into any active
+Adding a new policy no longer needs a GaP PR. Drop a `kind='policy'` bundle into any active
 registry and the catalog picks it up:
 
 ```text

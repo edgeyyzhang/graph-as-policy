@@ -140,7 +140,7 @@ and config in depth.
 
 | You want to | Go to |
 |---|---|
-| See everything gap can do | [Examples gallery](../examples/index.md) |
+| See everything GaP can do | [Examples gallery](../examples/index.md) |
 | Understand the vocabulary precisely | [Concepts](concepts.md) |
 | Author graphs in Python | [Build a graph](../examples/build-a-graph.md) · [The builder API](../authoring/builder.md) |
 | Write or contribute a skill | [Authoring bundles](../skills/authoring-bundles.md) |

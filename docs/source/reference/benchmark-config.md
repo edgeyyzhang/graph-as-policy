@@ -34,7 +34,7 @@ These keys apply to both shapes.
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `skills` | path or list of paths | auto-discovered | Skill registry root(s) the codegen registries are built from. `${VAR}` env interpolation is applied; relative paths resolve against the YAML's directory; each path must exist (else `ValueError`). When omitted, registries are resolved from `$GAP_SKILLS_PATH`, project/user config, or an `open-robot-skills` checkout next to the gap repo — see [Registries](../skills/registries.md). |
+| `skills` | path or list of paths | auto-discovered | Skill registry root(s) the codegen registries are built from. `${VAR}` env interpolation is applied; relative paths resolve against the YAML's directory; each path must exist (else `ValueError`). When omitted, registries are resolved from `$GAP_SKILLS_PATH`, project/user config, or an `open-robot-skills` checkout next to the GaP repo — see [Registries](../skills/registries.md). |
 
 ### `llm`
 

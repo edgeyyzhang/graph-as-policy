@@ -22,7 +22,7 @@ bundle `@tool` registrations are drained into it by
 
 - **Poses** are `Se3Pose` dicts: `{"position": {"x", "y", "z"}, "rotation":
   {"w", "x", "y", "z"}}` — quaternions are **wxyz scalar-first**
-  everywhere in gap.
+  everywhere in GaP.
 - **Gripper fraction** is `0.0` = fully closed, `1.0` = fully open.
 - **Joint configs** are `{"positions": [...]}` dicts (a bare list is also
   accepted); a **trajectory** is `{"waypoints": [joint_config, ...]}`.

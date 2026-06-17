@@ -17,7 +17,7 @@ gap.viz.serve("outputs")                                          # browse the t
 ## The policy is the graph
 
 Most robot stacks hide the policy: it is a neural network's weights, or an
-LLM agent's transient chain of tool calls. In gap the policy is a durable,
+LLM agent's transient chain of tool calls. In GaP the policy is a durable,
 inspectable artifact — a directory containing `workflow.json` (a version-3
 JSON graph), `scripts/` (typed Python step bodies), and `checkpoints/`
 (postcondition predicates). You can read it, diff it, validate it, version
@@ -51,7 +51,7 @@ routing and recovery. Rendered from
 
 ## Two repos, discovered by path
 
-gap is split into an engine and a skills library:
+GaP is split into an engine and a skills library:
 
 - **[graph-as-policy](gh-engine:.)** (import name `gap`) — the engine:
   runtime, validator, agent pipeline, connectors, environments, benchmark
@@ -131,7 +131,7 @@ No gRPC, no protobufs, no self-hosted model servers — the data contract is
 plain numpy arrays and TypedDicts. A deeper tour of the packages is in
 [Architecture](../developers/architecture.md).
 
-## Why gap
+## Why GaP
 
 - **Language → typed graph.** A coordinator → subgraph-agents →
   checkpoint-agent pipeline compiles one instruction into a validated
@@ -177,5 +177,5 @@ VLMs. Details in the [roadmap](../developers/roadmap.md).
 | Manage registries and write skill bundles | [Registries](../skills/registries.md) · [Authoring bundles](../skills/authoring-bundles.md) |
 | Run benchmark grids and gates | [Benchmarking](../benchmarks/benchmarking.md) |
 | Go to real hardware | [Connectors](../real-robots/connectors.md) · [Safety](../real-robots/safety.md) |
-| Drive gap from Claude Code | [Claude Code](../agents/claude-code.md) |
+| Drive GaP from Claude Code | [Claude Code](../agents/claude-code.md) |
 | Look something up | [CLI](../reference/cli.md) · [Python API](../reference/api.md) · [Workflow schema](../reference/workflow-schema.md) |

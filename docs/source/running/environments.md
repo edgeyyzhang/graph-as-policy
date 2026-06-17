@@ -1,6 +1,6 @@
 # Simulators and Environments
 
-gap's built-in simulation family is LIBERO tabletop manipulation: classic
+GaP's built-in simulation family is LIBERO tabletop manipulation: classic
 benchmark suites, the vab variance/packing suites, and a perturbed moving-target
 variant, all running in one process. This page covers the environment registry,
 the suites, seed semantics, cameras and video, and the motion-control details

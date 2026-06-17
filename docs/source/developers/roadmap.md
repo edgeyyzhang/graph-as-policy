@@ -1,6 +1,6 @@
 # Roadmap
 
-gap v1 draws a deliberate line: **language → verified pick-and-place graphs
+GaP v1 draws a deliberate line: **language → verified pick-and-place graphs
 on LIBERO and real Franka/UR hardware.** Everything inside that line is
 shipped, tested, and gated; everything outside it was cut for scope — named
 here, not hidden — and is planned to return after v1.
@@ -24,7 +24,7 @@ here, not hidden — and is planned to return after v1.
 ## Deliberately after v1
 
 These were cut for scope, not for lack of interest — several existed in the
-research codebase gap was ported from and return once the v1 surface is
+research codebase GaP was ported from and return once the v1 surface is
 stable:
 
 - **Execution-feedback graph repair.** Today the script-fix loop repairs
@@ -55,7 +55,7 @@ stable:
 
 ## How to influence it
 
-The cheapest way to extend gap is usually not the engine: new perception,
+The cheapest way to extend GaP is usually not the engine: new perception,
 grasping, or transport strategies are skill bundles — one directory, one PR
 to [open-robot-skills](gh-skills:.)
 ([Authoring bundles](../skills/authoring-bundles.md)). For engine work, see

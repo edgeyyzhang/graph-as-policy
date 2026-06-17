@@ -2,7 +2,7 @@
 
 > **What:** The end-to-end hero: real vision → OBB grasp → transport, ground-truth verified · **Needs:** `quickstart` + GPU + LLM key · **Time:** ~25–55 s/trial · **Measured:** 9/10 grasp · 7/10 task (10 seeds)
 
-The end-to-end quickstart for gap: a static, fully-authored workflow graph
+The end-to-end quickstart for GaP: a static, fully-authored workflow graph
 that perceives a target object and a container with real vision models
 (Grounding DINO + SAM3 + a hosted VLM), derives a top-down grasp from the
 fused 3D oriented bounding box, picks the object with a direct-IK
@@ -11,7 +11,7 @@ sim's own success predicate and a ground-truth `target_held` checkpoint.
 
 ## Run it
 
-From the gap checkout (open-robot-skills cloned next to it):
+From the GaP checkout (open-robot-skills cloned next to it):
 
 ```bash
 uv sync --extra quickstart            # engine + LIBERO sim + perception models

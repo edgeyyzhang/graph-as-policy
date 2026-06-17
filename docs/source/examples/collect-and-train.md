@@ -3,13 +3,13 @@
 :::{note} Requirements
 A CUDA GPU with `MUJOCO_GL=egl`, the `quickstart` and `policy` extras, and a
 VLM credential (the collection graph's perception uses one). Training itself
-happens outside gap with your framework of choice.
+happens outside GaP with your framework of choice.
 :::
 
 [examples/collect_and_train](gh-engine:examples/collect_and_train) closes the
-data loop: a verified gap graph acts as a **scripted expert**, its rollouts
+data loop: a verified GaP graph acts as a **scripted expert**, its rollouts
 become a demonstration dataset, an external recipe trains a VLA policy on
-them, and the trained policy comes back into gap as its own **policy-skill**
+them, and the trained policy comes back into GaP as its own **policy-skill**
 node (like the shipped `pi05-libero` / `molmoact-libero` skills) — steered by
 the same perception that collected the data ([Steered Policy](steered-policy.md)).
 
@@ -88,7 +88,7 @@ Convert with a small custom LeRobot adapter over the layout above, **filter
 to `episode_success == True` episodes**, then train with your recipe of
 choice — e.g. [LeRobot](https://github.com/huggingface/lerobot) ACT/diffusion
 baselines, or [openpi](https://github.com/Physical-Intelligence/openpi)
-fine-tuning (`pi05` configs). gap takes no position on the trainer: it only
+fine-tuning (`pi05` configs). GaP takes no position on the trainer: it only
 needs the result behind a websocket policy server.
 
 :::{tip}

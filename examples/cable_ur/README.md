@@ -9,7 +9,7 @@ orientation in the robot base frame. Then inspect the result in 3D with
 `visualize.py`.
 
 This is the **standalone-connector** story: the `ur_zed` connector wires
-real sensors into a gap graph **without any motion stack**. The env
+real sensors into a GaP graph **without any motion stack**. The env
 captures directly from the ZED (pyzed SDK) and reads UR joint state over
 read-only RTDE; camera pose comes from URDF forward kinematics plus a
 hand-eye calibration. The connector registers *only* observation/camera

@@ -1,13 +1,13 @@
 # Workflow JSON Schema
 
 This page is the reference for the v3 `workflow.json` format — the on-disk
-representation of a gap graph. The loader lives in
+representation of a GaP graph. The loader lives in
 [gap/runtime/workflow.py](gh-engine:gap/runtime/workflow.py) and the
 structural validator in
 [gap/runtime/validate.py](gh-engine:gap/runtime/validate.py). For how a
 loaded graph actually runs, see [Executor Semantics](executor.md).
 
-A gap workflow is a **dual control/data graph of subgraphs**. The top level
+A GaP workflow is a **dual control/data graph of subgraphs**. The top level
 is a DAG-with-loops of `subgraph` and `end` nodes wired by edges and
 conditional edges; each subgraph is a self-contained inner graph of
 `tool` / `script` / `router` / `noop` nodes with the same edge vocabulary,

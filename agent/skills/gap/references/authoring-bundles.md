@@ -21,7 +21,7 @@ Scaffold both kinds with `gap skills new <name> --kind tool|skill
 
 ## SKILL.md contract
 
-Frontmatter (Agent Skills spec + gap extensions under one `gap:` key):
+Frontmatter (Agent Skills spec + GaP extensions under one `gap:` key):
 
 ```yaml
 ---
@@ -52,7 +52,7 @@ gap:
 
 Hard rules enforced by the parser/validator (`gap skills check`):
 `name` == dirname; description present, ≤1024, with a "Use when/for/…"
-cue; gap extension keys only under `gap:` (top-level → error); declared
+cue; GaP extension keys only under `gap:` (top-level → error); declared
 tool names namespaced `<bundle>.<fn>` (`robot.*`/`sim.*` reserved for
 connectors); every referenced resource path exists; `allowed_tools`
 resolve against connector tools + every declared bundle tool;
@@ -119,7 +119,7 @@ def detect(image, query: str, threshold: float = 0.3) -> DetectResult:
 
 **Lazy-import discipline (test-enforced):** importing `tools.py` must
 never import torch/transformers/cuda libs. Load models on first call via
-a locked singleton. Typed signatures matter — gap introspects them into
+a locked singleton. Typed signatures matter — GaP introspects them into
 the tool schema that `gap tools show` and the codegen prompts render.
 
 ## Authoring a policy bundle

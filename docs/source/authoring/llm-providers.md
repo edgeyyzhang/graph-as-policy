@@ -82,7 +82,7 @@ Details worth knowing:
   backoff, 5xx and transport errors retry (3 retries), any other 4xx
   raises immediately.
 - vLLM with a reasoning parser can return `content: null` when the whole
-  response was thinking tokens; gap coalesces `reasoning_content` so
+  response was thinking tokens; GaP coalesces `reasoning_content` so
   downstream parsers don't crash.
 - Tools are translated from the Anthropic descriptor shape to the OpenAI
   tools API automatically.
@@ -180,7 +180,7 @@ message. Inline the inherited keys instead.
 ### Temperature is silently dropped for some models
 
 Models whose id contains `opus-4-7`, `opus-4-8`, or `fable` reject
-sampling parameters (the API returns 400), so gap omits `temperature` for
+sampling parameters (the API returns 400), so GaP omits `temperature` for
 them on the Anthropic request path (the `anthropic` provider and
 `claude-*` on `vertex`) — including the default `claude-opus-4-8`.
 Setting `temperature:` therefore has no effect with the default model.

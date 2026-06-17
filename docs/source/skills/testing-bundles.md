@@ -22,7 +22,7 @@ from gap.testing import (
 )
 ```
 
-These are the same fakes gap's own suite uses; anything else under
+These are the same fakes GaP's own suite uses; anything else under
 `gap.testing` is internal.
 
 ### FakeContext
@@ -101,7 +101,7 @@ make_test_observation(
 ```
 
 Renders a synthetic tabletop scene — colored axis-aligned boxes seen by a
-real pinhole camera model — into a gap `Observation`. The point is
+real pinhole camera model — into a GaP `Observation`. The point is
 **geometric consistency**: `depth`, `intrinsics`, and the camera `pose`
 reproject exactly onto the box surfaces, so perception math
 (mask → points → OBB) is tested against true numerics, not mocks.
@@ -119,8 +119,8 @@ reproject exactly onto the box surfaces, so perception math
 
 :::{note}
 `make_test_observation` requires scipy (for the look-at camera rotation).
-scipy is a base dependency of the gap engine, so it is already present
-wherever gap is installed — your bundle's extra does not need it.
+scipy is a base dependency of the GaP engine, so it is already present
+wherever GaP is installed — your bundle's extra does not need it.
 :::
 
 ### assert_graph_valid
@@ -282,7 +282,7 @@ markers = [
 ```
 
 So `gap skills test` (and a bare `pytest tests -q`) must stay green on a
-CPU-only machine. The gap engine repo uses the same convention with two
+CPU-only machine. The GaP engine repo uses the same convention with two
 extra markers, `sim` (MuJoCo/EGL) and `real` (robot hardware), and a
 300-second per-test timeout.
 

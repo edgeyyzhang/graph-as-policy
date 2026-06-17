@@ -124,7 +124,7 @@ two-terminal flow: run rr-session yourself and watch its logs directly.
 
 ### The msgpack bridge
 
-gap runs a TCP server (default `127.0.0.1:9000`); the robots_realtime client
+GaP runs a TCP server (default `127.0.0.1:9000`); the robots_realtime client
 connects to it. Each exchange is one framed observation in, the latest action
 out. Frames are a 4-byte big-endian length plus a msgpack payload with numpy
 support:
@@ -149,10 +149,10 @@ of the link stopped:
 
 | Field | Healthy | Diagnosis when off |
 |---|---|---|
-| `republish_hz` | ~50 | Drops toward 0 → the gap-side republisher died. Anything below ~30 Hz is a problem. |
+| `republish_hz` | ~50 | Drops toward 0 → the GaP-side republisher died. Anything below ~30 Hz is a problem. |
 | `obs_age` | small (ms) | Keeps growing → the realtime side hung or the client disconnected. |
 | `joint_max_diff` | nonzero while moving | ≈0 with fresh observations while commanding → the robot is physically stuck. |
-| `target_age` | small while commanding | Grows large → gap stopped issuing new targets (`move_to_joints` not being called). |
+| `target_age` | small while commanding | Grows large → GaP stopped issuing new targets (`move_to_joints` not being called). |
 | `cmd_vs_obs` | small | Persistent gap between commanded and observed joints → the arm is not tracking. |
 
 `env.obs_stale` flips to `True` (and the heartbeat logs at warning level) when
@@ -214,7 +214,7 @@ The full list lives in
 
 ## Next steps
 
-- [Safety](safety.md) — pre-session checklist, what gap enforces, what it
+- [Safety](safety.md) — pre-session checklist, what GaP enforces, what it
   does not.
 - [Real Franka Pick & Place](../examples/real-franka-pick-place.md) — the
   full-motion example on this connector.

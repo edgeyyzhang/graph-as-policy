@@ -38,7 +38,7 @@ This example moves a real robot arm.
 ## Hardware setup (rr-session)
 
 The robots_realtime stack is vendored as a pinned submodule and runs in
-its **own** process + environment — gap never imports it:
+its **own** process + environment — GaP never imports it:
 
 ```bash
 git submodule update --init third_party/robots_realtime
@@ -48,7 +48,7 @@ cd third_party/robots_realtime && uv sync   # one-time; needs the Franka/robotiq
 The session config is
 `third_party/robots_realtime/configs/franka/franka_robotiq_client.yaml`:
 a `RobotNode` (Franka + Robotiq), a ZED `CameraNode`, and the
-`FrankaOscClientCartesianAgent` client that connects to gap's msgpack
+`FrankaOscClientCartesianAgent` client that connects to GaP's msgpack
 server on `127.0.0.1:9000`. Adjust the camera `device_id`, extrinsics
 file, and robot config for your cell.
 

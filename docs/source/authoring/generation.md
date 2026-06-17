@@ -83,7 +83,7 @@ async def generate(
 - `skills` — registry root(s); a path or a precedence-ordered sequence.
   Omitted means the active registries are resolved (`$GAP_SKILLS_PATH` >
   project `[tool.gap]` > user config > an open-robot-skills checkout next
-  to the gap checkout). Generation needs at least one; resolution failure
+  to the GaP checkout). Generation needs at least one; resolution failure
   raises `FileNotFoundError` listing what was tried.
 - `model` / `provider` — per-call LLM overrides; they take precedence over
   the corresponding `config` fields.

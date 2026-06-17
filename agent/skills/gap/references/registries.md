@@ -4,7 +4,7 @@ A **registry** is a local directory of bundles: manipulation strategies
 under `skills/<name>/` and model-backed tool bundles under
 `tools/<name>/`, each an Agent-Skills-format directory with a `SKILL.md`.
 [open-robot-skills](https://github.com/graph-robots/open-robot-skills) is
-the canonical public registry — gap treats it as exactly that, an
+the canonical public registry — GaP treats it as exactly that, an
 example. Labs and projects bring their own and layer them.
 
 ## Resolution order (first hit wins the layer)
@@ -31,7 +31,7 @@ example. Labs and projects bring their own and layer them.
    path = "/home/u/lab-skills"
    ```
 
-5. Auto-discovery: an `open-robot-skills` checkout next to the gap
+5. Auto-discovery: an `open-robot-skills` checkout next to the GaP
    checkout or the cwd (the documented side-by-side layout).
 
 Layers 3–5 merge (project, then user, then auto), deduplicated by path.

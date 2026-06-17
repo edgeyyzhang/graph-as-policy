@@ -1,6 +1,6 @@
 # Architecture
 
-How gap is put together and why: the principles behind the engine, a map of
+How GaP is put together and why: the principles behind the engine, a map of
 its modules, the design decisions contributors most often ask about, the
 acceptance gates that defined the v1 release, and how the project is
 packaged. This page adapts the release design doc
@@ -10,7 +10,7 @@ trace) start with [Concepts](../getting-started/concepts.md).
 
 ## Principles
 
-gap is a port of a working research codebase, restructured around five
+GaP is a port of a working research codebase, restructured around five
 explicit principles:
 
 - **As easy to use as a Python library.** `pip install`, four lines of
@@ -68,7 +68,7 @@ Three flows cross this boundary:
 - **benchmark** — config → grid of generate/execute cells → summary + videos
   ([Benchmarking](../benchmarks/benchmarking.md))
 
-The dependency is one-way: open-robot-skills bundles import gap's stable
+The dependency is one-way: open-robot-skills bundles import GaP's stable
 authoring surface (`gap.NodeContext`, `gap.types`, `gap.errors`,
 `gap.skills`, `gap.testing`); the engine never imports the skills repo — it
 discovers bundle directories on disk and loads them.
