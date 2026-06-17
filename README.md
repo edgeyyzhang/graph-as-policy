@@ -10,8 +10,7 @@ simulators and real robots.
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![Skills: open-robot-skills](https://img.shields.io/badge/skills-open--robot--skills-orange.svg)](https://github.com/graph-robots/open-robot-skills)
-[![Paper: GaP @ CoRL '26](https://img.shields.io/badge/paper-GaP%20%40%20CoRL%202026-8a2be2.svg)](https://graph-robots.github.io/graph-as-policy-anonymous/)
-[![Docs](https://img.shields.io/badge/docs-quickstart-0f766e.svg)](docs/quickstart.md)
+[![Docs](https://img.shields.io/badge/docs-quickstart-0f766e.svg)](https://graph-robots.github.io/graph-as-policy/getting-started/quickstart.html)
 
 <video src="docs/assets/grocery_packing_real.mp4"
        autoplay loop muted playsinline width="640"></video>
@@ -73,8 +72,8 @@ MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
 uv run gap viz                           # browse the trial at localhost:9432
 ```
 
-See the **[15-minute tour](docs/quickstart.md)** for the full walkthrough
-(clone → run → generate → trace).
+See the **[15-minute tour](https://graph-robots.github.io/graph-as-policy/getting-started/quickstart.html)**
+for the full walkthrough (clone → run → generate → trace).
 
 ## Examples
 
@@ -97,14 +96,16 @@ media in **[examples/README.md](examples/README.md)**. Real-robot examples
 
 ## Documentation
 
-- [Quickstart (15-min tour)](docs/quickstart.md) — clone → run → generate → trace
-- [Architecture](docs/design.md) — engine + skills split; tools vs. skills
-- [Runtime & schema](docs/runtime.md) — workflow JSON, executor semantics, checkpoints
-- [Skill authoring](docs/skills.md) — Agent Skills format, `gap.requires:` frontmatter
-- [LLM providers](docs/source/authoring/llm-providers.md) — anthropic / openai / vertex
-- [Skill registries](docs/source/skills/registries.md) — `--skills`, `$GAP_SKILLS_PATH`, `gap registry …`
-- [CLI reference](docs/source/reference/cli.md) — every `gap` verb
-- [Safety](docs/safety.md) — required reading before any real-robot example
+Full docs site: **<https://graph-robots.github.io/graph-as-policy/>**
+
+- [Quickstart (15-min tour)](https://graph-robots.github.io/graph-as-policy/getting-started/quickstart.html) — clone → run → generate → trace
+- [Architecture](https://graph-robots.github.io/graph-as-policy/developers/architecture.html) — engine + skills split; tools vs. skills
+- [Runtime & schema](https://graph-robots.github.io/graph-as-policy/reference/workflow-schema.html) — workflow JSON, executor semantics, checkpoints
+- [Skill authoring](https://graph-robots.github.io/graph-as-policy/skills/authoring-bundles.html) — Agent Skills format, `gap.requires:` frontmatter
+- [LLM providers](https://graph-robots.github.io/graph-as-policy/authoring/llm-providers.html) — anthropic / openai / vertex
+- [Skill registries](https://graph-robots.github.io/graph-as-policy/skills/registries.html) — `--skills`, `$GAP_SKILLS_PATH`, `gap registry …`
+- [CLI reference](https://graph-robots.github.io/graph-as-policy/reference/cli.html) — every `gap` verb
+- [Safety](https://graph-robots.github.io/graph-as-policy/real-robots/safety.html) — required reading before any real-robot example
 
 ## Use with Claude Code & AI agents
 
