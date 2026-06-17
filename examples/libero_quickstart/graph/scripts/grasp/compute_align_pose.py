@@ -1,14 +1,9 @@
-"""Compute the align-pose for direct-IK grasping.
+"""Compute the align-pose for grasping-with-planner.
 
-Constructs an SE(3) pose at ``(grasp_pose.x, grasp_pose.y, target_obb_top + 0.15)``
-with the same rotation as the grasp pose. Used by the ``grasping-direct-ik``
-skill: the gripper rotates into the grasp orientation at this align-pose
-first, then descends straight down to the actual grasp pose.
-
-The 0.15 m clearance above the OBB top is the minimum safe approach height
-for the Franka end-effector + a typical 5 cm gripper plus a few cm of
-margin. If the held object is much taller, the workflow author may want to
-post-process this with ``transporting-objects``'s clearance constants.
+Same construction as ``grasping-direct-ik``: lifts the grasp pose's XY by 0.15 m
+above the OBB top, preserving the rotation. CuRobo plans into this pre-grasp
+align-pose so the trajectory to the actual grasp pose becomes a pure
+straight-line descent — no rotation blending, no twist-while-closing.
 """
 
 from typing import TypedDict

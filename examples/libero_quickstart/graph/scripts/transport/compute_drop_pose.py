@@ -89,7 +89,25 @@ def run(
         zone_floor = container_top  # exterior top
         zone_ceiling = zone_floor + 0.10  # arbitrary headroom for fallback path
 
-    if held_obb is not None and ee_pose_at_grasp is not None:
+    # Measure the at-grasp EE height LIVE. This node runs right after the
+    # grasp subgraph closes the gripper and before any lift, so the
+    # current EE pose IS the at-grasp pose the invariant below requires.
+    # Generated graphs typically wire ``ee_pose_at_grasp`` from an
+    # ``observe`` node that runs at the pre-grasp HOVER (between approach
+    # and plan) — recorded traces show that observation ~0.12-0.20 m above
+    # the true at-grasp height, which inflates ``ee_to_obj_z`` and made
+    # the release happen ~30 cm above the rim (items bounced out of the
+    # basket or rolled away on landing). The wired value is kept for yaw
+    # preservation and as a fallback when the live read fails.
+    ee_z_at_grasp: float | None = None
+    try:
+        live = ctx.tool("robot.get_ee_pose")
+        ee_z_at_grasp = float(live["pose"]["position"]["z"])
+    except Exception:
+        if ee_pose_at_grasp is not None:
+            ee_z_at_grasp = float(ee_pose_at_grasp["position"]["z"])
+
+    if held_obb is not None and ee_z_at_grasp is not None:
         # LIBERO's ``In(obj, contain_region)`` predicate checks that the
         # object's CENTER is inside the contain_region 3D AABB. Target a
         # held-object Z that:
@@ -120,8 +138,9 @@ def run(
         # held-object center is preserved across the trajectory:
         #   ee_z_at_drop - held_z_at_drop == ee_z_at_grasp - obj_z_at_grasp
         # ``held_obb["center"]["z"]`` IS ``obj_z_at_grasp`` because the OBB
-        # was captured before the gripper closed.
-        ee_to_obj_z = ee_pose_at_grasp["position"]["z"] - held_obb["center"]["z"]
+        # was captured before the gripper closed; ``ee_z_at_grasp`` is the
+        # live measurement taken above.
+        ee_to_obj_z = ee_z_at_grasp - held_obb["center"]["z"]
         ee_z_at_drop = desired_obj_z + ee_to_obj_z
         tcp_z = ee_z_at_drop - panda_hand_to_tcp
     elif held_obb is not None:

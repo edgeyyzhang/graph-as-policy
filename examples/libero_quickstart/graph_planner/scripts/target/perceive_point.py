@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Any, TypedDict
 
 import numpy as np
-
 from gap import NodeContext
 from gap_core.types import CameraFrame, Mask, PointCloud
 
