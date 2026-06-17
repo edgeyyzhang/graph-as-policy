@@ -90,43 +90,69 @@ For every subgraph in the workflow you must:
    grasp checkpoint (EE over the target footprint / `is_grasped()`),
    not by a privileged position match here.
 
+6. **Frame convention (HARD). Perception outputs are in ROBOT frame.
+   `w.body(...).position`, `cavity_*`, `aabb_*` are in WORLD frame.
+   Do NOT compare them directly.** Perception OBBs / clouds / drop
+   positions / grasp poses derived from them all live in the robot's
+   base frame (camera and IK are anchored to the robot). On a Franka
+   the base sits at world `x ≈ -0.6`, so
+   `abs(o["target_obb"]["center"]["x"] - w.body("alphabet soup").position[0])`
+   reads ~0.6 m every time, **even when perception is perfect** —
+   a guaranteed false-fail that fires on every trial.
+
+   Validate perception **implicitly via downstream behavior** —
+   `target_held` / `target_in_container` / `is_grasped()` — and use
+   1-arg sanity checks on the OBB alone (finite, non-degenerate
+   extent; center above table) when you need a per-subgraph gate.
+   Both shapes are demonstrated in the example block below.
+
+   Same rule for grasp/drop poses produced upstream of motion: they
+   inherit perception's frame. Don't compare `o["drop_position"]` to
+   `w.body(...).cavity_*` directly; let `target_in_container` (a
+   world-frame `Body.is_in(Body)` check) be the postcondition.
+
 ## Output shape
 
 Single fenced ```python block. Example for a 4-subgraph workflow:
 
 ```python
-# target_sg — output-anchored: did perception localize correctly?
+# target_sg — 1-arg sanity check on the perception output (frame-free).
+# Perception OBBs are robot-frame; w.body(...) is world-frame, so DO NOT
+# compare positions directly. Instead check the OBB is a valid,
+# non-degenerate detection above the table. Correctness of localization
+# is validated implicitly downstream by `target_held` (frame-independent).
 subgraphs["target_sg"].add_checkpoint(
-    "target_obb_matches_truth",
+    "target_obb_is_plausible",
     predicate=lambda w, o: (
-        abs(o["target_obb"]["center"]["x"] - w.body("alphabet soup").position[0]) < 0.03
-        and abs(o["target_obb"]["center"]["y"] - w.body("alphabet soup").position[1]) < 0.03
-        and abs(o["target_obb"]["center"]["z"] - w.body("alphabet soup").position[2]) < 0.05
+        0.01 < o["target_obb"]["extent"]["x"] < 0.30
+        and 0.01 < o["target_obb"]["extent"]["y"] < 0.30
+        and 0.01 < o["target_obb"]["extent"]["z"] < 0.40
     ),
     diagnostics=lambda w, o: {
-        "obb_center": [
-            float(o["target_obb"]["center"]["x"]),
-            float(o["target_obb"]["center"]["y"]),
-            float(o["target_obb"]["center"]["z"]),
+        "extent": [
+            float(o["target_obb"]["extent"]["x"]),
+            float(o["target_obb"]["extent"]["y"]),
+            float(o["target_obb"]["extent"]["z"]),
         ],
-        "body_position": [float(v) for v in w.body("alphabet soup").position],
     },
-    rationale="perception OBB center within 3 cm xy / 5 cm z of the privileged body pose",
+    rationale="perception emitted an OBB with non-degenerate, plausible can-sized extents",
     validate=True,
 )
 
-# container_sg — output-anchored: did perception find the container?
+# container_sg — same shape for the container's OBB.
 subgraphs["container_sg"].add_checkpoint(
-    "container_obb_matches_truth",
+    "container_obb_is_plausible",
     predicate=lambda w, o: (
-        abs(o["container_obb"]["center"]["x"] - w.body("basket").position[0]) < 0.05
-        and abs(o["container_obb"]["center"]["y"] - w.body("basket").position[1]) < 0.05
+        0.05 < o["container_obb"]["extent"]["x"] < 0.60
+        and 0.05 < o["container_obb"]["extent"]["y"] < 0.60
     ),
-    rationale="container OBB centered over the privileged basket pose",
+    rationale="container OBB has basket-scale xy extents (frame-free sanity check)",
     validate=True,
 )
 
-# grasp_sg — robot-state postcondition (no useful bound output to anchor on)
+# grasp_sg — robot-state postcondition (frame-independent by construction).
+# `is_grasped()` consults world-frame contacts between the body and the
+# robot's gripper links; safe to compare across all frames.
 subgraphs["grasp_sg"].add_checkpoint(
     "target_held",
     predicate=lambda w: w.body("alphabet soup").is_grasped(),
@@ -137,18 +163,11 @@ subgraphs["grasp_sg"].add_checkpoint(
     validate=True,
 )
 
-# transport_sg — output-anchored: did compute_drop_pose target the cavity?
-subgraphs["transport_sg"].add_checkpoint(
-    "drop_inside_cavity",
-    predicate=lambda w, o: (
-        w.body("basket").cavity_lower[0] < o["drop_position"]["x"] < w.body("basket").cavity_upper[0]
-        and w.body("basket").cavity_lower[1] < o["drop_position"]["y"] < w.body("basket").cavity_upper[1]
-    ),
-    rationale="planned drop xy lands inside the container's privileged cavity AABB",
-    validate=True,
-)
-
 # transport_sg — privileged-state postcondition: did the object land?
+# `Body.is_in(Body)` is world-frame on BOTH sides, so it's the canonical
+# transport postcondition. Do NOT separately add a `drop_inside_cavity`
+# check that compares `o["drop_position"]` (robot frame, from perception)
+# to `w.body("basket").cavity_*` (world frame) — guaranteed false-fail.
 subgraphs["transport_sg"].add_checkpoint(
     "target_in_container",
     predicate=lambda w: w.body("alphabet soup").is_in(w.body("basket")),
@@ -219,8 +238,18 @@ scene body — treat that as a fast hint that the name is wrong.
 ## Anchoring rules
 
 - Comparing perception output (a workflow edge value in `o`) to
-  privileged ground truth in `w` is **encouraged**. This is the
-  primary capability — use it.
+  privileged ground truth in `w` is **encouraged for frame-compatible
+  semantics only**: contacts, grasp state, containment, joint state,
+  gripper open-fraction. Concretely: `is_grasped()`, `is_in(Body)`,
+  `gripper_is_closed()` — these consult world-frame state on both
+  sides and are safe.
+- **Position comparisons across `o` and `w` are FORBIDDEN as
+  `validate=True` postconditions.** `o["...obb"]["center"]`,
+  `o["drop_position"]`, `o["grasp_pose"]["position"]`,
+  `o["ee_pose_at_grasp"]` are all in robot frame (camera + IK are
+  anchored to the robot base); `w.body(...).position`, `cavity_*`,
+  `aabb_*` are in world frame. They differ by the robot base offset
+  (~0.6 m on Franka). See Hard requirement #6.
 - Comparing two values both pulled from `o` (e.g.
   `o["target_obb"]["center"]["x"] == o["grasp_pose"]["position"]["x"]`)
   is **not** a privileged check — that just verifies workflow plumbing.
@@ -233,18 +262,22 @@ scene body — treat that as a fast hint that the name is wrong.
 
 ## Axis coverage (HARD)
 
-When you check a position-like output (`o["ee_pose_at_grasp"]`,
-`o["drop_position"]`, `o["target_obb"]["center"]`, etc.), **cover all
-three axes that matter** rather than only xy. A common upstream-planner
-bug is to emit a pose with the wrong z (e.g. below the tabletop for a
-low-profile object) while xy is fine — if your checkpoint only checks
-xy, that bug surfaces downstream as a `target_held=False` cascade and
-the feedback sees a planning failure at a node several steps removed
-from the actual cause.
+For OBB / pose outputs you DO author 1-arg sanity predicates on (frame-
+free shape checks: extents are non-degenerate, centers are above the
+table the perception ran on), cover all three axes that matter rather
+than only xy. A common upstream bug is a degenerate / sliver detection
+with one near-zero extent while xy are fine — checking only xy lets it
+through and the failure surfaces downstream as a `target_held=False`
+cascade many nodes removed from the actual cause.
 
-For grasp poses: also check `["position"]["z"] > <table_top> +
-<clearance>`. For drop poses: also check `["z"]` is within the
-container cavity range (`cavity_lower[2]` to `cavity_upper[2]`). For
-perception OBB matches: check `["center"]["z"]` against
-`w.body(...).position[2]` with a slightly larger tolerance than xy
-(typical: 3 cm xy / 5 cm z).
+- For perception OBB sanity checks: assert all three `["extent"][...]`
+  components are in a plausible range for the object class (canned
+  goods: 0.01–0.30 m; bottles/cartons: 0.01–0.40 m z; baskets:
+  0.05–0.60 m xy).
+- For grasp / drop poses derived from perception: prefer NOT to assert
+  on absolute z either — it is robot-frame, so a fixed threshold like
+  "above the table" is ambiguous. Let the downstream `target_held` /
+  `target_in_container` postcondition catch a misplaced pose.
+- For robot-state outputs (gripper open fraction, joint positions),
+  use the natural frame-independent thresholds (`< 0.1` closed,
+  `> 0.9` open) — these don't carry a frame.

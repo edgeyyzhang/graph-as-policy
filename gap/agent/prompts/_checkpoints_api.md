@@ -179,29 +179,36 @@ Use 2-arg predicates **whenever** a bound output can be cross-checked —
 perception OBBs against body poses, computed grasp poses against target
 AABBs, computed drop poses against container cavities:
 
-### Perception accuracy (output OBB vs privileged body)
+### Perception sanity (frame-free 1-arg/2-arg OBB shape check)
+
+⚠ **Frames:** perception OBBs/clouds/derived poses are in the **robot's
+base frame** (camera and IK are anchored there). `w.body(...).position`,
+`cavity_*`, `aabb_*` are in **world frame**. On a Franka the base sits
+at world `x ≈ -0.6`, so a direct
+`abs(o["...obb"]["center"]["x"] - w.body(...).position[0])` reads
+~0.6 m **even when perception is perfect** — a guaranteed false-fail.
+
+Validate perception implicitly via downstream behavior
+(`target_held` → frame-independent contacts; `target_in_container` →
+world-frame `Body.is_in(Body)`), and use a 1-arg sanity check on the
+OBB alone:
 
 ```python
 sg.add_checkpoint(
-    "target_obb_matches_truth",
+    "target_obb_is_plausible",
     predicate=lambda w, o: (
-        abs(o["target_obb"]["center"]["x"] - w.body("alphabet soup").position[0]) < 0.03
-        and abs(o["target_obb"]["center"]["y"] - w.body("alphabet soup").position[1]) < 0.03
-        and abs(o["target_obb"]["center"]["z"] - w.body("alphabet soup").position[2]) < 0.05
+        0.01 < o["target_obb"]["extent"]["x"] < 0.30
+        and 0.01 < o["target_obb"]["extent"]["y"] < 0.30
+        and 0.01 < o["target_obb"]["extent"]["z"] < 0.40
     ),
     diagnostics=lambda w, o: {
-        "obb_center": [
-            float(o["target_obb"]["center"]["x"]),
-            float(o["target_obb"]["center"]["y"]),
-            float(o["target_obb"]["center"]["z"]),
+        "extent": [
+            float(o["target_obb"]["extent"]["x"]),
+            float(o["target_obb"]["extent"]["y"]),
+            float(o["target_obb"]["extent"]["z"]),
         ],
-        "body_position": [float(v) for v in w.body("alphabet soup").position],
-        "xy_error": float((
-            (o["target_obb"]["center"]["x"] - w.body("alphabet soup").position[0]) ** 2
-            + (o["target_obb"]["center"]["y"] - w.body("alphabet soup").position[1]) ** 2
-        ) ** 0.5),
     },
-    rationale="perception OBB center within 3cm xy / 5cm z of the privileged body pose",
+    rationale="perception emitted a non-degenerate, can-sized OBB (frame-free)",
     validate=True,
 )
 ```

@@ -63,9 +63,14 @@ git clone --recurse-submodules https://github.com/graph-robots/graph-as-policy.g
 git clone https://github.com/graph-robots/open-robot-skills.git    # sibling, auto-discovered
 cd graph-as-policy
 uv sync                                  # engine + LIBERO sim (now baseline)
+# `uv sync --extra vertex` instead if you'll use --provider vertex for codegen
 uv run gap skills install --all          # per-bundle venvs (sam3, cuRobo, vlm, …)
-uv run gap skills check --download       # weight prefetch + capability gate
 
+export HF_TOKEN=...                      # for the gated SAM3 weights
+uv run gap skills check --download       # weight prefetch (SAM3 + GDINO) + capability gate
+
+# Pick one LLM provider for codegen + the in-graph VLM. anthropic is the
+# default; for vertex, see `docs/source/authoring/llm-providers.md`.
 export ANTHROPIC_API_KEY=...
 MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
   --sim libero_object_all_variance/0
