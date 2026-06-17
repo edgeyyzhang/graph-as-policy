@@ -50,9 +50,18 @@ logger = logging.getLogger(__name__)
 _MAX_RETRIES = 3
 _INITIAL_BACKOFF = 2.0  # seconds
 
-#: Provider default models. Only anthropic has one — openai/vertex
-#: endpoints serve arbitrary models, so ``model`` must be set explicitly.
-DEFAULT_MODELS: dict[str, str] = {"anthropic": "claude-opus-4-8"}
+#: Provider default models. OpenAI-compatible endpoints serve arbitrary
+#: models, so ``model`` must be set explicitly for ``openai``.
+#:
+#: ``gemini-3.1-flash-lite-preview`` is the verified vertex default for
+#: ``gap generate``: ~3× faster codegen than 2.5-flash on this repo's
+#: 4-subgraph quickstart, picks the hand-curated topology, and a fresh
+#: clean-env run on ``libero_object_all_variance/0`` ended SUCCESS with
+#: ``target_held`` PASSED.
+DEFAULT_MODELS: dict[str, str] = {
+    "anthropic": "claude-opus-4-8",
+    "vertex": "gemini-3.1-flash-lite-preview",
+}
 
 #: Models that reject sampling parameters (``temperature`` 400s on them).
 _NO_SAMPLING_MARKERS: tuple[str, ...] = ("opus-4-7", "opus-4-8", "fable")
@@ -99,8 +108,9 @@ class LlmConfig:
     dataclass default honors ``$GAP_LLM_PROVIDER``."""
 
     model: str | None = field(default_factory=default_model)
-    """Model id. ``None`` uses the provider default (anthropic only).
-    The dataclass default honors ``$GAP_LLM_MODEL``."""
+    """Model id. ``None`` uses the provider default (set for ``anthropic``
+    and ``vertex``; ``openai`` requires an explicit model). The dataclass
+    default honors ``$GAP_LLM_MODEL``."""
 
     endpoint: str | None = None
     """OpenAI-compatible base URL (``http://host:port/v1``) or a full

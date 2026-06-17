@@ -24,11 +24,18 @@ though codegen was pointed at vLLM.
 |---|---|---|---|
 | `anthropic` (default) | `claude-opus-4-8` | `ANTHROPIC_API_KEY` | native |
 | `openai` (incl. OpenRouter / vLLM) | none — `model` **required** | `OPENAI_API_KEY` (or `api_key:` in YAML) | OpenAI tools API |
-| `vertex` | none — `model` **required** | ADC (`gcloud auth application-default login`) | `claude-*` models only |
+| `vertex` | `gemini-3.1-flash-lite-preview` | ADC (`gcloud auth application-default login`) | `claude-*` models native; gemini via `google-genai` SDK |
 
-Only `anthropic` has a default model. On `openai` and `vertex` the
-endpoint serves arbitrary models, so omitting `model` raises a
-`ValueError` — always pass `--model` or set `llm.model`.
+On `openai` the endpoint serves arbitrary models, so omitting `model`
+raises a `ValueError` — always pass `--model` or set `llm.model`.
+On `anthropic` and `vertex`, the default works out of the box; override
+per-call with `--model` if you want a specific one.
+
+The vertex default (`gemini-3.1-flash-lite-preview`) was picked because
+on the public `libero_quickstart` task it codegens a valid 4-subgraph
+graph in ~18 s (vs. ~50 s for `gemini-2.5-flash`) and picks the same
+hand-curated topology (perceptions front-loaded). Override for other
+tasks where you want a stronger or different model.
 
 ### anthropic
 
