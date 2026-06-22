@@ -1,6 +1,11 @@
 <div align="center">
 
-# graph-as-policy
+# Graph-as-Policy
+<h3 align="center">
+  <strong>🟠 INTERNAL TEST VERSION</strong> | <em>Alpha</em> | June 22, 2026
+</h3>
+
+
 
 **The graph is the policy.**
 GaP targets *Variational Automation* — tasks a robot must perform persistently
