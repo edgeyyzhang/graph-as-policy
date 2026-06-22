@@ -16,6 +16,7 @@ graph-as-policy documentation
 .. toctree::
    :hidden:
 
+   Project Page <https://graph-robots.github.io/graph-as-policy-anonymous/>
    Docs <docs/index>
    graph-as-policy on GitHub <https://github.com/graph-robots/graph-as-policy>
    open-robot-skills <https://github.com/graph-robots/open-robot-skills>
