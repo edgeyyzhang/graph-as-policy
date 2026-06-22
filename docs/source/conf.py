@@ -71,6 +71,13 @@ html_css_files = ["custom.css"]
 html_favicon = "_static/favicon.svg"
 
 html_theme_options = {
+    # Site-wide banner: GaP is pre-1.0 and in public beta. Shown on every page.
+    "announcement": (
+        "🧪 <strong>GaP Beta Code release (1 July 2026)</strong> — under active "
+        "development and now in beta testing. Send comments and suggestions to "
+        '<a href="mailto:kych@berkeley.edu">kych@berkeley.edu</a>; an updated '
+        "version is planned by 1 Aug 2026."
+    ),
     "logo": {
         "text": "GaP",
         "alt_text": "GaP — graph-as-policy",
