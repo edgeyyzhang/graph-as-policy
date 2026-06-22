@@ -186,6 +186,7 @@ def _handle(args: argparse.Namespace) -> int:
 
     from gap.runtime.execute import execute
 
+    success_metric: tuple[bool, float] | None = None
     try:
         result = execute(
             args.graph,
@@ -203,12 +204,37 @@ def _handle(args: argparse.Namespace) -> int:
                 print(f"video: {video_path} ({saved['num_frames']} frames)")
             else:
                 print(f"video: not saved ({saved})")
+        # Snapshot success/reward BEFORE close() — the sim env tears
+        # down its MjSim there and compute_reward()/task_completed()
+        # would crash on a closed env.
+        check_success = getattr(connector, "check_success", None) if connector else None
+        if check_success is not None:
+            try:
+                success_metric = check_success()
+            except Exception:
+                success_metric = None
     finally:
         if connector is not None:
             connector.close()
 
     status = "SUCCESS" if result.success else "FAILURE"
     print(f"{status} (exit={result.exit_status}, {result.duration_s:.1f}s)")
+    if success_metric is not None:
+        completed, reward = success_metric
+        print(f"reward: {reward:.4f}  success={bool(completed)}")
+    if result.latency:
+        steps = int(result.latency.get("control_steps", 0))
+        freq = float(result.latency.get("control_freq", 0.0))
+        sim_phys = float(result.latency.get("sim_physics_wall_s", 0.0))
+        ctrl_s = steps / freq if freq > 0 else 0.0
+        compute_s = max(0.0, result.duration_s - sim_phys)
+        physical_s = ctrl_s + compute_s
+        print(f"sim wallclock: {result.duration_s:.2f} s")
+        print(
+            f"physical execution: {physical_s:.2f} s  "
+            f"(control: {ctrl_s:.2f} s @ {freq:.1f} Hz × {steps} steps; "
+            f"compute: {compute_s:.2f} s)"
+        )
     if result.trace_path is not None:
         print(f"trace: {result.trace_path}")
     for cp in result.checkpoint_results:

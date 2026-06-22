@@ -144,6 +144,17 @@ class SimConnector(Connector):
         reward = float(self.env.compute_reward())
         return bool(self.env.task_completed()), reward
 
+    def get_latency_info(self) -> dict[str, Any]:
+        """Forward the env's cumulative episode latency, if exposed.
+
+        ``{}`` when the underlying env doesn't implement
+        :meth:`get_latency_info` (real-robot / UR-Zed envs today). The
+        ``gap run`` and ``gap bench`` printouts gate on the dict being
+        non-empty before reporting physical-execution time.
+        """
+        fn = getattr(self.env, "get_latency_info", None)
+        return dict(fn()) if fn is not None else {}
+
     def _tool_check_success(self) -> dict:
         completed, reward = self.check_success()
         return {"task_completed": completed, "reward": reward}

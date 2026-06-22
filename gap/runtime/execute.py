@@ -57,6 +57,13 @@ class ExecutionResult:
     checkpoint_results: list[Any]    # gap.runtime.verify.CheckpointResult
     error: Exception | None
     duration_s: float
+    latency: dict[str, Any] | None = None
+    """Connector-reported episode latency snapshot (``{}``-or-``None``
+    when the connector doesn't expose ``get_latency_info``). Today only
+    :class:`gap.connector.sim.SimConnector` (LIBERO/VAB) populates this.
+    Keys: ``control_steps`` (int), ``control_freq`` (Hz),
+    ``sim_physics_wall_s`` (s). ``duration_s`` above is the total wall
+    time; ``compute_overhead_s = duration_s − sim_physics_wall_s``."""
 
 
 def execute(
@@ -197,6 +204,16 @@ def execute(
         getattr(executor.trace, "_output_dir", None)
         if executor is not None else None
     )
+
+    latency: dict[str, Any] | None = None
+    if connector is not None:
+        latency_fn = getattr(connector, "get_latency_info", None)
+        if latency_fn is not None:
+            try:
+                latency = dict(latency_fn())
+            except Exception:
+                logger.debug("connector.get_latency_info failed", exc_info=True)
+
     return ExecutionResult(
         success=(
             error is None
@@ -213,6 +230,7 @@ def execute(
         ),
         error=error,
         duration_s=duration_s,
+        latency=latency,
     )
 
 

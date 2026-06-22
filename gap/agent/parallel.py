@@ -182,6 +182,19 @@ class TrialResult:
     execution_stderr: str = ""
     video_path: str = ""
     duration_secs: float = 0.0
+    control_steps: int = 0
+    """Cumulative env-step count from the sim connector — actuator
+    operations the policy issued. Real robot's actuator time is
+    ``control_steps / control_freq``."""
+    control_freq: float = 0.0
+    """Sim env control frequency (Hz). 0 when latency wasn't reported."""
+    sim_physics_wall_s: float = 0.0
+    """Wall time spent inside ``env.step`` (MuJoCo physics + obs/reward)."""
+    physical_execution_s: float = 0.0
+    """Estimated real-robot wall time: ``control_steps / control_freq +
+    (duration_secs - sim_physics_wall_s)``. ``compute_overhead`` is the
+    non-physics share of trial wall time (LLM, planning, perception),
+    which would also run on a real robot."""
 
 
 @dataclass
@@ -539,6 +552,7 @@ def _execute_trial(
     # from PRESETS unless overridden in `policies:`); a missing/unstartable
     # server fails the trial here with a clear error.
     from gap.runtime.policy_boot import boot_policies
+    from gap.runtime.tool_bundle_boot import boot_tool_bundles
 
     policy_manager, policy_executor = boot_policies(
         item.workflow_dir,
@@ -551,6 +565,26 @@ def _execute_trial(
             config.policy_manager.get("evict_grace_s", 10.0)
         ),
     )
+
+    # Boot RPC tool bundles (sam3, molmo, grounding-dino, vlm, geometry, ...)
+    # the workflow references. Without this the trial registry only sees
+    # connector-owned robot.* / sim.* tools, and every perception node fails
+    # with "Tool 'sam3.segment_text' not found". gap.execute() does the same
+    # boot on the single-run path (gap/runtime/execute.py:169); the
+    # benchmark trial path was missing it.
+    tool_bundle_manager = None
+    if state.skill_registry is not None:
+        try:
+            tool_bundle_manager = boot_tool_bundles(
+                item.workflow_dir,
+                state.skill_registry,
+                state.tool_registry,
+            )
+        except Exception as exc:
+            logger.error(
+                "Trial %d (task %d): tool bundle boot failed: %s",
+                item.trial_id, item.task_id, exc,
+            )
 
     executor = None
     try:
@@ -580,6 +614,11 @@ def _execute_trial(
                 executor.close()
             except Exception:
                 pass
+        if tool_bundle_manager is not None:
+            try:
+                tool_bundle_manager.shutdown_all()
+            except Exception:
+                pass
         if policy_executor is not None:
             policy_executor.close()
         if policy_manager is not None:
@@ -591,6 +630,16 @@ def _execute_trial(
     trial_result.completion_rate = (
         1.0 if completed else min(max(float(reward), 0.0), 1.0)
     )
+
+    latency_fn = getattr(conn, "get_latency_info", None)
+    if latency_fn is not None:
+        try:
+            lat = dict(latency_fn())
+        except Exception:
+            lat = {}
+        trial_result.control_steps = int(lat.get("control_steps", 0))
+        trial_result.control_freq = float(lat.get("control_freq", 0.0))
+        trial_result.sim_physics_wall_s = float(lat.get("sim_physics_wall_s", 0.0))
 
     if config.record_video and hasattr(conn, "save_video"):
         video_path = str(trial_dir / "video.mp4")
@@ -645,6 +694,15 @@ def run_trial_on_worker(state: WorkerState, item: WorkItem) -> TrialResult:
             )
 
     trial_result.duration_secs = time.monotonic() - start_time
+    # Physical execution: actuator time + non-physics wall (LLM /
+    # planning / perception — the share of the trial that would also
+    # run on a real robot).
+    if trial_result.control_freq > 0:
+        control_s = trial_result.control_steps / trial_result.control_freq
+        compute_s = max(
+            0.0, trial_result.duration_secs - trial_result.sim_physics_wall_s
+        )
+        trial_result.physical_execution_s = control_s + compute_s
     _write_result_json(trial_result, trial_dir)
     return trial_result
 

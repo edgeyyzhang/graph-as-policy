@@ -64,6 +64,10 @@ class TaskResult:
     success_rate: float = 0.0
     completion_rate: float = 0.0
     avg_reward: float = 0.0
+    avg_physical_execution_s: float = 0.0
+    """Mean across trials of the physical-execution estimate."""
+    avg_control_steps: float = 0.0
+    avg_sim_physics_wall_s: float = 0.0
     trial_results: list[TrialResult] = field(default_factory=list)
 
 
@@ -769,6 +773,15 @@ def _aggregate_tasks(
         completion = (
             sum(t.completion_rate for t in trials) / total if total else 0.0
         )
+        avg_physical_execution_s = (
+            sum(t.physical_execution_s for t in trials) / total if total else 0.0
+        )
+        avg_control_steps = (
+            sum(t.control_steps for t in trials) / total if total else 0.0
+        )
+        avg_sim_physics_wall_s = (
+            sum(t.sim_physics_wall_s for t in trials) / total if total else 0.0
+        )
 
         tr = TaskResult(
             task_id=task_id,
@@ -777,6 +790,9 @@ def _aggregate_tasks(
             success_rate=successes / total if total else 0.0,
             completion_rate=completion,
             avg_reward=avg_reward,
+            avg_physical_execution_s=avg_physical_execution_s,
+            avg_control_steps=avg_control_steps,
+            avg_sim_physics_wall_s=avg_sim_physics_wall_s,
             trial_results=trials,
         )
         task_results.append(tr)

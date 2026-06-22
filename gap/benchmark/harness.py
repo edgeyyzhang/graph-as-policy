@@ -71,6 +71,10 @@ class BenchmarkSummary:
     """Trial-weighted completion rate over every scored cell."""
     n_trials: int = 0
     n_success: int = 0
+    avg_physical_execution_s: float = 0.0
+    """Trial-weighted mean of the physical-execution estimate over every
+    scored cell. Zero when no cell reported latency (real-robot suites,
+    non-LIBERO envs)."""
     run_dir: Path | None = None
     cells: list[ModeResult] = field(default_factory=list)
     summary: dict[str, Any] = field(default_factory=dict)
@@ -488,6 +492,10 @@ async def run_benchmark(
         sum(c.completion_rate * c.n_trials for c in cells) / n_trials
         if n_trials else 0.0
     )
+    avg_physical_execution_s = (
+        sum(c.avg_physical_execution_s * c.n_trials for c in cells) / n_trials
+        if n_trials else 0.0
+    )
     errored = [c for c in cells if c.error]
     ok = True
     if gate:
@@ -510,6 +518,7 @@ async def run_benchmark(
         completion_rate=completion_rate,
         n_trials=n_trials,
         n_success=n_success,
+        avg_physical_execution_s=avg_physical_execution_s,
         run_dir=run_dir,
         cells=cells,
         summary=summary,

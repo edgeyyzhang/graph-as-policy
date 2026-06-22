@@ -46,6 +46,14 @@ class ModeResult:
     wall_clock_s: float = 0.0
     produce_wall_s: float = 0.0
     eval_wall_s: float = 0.0
+    avg_physical_execution_s: float = 0.0
+    """Trial-weighted mean of the physical-execution estimate (s).
+    ``control_steps / control_freq + non-physics wall``; mirrors what
+    real hardware would take. Zero when the env didn't report latency."""
+    avg_control_steps: float = 0.0
+    """Trial-weighted mean of cumulative env steps per trial."""
+    avg_sim_physics_wall_s: float = 0.0
+    """Trial-weighted mean of wall time spent inside ``env.step``."""
     out_dir: str = ""
     error: str | None = None
     # [{task_id, success_rate, completion_rate, avg_reward, n_trials, n_success}]
@@ -83,10 +91,30 @@ def normalize_task_results(
         avg_reward = (
             sum(t.avg_reward * t.total_trials for t in task_results) / n_trials
         )
+        avg_physical_execution_s = (
+            sum(
+                t.avg_physical_execution_s * t.total_trials
+                for t in task_results
+            )
+            / n_trials
+        )
+        avg_control_steps = (
+            sum(t.avg_control_steps * t.total_trials for t in task_results)
+            / n_trials
+        )
+        avg_sim_physics_wall_s = (
+            sum(
+                t.avg_sim_physics_wall_s * t.total_trials for t in task_results
+            )
+            / n_trials
+        )
     else:
         success_rate = 0.0
         completion_rate = 0.0
         avg_reward = 0.0
+        avg_physical_execution_s = 0.0
+        avg_control_steps = 0.0
+        avg_sim_physics_wall_s = 0.0
     return ModeResult(
         mode=mode,
         family=family,
@@ -101,6 +129,9 @@ def normalize_task_results(
         wall_clock_s=produce_wall_s + eval_wall_s,
         produce_wall_s=produce_wall_s,
         eval_wall_s=eval_wall_s,
+        avg_physical_execution_s=avg_physical_execution_s,
+        avg_control_steps=avg_control_steps,
+        avg_sim_physics_wall_s=avg_sim_physics_wall_s,
         out_dir=out_dir,
         error=error,
         per_task=[
@@ -109,6 +140,9 @@ def normalize_task_results(
                 "success_rate": t.success_rate,
                 "completion_rate": t.completion_rate,
                 "avg_reward": t.avg_reward,
+                "avg_physical_execution_s": t.avg_physical_execution_s,
+                "avg_control_steps": t.avg_control_steps,
+                "avg_sim_physics_wall_s": t.avg_sim_physics_wall_s,
                 "n_trials": t.total_trials,
                 "n_success": t.success_count,
             }
@@ -172,6 +206,21 @@ def merge_cells(task_cells: list[ModeResult]) -> ModeResult:
         if n_trials
         else 0.0
     )
+    avg_physical_execution_s = (
+        sum(c.avg_physical_execution_s * c.n_trials for c in scored) / n_trials
+        if n_trials
+        else 0.0
+    )
+    avg_control_steps = (
+        sum(c.avg_control_steps * c.n_trials for c in scored) / n_trials
+        if n_trials
+        else 0.0
+    )
+    avg_sim_physics_wall_s = (
+        sum(c.avg_sim_physics_wall_s * c.n_trials for c in scored) / n_trials
+        if n_trials
+        else 0.0
+    )
     per_task: list[dict[str, Any]] = []
     for c in scored:
         per_task.extend(c.per_task)
@@ -188,6 +237,9 @@ def merge_cells(task_cells: list[ModeResult]) -> ModeResult:
         wall_clock_s=sum(c.wall_clock_s for c in task_cells),
         produce_wall_s=sum(c.produce_wall_s for c in task_cells),
         eval_wall_s=sum(c.eval_wall_s for c in task_cells),
+        avg_physical_execution_s=avg_physical_execution_s,
+        avg_control_steps=avg_control_steps,
+        avg_sim_physics_wall_s=avg_sim_physics_wall_s,
         out_dir=head.out_dir,
         # Partial task failures do NOT mark the whole cell errored — it
         # still has scored tasks and a meaningful success_rate.
@@ -258,6 +310,9 @@ def build_summary(
                 "n_success",
                 "n_trials",
                 "wall_clock_s",
+                "avg_physical_execution_s",
+                "avg_control_steps",
+                "avg_sim_physics_wall_s",
                 "error",
             ]
         )
@@ -278,6 +333,9 @@ def build_summary(
                     c.n_success,
                     c.n_trials,
                     f"{c.wall_clock_s:.1f}",
+                    f"{c.avg_physical_execution_s:.2f}",
+                    f"{c.avg_control_steps:.1f}",
+                    f"{c.avg_sim_physics_wall_s:.2f}",
                     c.error or "",
                 ]
             )

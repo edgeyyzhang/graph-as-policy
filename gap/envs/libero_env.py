@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Any
 
 import numpy as np
@@ -81,6 +82,17 @@ class FrankaLiberoEnv(BaseEnv):
         # State tracking
         self._step_count = 0
         self._sim_step_count = 0
+        self._sim_physics_wall_s = 0.0
+        self._command_count = 0
+        """Unique actuator commands issued — bumped once per ``step``,
+        ``apply_policy_action``, or ``move_to_joints_blocking`` call.
+        Decoupled from ``_sim_step_count`` (which also counts closed-loop
+        tracking iterations and ``_step_once`` settles) so latency can
+        report what a real robot at the same control rate would have
+        sent. Real-robot motion time ≈ ``_command_count / control_freq``."""
+        self._reset_step_baseline = 0
+        self._reset_phys_baseline = 0.0
+        self._reset_command_baseline = 0
         self._control_freq = control_freq
         self._rng = np.random.default_rng(self.seed)
         self._current_obs = None
@@ -230,6 +242,7 @@ class FrankaLiberoEnv(BaseEnv):
 
         self._step_count = 0
         self._sim_step_count = 0
+        self._sim_physics_wall_s = 0.0
 
         self._current_joints = self.handle.env.sim.data.qpos[:7].copy()
         self.home_joint_position = np.array(
@@ -246,6 +259,15 @@ class FrankaLiberoEnv(BaseEnv):
         for _ in range(40):
             self._step_once()
 
+        # Latency baseline: the 40 settle steps above are sim warmup,
+        # not actuator commands the policy issued — exclude them from
+        # ``get_latency_info``. We don't zero ``_sim_step_count`` here
+        # because ``max_steps`` truncation + ``get_current_time_s`` and
+        # frame-recording downstream all read the legacy counter.
+        self._reset_step_baseline = self._sim_step_count
+        self._reset_phys_baseline = self._sim_physics_wall_s
+        self._reset_command_baseline = self._command_count
+
         obs = self.get_observation()
         self.gripper_link_wxyz_xyz = np.concatenate([
             self.handle.env.sim.data.xquat[self.gripper_link_idx],
@@ -260,9 +282,12 @@ class FrankaLiberoEnv(BaseEnv):
     ) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
         """Step the simulation with the given action."""
         self._step_count += 1
+        self._command_count += 1
+        _t0 = time.perf_counter()
         self._current_obs, self._current_reward, self._current_done, self._current_info = (
             self.handle.step(action)
         )
+        self._sim_physics_wall_s += time.perf_counter() - _t0
         self._sim_step_count += 1
         self.gripper_link_wxyz_xyz = np.concatenate([
             self.handle.env.sim.data.xquat[self.gripper_link_idx],
@@ -274,7 +299,34 @@ class FrankaLiberoEnv(BaseEnv):
         reward = self.compute_reward()
         terminated = bool(self._current_done)
         truncated = self._sim_step_count >= self.max_steps
-        return obs, reward, terminated, truncated, {}
+        info: dict[str, Any] = dict(self._current_info or {})
+        info["reward"] = float(reward)
+        info.update(self.get_latency_info())
+        return obs, reward, terminated, truncated, info
+
+    def get_latency_info(self) -> dict[str, Any]:
+        """Cumulative episode latency since the last :meth:`reset`.
+
+        ``control_steps`` counts unique high-level actuator commands —
+        one per ``step``, ``apply_policy_action``, or
+        ``move_to_joints_blocking`` call. NOT the closed-loop tracking
+        iterations a sim controller spins through to converge (those
+        live in ``_sim_step_count``). On a real Franka with the same
+        control rate, that count IS what gets sent to the actuator, so
+        ``control_steps / control_freq`` is the real-robot motion time.
+
+        Pair with the run's total wall time (outside this env) to derive
+        ``compute_overhead = total_wall − sim_physics_wall`` and
+        ``physical_execution = control_steps / control_freq +
+        compute_overhead``.
+        """
+        return {
+            "control_steps": int(self._command_count - self._reset_command_baseline),
+            "control_freq": float(self._control_freq),
+            "sim_physics_wall_s": float(
+                self._sim_physics_wall_s - self._reset_phys_baseline
+            ),
+        }
 
     # ----------------------- Control Interface -----------------------
 
@@ -304,6 +356,11 @@ class FrankaLiberoEnv(BaseEnv):
         """
         target = np.asarray(joints, dtype=np.float64).reshape(7)
         self._current_joints = target
+        # One logical motion command per call. The closed-loop branch
+        # below may iterate many ``handle.step`` calls to converge, but
+        # those are sim-controller tracking — a real Franka at the same
+        # control rate gets sent ONE waypoint command here.
+        self._command_count += 1
 
         # Teleport is only safe when the hand is empty. Once the gripper has
         # closed on something (``_gripper_fraction`` near 0 = closed), a qpos
@@ -353,9 +410,11 @@ class FrankaLiberoEnv(BaseEnv):
             normalized = np.clip((target - current) / output_max, -1.0, 1.0)
             gripper_cmd = 1.0 - self._gripper_fraction * 2.0
             action = np.concatenate([normalized, [gripper_cmd]])
+            _t0 = time.perf_counter()
             self._current_obs, self._current_reward, self._current_done, self._current_info = (
                 self.handle.step(action)
             )
+            self._sim_physics_wall_s += time.perf_counter() - _t0
             self._sim_step_count += 1
             self.gripper_link_wxyz_xyz = np.concatenate([
                 self.handle.env.sim.data.xquat[self.gripper_link_idx],
@@ -382,9 +441,12 @@ class FrankaLiberoEnv(BaseEnv):
             )
         self._use_controller("osc")
         self._step_count += 1
+        self._command_count += 1
+        _t0 = time.perf_counter()
         self._current_obs, self._current_reward, self._current_done, self._current_info = (
             self.handle.step(a)
         )
+        self._sim_physics_wall_s += time.perf_counter() - _t0
         self._sim_step_count += 1
         # Robosuite OSC convention: action[-1] = -1 → fully open, +1 → closed.
         # Map back to the bridge's open-fraction representation so
@@ -413,10 +475,19 @@ class FrankaLiberoEnv(BaseEnv):
         action = np.zeros(action_dim, dtype=np.float64)
         action[-1] = 1.0 - self._gripper_fraction * 2.0
 
+        _t0 = time.perf_counter()
         self._current_obs, self._current_reward, self._current_done, self._current_info = (
             self.handle.step(action)
         )
+        self._sim_physics_wall_s += time.perf_counter() - _t0
         self._sim_step_count += 1
+        # Settle / hold-pose cycles ARE control commands at 20 Hz on a
+        # real robot (gripper open/close + post-move dampers all spin
+        # the inner loop while no arm waypoint moves). Closed-loop
+        # tracking inside ``move_to_joints_blocking`` bypasses
+        # ``_step_once`` — it calls ``handle.step`` directly — so those
+        # convergence iterations are NOT counted here.
+        self._command_count += 1
 
         self.gripper_link_wxyz_xyz = np.concatenate([
             self.handle.env.sim.data.xquat[self.gripper_link_idx],
@@ -623,12 +694,17 @@ class FrankaLiberoEnv(BaseEnv):
     def _record_frame(self) -> None:
         if not self._record_frames:
             return
+        # MuJoCo offscreen render: ~tens of ms per call on GPU. Sim-only
+        # work (a real robot uses real cameras), so attribute to
+        # ``sim_physics_wall_s`` so compute_overhead doesn't double-count it.
+        _t0 = time.perf_counter()
         frame = self.handle.env.sim.render(
             camera_name="agentview",
             width=self._render_width,
             height=self._render_height,
             depth=False,
         )
+        self._sim_physics_wall_s += time.perf_counter() - _t0
         self._frame_buffer.append(frame[::-1])
 
     def render(
@@ -636,12 +712,14 @@ class FrankaLiberoEnv(BaseEnv):
     ) -> np.ndarray:
         if mode != "rgb_array":
             raise ValueError("Only rgb_array render mode is supported")
+        _t0 = time.perf_counter()
         frame = self.handle.env.sim.render(
             camera_name=camera_name,
             width=self._render_width,
             height=self._render_height,
             depth=False,
         )
+        self._sim_physics_wall_s += time.perf_counter() - _t0
         return frame[::-1]
 
 

@@ -569,7 +569,14 @@ class Connector:
         done = getattr(self.env, "_current_done", False)
         truncated = self.env._sim_step_count >= self.env.max_steps
         self._emit_step(None, obs, float(reward or 0.0), bool(done))
-        return obs, reward, bool(done), truncated, {}
+        info: dict = {}
+        latency_fn = getattr(self.env, "get_latency_info", None)
+        if latency_fn is not None:
+            try:
+                info.update(latency_fn())
+            except Exception:
+                pass
+        return obs, reward, bool(done), truncated, info
 
     def set_gripper(self, fraction: float, arm_id: int = 0) -> None:
         """Set gripper open fraction (0 closed, 1 open). Local call."""

@@ -89,6 +89,10 @@ def _handle(args: argparse.Namespace) -> int:
         f"(success_rate={summary.success_rate:.4f}, "
         f"completion_rate={summary.completion_rate:.4f})"
     )
+    if summary.avg_physical_execution_s > 0:
+        print(
+            f"avg physical execution: {summary.avg_physical_execution_s:.2f} s/trial"
+        )
     if summary.run_dir is not None:
         print(f"summary: {summary.run_dir / 'summary.tsv'}")
     if args.gate:
