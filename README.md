@@ -14,7 +14,6 @@ not just solve once. It compiles a natural-language task into a typed, verified
 computation graph of modular skills, self-improves it in simulation, and runs
 the graph — not a black-box policy — on simulators and real robots.
 
-[![Status: beta](https://img.shields.io/badge/status-beta-f59e0b.svg)](https://graph-robots.github.io/graph-as-policy/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![Skills: open-robot-skills](https://img.shields.io/badge/skills-open--robot--skills-orange.svg)](https://github.com/graph-robots/open-robot-skills)
