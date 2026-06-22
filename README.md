@@ -46,20 +46,6 @@ Skills live in the sibling
 repo (Anthropic Agent Skills format, contributable) and are discovered
 by path — clone the two repos side by side and every command finds them.
 
-## Why GaP
-
-- **Language → typed graph.** A coordinator → subgraph-agents →
-  checkpoint-agent pipeline compiles one instruction into a validated
-  workflow of skills, with a script-fix loop on validation errors.
-- **Verified, not hoped.** LLM-authored postcondition checkpoints are
-  enforced against simulator ground truth at every subgraph exit.
-- **Skills are contributable.** Strategies and model tools live in
-  [open-robot-skills](https://github.com/graph-robots/open-robot-skills)
-  as Agent Skills bundles — one directory, one PR. The LLM composes them; you can too.
-- **Per-bundle isolation, no monolith venv.** Each tool bundle (sam3, cuRobo,
-  vlm, openpi, …) runs in its own venv via stdio-msgpack RPC. The engine
-  stays ~150 MB; heavy ML stacks don't fight each other.
-
 ## Quickstart
 
 **Requirements:** **1× NVIDIA RTX 4090 (≥24 GB VRAM, Linux + EGL)**, an
@@ -114,7 +100,6 @@ media in **[examples/README.md](examples/README.md)**. Real-robot examples
 Full docs site: **<https://graph-robots.github.io/graph-as-policy/>**
 
 - [Quickstart (15-min tour)](https://graph-robots.github.io/graph-as-policy/getting-started/quickstart.html) — clone → run → generate → trace
-- [Architecture](https://graph-robots.github.io/graph-as-policy/developers/architecture.html) — engine + skills split; tools vs. skills
 - [Runtime & schema](https://graph-robots.github.io/graph-as-policy/reference/workflow-schema.html) — workflow JSON, executor semantics, checkpoints
 - [Skill authoring](https://graph-robots.github.io/graph-as-policy/skills/authoring-bundles.html) — Agent Skills format, `gap.requires:` frontmatter
 - [LLM providers](https://graph-robots.github.io/graph-as-policy/authoring/llm-providers.html) — anthropic / openai / vertex

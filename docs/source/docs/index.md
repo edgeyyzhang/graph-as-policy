@@ -206,27 +206,6 @@ One plugin install teaches AI coding agents to drive the whole workflow.
 :::
 ::::
 
-## Why GaP
-
-- 🧭 **Language → typed graph.** A coordinator → subgraph-agents →
-  checkpoint-agent pipeline compiles one instruction into a validated
-  workflow of skills, with a script-fix loop on validation errors.
-- ✅ **Verified, not hoped.** LLM-authored postcondition checkpoints are
-  enforced against simulator ground truth at every subgraph exit.
-- 🧩 **Skills are contributable.** Strategies and model tools live in
-  [open-robot-skills](https://github.com/graph-robots/open-robot-skills) as
-  Agent Skills bundles — one directory, one PR. The LLM composes them; you
-  can too.
-- 📦 **Per-bundle isolation, no monolith venv.** Each tool bundle (sam3,
-  cuRobo, vlm, openpi, …) runs in its own venv via stdio-msgpack RPC; the
-  engine stays ~150 MB. Heavy ML stacks don't fight each other.
-- 🔍 **The trace is the product.** Every run records `workflow.json`,
-  `dag_trace.json`, per-node I/O and assets; `gap viz` browses them,
-  `gap trace-diff` compares them.
-- 📊 **Benchmarked with a gate.** A grid harness with `--gate`: the
-  grocery-fulfillment acceptance config must clear **≥90% success** for a
-  release.
-
 ## Two ways in
 
 GaP runs the same workflow artifact however you produce it — by hand or
@@ -244,33 +223,6 @@ from language:
   postcondition checkpoints enforced at every subgraph exit.
 - **[Release gate](../examples/benchmark.md)** — a grid harness with
   `--gate` for batch evaluation across modes × families × seeds.
-
-## Architecture
-
-```text
-┌────────────────────────── gap (engine) ──────────────────────────┐
-│ agent/      instruction ─► coordinator ─► subgraph agents        │
-│             ─► checkpoint agent ─► validate / fix ─► graph       │
-│ runtime/    executor (super-steps, streaming, Send), validator,  │
-│             tracing, policy loop, verify/ (World, checkpoints)   │
-│ tools/      ToolRegistry: typed schemas, tags→guards, dispatch   │
-│ connector/  sim()/real(), env registry, in-process pyroki IK,    │
-│             rr_launcher, data collector                          │
-│ envs/       libero (+perturbed), franka_real, ur_zed, msgpack    │
-│ benchmark/  grid harness (modes × families × seeds), --gate      │
-│ viz/        FastAPI+React trial browser, replay3d, PDF render    │
-└──────────────┬───────────────────────────────▲───────────────────┘
-               │ discovers (by path)           │ registers tools
-        ┌──────▼───────────────────────────────┴──────┐
-        │ open-robot-skills (Agent Skills format)     │
-        │ tools/   sam3, grounding-dino, gemini-er,   │
-        │          molmo, vlm, curobo, geometry       │
-        │ skills/  perceiving-*, grasping-*,          │
-        │          transporting-objects,              │
-        │          tracking-objects, pi05-libero,     │
-        │          molmoact-libero                    │
-        └─────────────────────────────────────────────┘
-```
 
 Read more in [Overview](../getting-started/overview.md), or jump straight to
 [Installation](../getting-started/installation.md).
