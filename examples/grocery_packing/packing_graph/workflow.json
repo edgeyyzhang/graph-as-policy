@@ -346,8 +346,7 @@
               "$ref": "exterior_view.cameras"
             },
             "object_name": "grocery item",
-            "object_description": "a packaged grocery product such as a can, box, carton, jar, or bottle. Never the wicker basket or storage container that the items are being packed into.",
-            "reject_unverified": true
+            "object_description": "a packaged grocery product such as a can, box, carton, jar, or bottle. Never the wicker basket or storage container that the items are being packed into."
           },
           "script": "scripts/perceive_dino_vlm.py"
         },

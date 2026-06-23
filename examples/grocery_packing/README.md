@@ -1,34 +1,28 @@
 # grocery_packing — pack EVERY object into the basket with a loop
 
-> **What:** A pick-and-place graph with a real **backward edge** — loop until the table is clear · **Needs:** `uv sync` to build · **Time:** ~1 min
+> **What:** a pick-and-place graph with a real **backward edge** — loop until
+> every grocery item is in the basket · **Artifact:** a static `workflow.json`
+> (v3) you run directly.
 
 Where [build_a_graph](../build_a_graph/) picks one described object, this
-example **loops**: perceive the next object, grasp it with the planner recipe,
-transport it into the basket, then route **back** to perception and repeat —
-until perception reports nothing left. It is authored with the same
-`gap.builder` pipeline (the identical `workflow.json` + `scripts/` +
-`checkpoints/` layout, the same parser/validation, the same `gap run` /
-`gap.execute`).
+example **loops**: perceive the next object on the table, grasp it with the
+planner recipe, transport it into the basket, then route **back** to perception
+and repeat — until the benchmark reports every item delivered.
 
-```bash
-uv run python examples/grocery_packing/build_graph.py --out my_packing   # build + validate
-```
-
-leaves a runnable artifact:
+This is a self-contained static graph: `packing_graph/workflow.json` plus the
+`scripts/` it references. There is no build step — load and run it like any
+other v3 graph.
 
 ```
-my_packing/
-├── workflow.json              # the v3 graph (4 subgraphs + done/abort ends)
-├── scripts/                   # canonical bundle scripts, copied verbatim
-│   ├── perceive_dino_vlm.py   #   from the open-robot-skills checkout
-│   ├── compute_drop_pose.py
-│   ├── waypoint_move.py
-│   ├── descend_release.py
-│   └── route_next_object.py   # NEW: loop control (item → grasp, only-basket → done)
-└── checkpoints/
-    ├── container_sg.py        # ground-truth basket-localization gate (validate=True)
-    ├── grasp_sg.py            # per-iteration grasp probe
-    └── transport_sg.py        # per-iteration placement probe
+packing_graph/
+├── workflow.json            # the v3 graph: 4 subgraphs + done/abort ends
+└── scripts/
+    ├── perceive_dino_vlm.py # DINO + VLM tournament + SAM3 → world-frame cloud
+    ├── exterior_view.py     # keep only the agentview cam (drop the wrist)
+    ├── route_next_object.py # loop control: all-packed → done, else found/none
+    ├── grasp_move.py        # VAB-style grasp approach (rise → XY → straight-Z)
+    ├── transport_move.py    # VAB-style transport into the basket (straight-Z)
+    └── place_release.py     # open gripper + linear retract
 ```
 
 ## The loop
@@ -38,89 +32,98 @@ START → container ──found──→ perceive_next ──found──→ gras
                   │             │  │ none                 │ failed          │ placed │
         not_found │             │  ↓                      ↓                 │ blocked│
                   ↓             │ done  ←──────────────── abort ←───────────┘        │
-                abort           │ (open gripper, go home)                            │
+                abort           │ (clean success exit)                              │
                                 └────────────────── perceive_next ←─────────────────┘
                                           THE BACKWARD EDGE (transport → perceive_next)
 ```
 
-- **container_sg** (`perceiving-objects`) runs **once** and localizes the
-  basket (`container_obb`).
-- **perceive_next_sg** (`perceiving-objects`) is the **loop head**:
-  `robot.get_observation` → DINO+VLM+SAM3 → a `router`. It perceives a
-  **`"grocery item"`** (the *class*, not a single described object), which is
-  load-bearing: `perceive_dino_vlm` runs a VLM pairwise tournament that keeps
-  the crop better matching the prompt, and a real item beats the basket on
-  "which is the grocery item?" every time — so it returns the basket **only**
-  once every item has been packed and teleported away. The router (which is
-  also handed the once-perceived `container_obb`) turns that into the loop's
-  stop signal: a perceived target sitting inside the basket's XY footprint
-  means the table is clear → exit `none`; otherwise → fit the OBB and exit
-  `found` (grasp it). A bare `"object"` prompt breaks both halves — the
-  tournament ranks the basket as just another "object", so perception grasps
-  the basket and the loop never terminates. Gating the OBB fit behind `found`
-  keeps an empty point cloud away from `geometry.filter_and_compute_obb`, and
-  `none` is a normal exit (not `on_error`), so finishing never looks like a
-  failure.
-- **grasp_sg** and **transport_sg** mirror the simplified grocery_fulfillment
-  recipes: a **planner-free** direct top-down grasp
-  (`top_down_grasp_candidates → robot.go_to_pose(z_approach=0.1) → close`),
-  then drop-pose + lift/lateral move + release. The direct grasp avoids the
-  CuRobo per-candidate planning that can stall on awkward objects.
-- **transport → perceive_next** is a genuine cycle. The executor treats a
-  conditional edge that resolves to an already-completed node as a loop: it
-  resets the loop body (`perceive_next`, `grasp`, `transport`) and re-runs it.
-  Because the cross-subgraph store keeps the most-recent producer, each
-  iteration grasps the freshly-perceived `target_obb` while the once-perceived
-  `container_obb` stays fixed. `node_visit_cap` bounds runaway loops. See
-  `docs/runtime.md` §7.2.
+`transport --placed--> perceive_next` is a genuine cycle. The executor treats a
+conditional edge that resolves to an already-completed node as a loop: it resets
+the loop body (`perceive_next`, `grasp`, `transport`) and re-runs it. The
+cross-subgraph store keeps the most-recent producer, so each iteration grasps
+the freshly-perceived `target_obb` while the once-perceived `container_obb`
+stays fixed. `GAP_ITERATION_CAP` bounds runaway loops. See `docs/runtime.md`
+§7.2 for the back-edge semantics.
+
+## The subgraphs
+
+- **container_sg** (`perceiving-objects`) runs **once** and localizes the basket
+  (`container_obb`): `get_observation → exterior_view → perceive("basket") →
+  filter_and_compute_obb`.
+
+- **perceive_next_sg** is the **loop head**: `get_observation → exterior_view →
+  perceive("grocery item") → decide`. Two things keep it honest:
+  - The perceive node passes an `object_description` — *"a packaged grocery
+    product such as a can, box, carton, jar, or bottle; never the wicker basket
+    or storage container"* — so the VLM pairwise tournament prefers a real item
+    over the basket whenever one is on the table.
+  - `decide` (`route_next_object.py`) is the loop's stop signal, and it is
+    **driven by the benchmark, not geometry** (see below).
+
+- **grasp_sg** — `open → top_down_grasp_candidates → grasp_move → observe →
+  close`. `grasp_move.py` is the **VAB approach recipe**: rise to a hover height
+  (straight-line cartesian), translate in XY over the object (cartesian), then
+  descend straight down onto it with cuRobo's **axis-constrained** linear plan
+  (`plan_directed_linear`, `allowed_axes=["Z"]`, `orientation_mode="LOCK"`) — a
+  guaranteed vertical drop, not a curved IK path.
+
+- **transport_sg** — `transport_move → release`. `transport_move.py` lifts,
+  translates in XY over the basket, then does the same axis-locked straight-Z
+  descend *into* the basket; `place_release.py` opens the gripper and retracts
+  linearly.
+
+## Termination — the benchmark's own completion signal
+
+The VAB packing env teleports each delivered item to a graveyard and flips
+`task_completed` once everything is packed. `route_next_object.py` reads that
+directly via the `sim.check_success` tool:
+
+1. `sim.check_success().task_completed` is True → **`none` → done (success)** —
+   authoritative, no false-rejects, so the loop never spins on the basket after
+   the table is clear and never stops early while items remain.
+2. otherwise route on perception: an item was returned → `found` (grasp it);
+   nothing → `none`.
+
+The `sim.check_success` call is wrapped so a non-sim connector (real robot)
+falls back to perception cleanly. `none` is a normal exit (not `on_error`), so
+finishing never looks like a failure.
 
 ## The packing benchmark (teleport-on-delivery)
 
 The default task is the **Variational-Automation-Benchmark** pack-all suite
-(`libero_object_packing`), whose env (`VABControlEnv`) implements
-**teleport-on-In monotonic delivery**: the moment an object settles inside the
-basket, the `pack_all_into` predicate marks it *delivered* and the env
-**teleports it to a graveyard pose** (out of the scene). It scores
-`completion_rate = delivered / total`.
-
-This is what makes the loop well-defined: each delivered object disappears from
-the table, so the next `perceive_next` finds the *next* object, and when the
-table is clear perception returns nothing → `none → done`. The graph stays a
-pure policy (perceive / grasp / transport); the *benchmark* owns the teleport
-and the score. For a scored grid, run the `grocery_packing` benchmark family
-(`object` = single-In, `permutation` = full-table conjunction).
-
-## Assumptions & limitations
-
-- **Checkpoints.** The per-iteration `grasp_sg` / `transport_sg` and the
-  `container_sg` checkpoints are **probes** (`validate=False`) — the authoritative
-  packing metric is the env's `completion_rate`, not body-name ground truth.
-  (Note: once an object is delivered it is teleported to the graveyard, so a
-  `body(name).is_in(basket)` probe reads False afterwards — another reason these
-  are probes, not gates.)
+(`libero_object_packing`). The moment an object settles inside the basket, the
+`pack_all_into` predicate marks it *delivered* and the env **teleports it to a
+graveyard pose** (out of the scene), scoring `completion_rate = delivered /
+total`. Each delivered object disappears from the table, so the next
+`perceive_next` finds the *next* object; when all are packed `task_completed`
+fires and the loop exits. The graph stays a pure policy (perceive / grasp /
+transport); the *benchmark* owns the teleport and the score.
 
 ## Execute it
 
-Same requirements as grocery_fulfillment (`uv sync --extra grocery` for CuRobo,
-downloaded weights, a VLM credential) **plus** the executor's back-edge support
-(in this checkout):
+Needs the `perceiving-objects` weights, CuRobo (`uv sync --extra grocery`), a
+VLM credential, and the executor's back-edge support (in this checkout):
 
 ```bash
-# Runs against the VAB pack-all suite by default; --video records an mp4.
-MUJOCO_GL=egl uv run python examples/grocery_packing/build_graph.py \
-    --out my_packing --execute --video my_packing.mp4
-# or run the built artifact directly:
-MUJOCO_GL=egl uv run gap run my_packing --sim libero_object_packing/0
+# Runs against the VAB pack-all suite; records an mp4.
+MUJOCO_GL=egl uv run gap run examples/grocery_packing/packing_graph \
+    --sim libero_object_packing/0 --video packing.mp4
 uv run gap viz     # browse the recorded trace — perceive_next is visited once per object
 ```
 
-The open-robot-skills checkout is auto-discovered (`$GAP_SKILLS_PATH` or the
-sibling checkout); pass `--skills /path/to/open-robot-skills` to override.
+The `open-robot-skills` checkout is auto-discovered (`$GAP_SKILLS_PATH` or the
+sibling checkout); pass `--skills /path/to/open-robot-skills` to override. The
+VLM provider/model come from `GAP_VLM_PROVIDER` / `GAP_VLM_MODEL` (+ the
+provider's credentials).
+
+On the default `seed=3` arrangement this delivers all six items
+(`completion_rate = 1.0`) and exits cleanly the iteration after the last
+delivery.
 
 ## Where to go next
 
 - [build_a_graph](../build_a_graph/) — the single-object version of this graph.
 - [grocery_fulfillment](../grocery_fulfillment/) — the LLM-generated acceptance
-  benchmark whose grasp/transport recipes this example reuses.
+  benchmark whose grasp/transport recipes this example mirrors.
 - `docs/runtime.md` §7.2 — the loop (backward-edge) semantics the executor
   implements.
