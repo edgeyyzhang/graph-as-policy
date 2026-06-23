@@ -19,12 +19,12 @@ the graph — not a black-box policy — on simulators and real robots.
 [![Skills: open-robot-skills](https://img.shields.io/badge/skills-open--robot--skills-orange.svg)](https://github.com/graph-robots/open-robot-skills)
 [![Docs](https://img.shields.io/badge/docs-quickstart-0f766e.svg)](https://graph-robots.github.io/graph-as-policy/getting-started/quickstart.html)
 
-<video src="docs/assets/grocery_packing_real.mp4"
-       autoplay loop muted playsinline width="640"></video>
+![GaP on real robots — grocery packing, popcorn, tool packing, USB-C insertion](docs/assets/real_robots_strip.gif)
 
-<sub>Franka arm packing varied grocery items — graph generated from
-"pack the basket with the items on the table", refined in sim, run on
-the real robot. (10× speed.)</sub>
+<sub>GaP running on real robots — graphs generated from natural-language
+tasks, refined in sim, executed on hardware. Left→right: grocery packing
+(Franka, 10×), popcorn (long-horizon stove manipulation, 16×), tool & charger
+packing into tagged bins, and USB-C insertion (UR5 with force feedback).</sub>
 
 </div>
 
