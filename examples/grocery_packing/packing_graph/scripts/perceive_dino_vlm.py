@@ -560,6 +560,7 @@ def run(
     text_threshold: float = 0.20,
     dino_prompt: str = "object.",
     object_description: str = "",
+    reject_unverified: bool = False,
 ) -> Output:
     """Execute DINO+VLM perception with the `safe` wrist-fallback gate.
 
@@ -593,6 +594,7 @@ def run(
             "text_threshold": text_threshold,
             "dino_prompt": dino_prompt,
             "object_description": object_description,
+            "reject_unverified": reject_unverified,
         })
         hit = _cache_load(cache_key)
         if hit is not None:
@@ -604,7 +606,7 @@ def run(
     out = _run_uncached(
         ctx, cameras, object_name, text_prompts, min_points, min_score,
         use_multiview, box_threshold, text_threshold, dino_prompt,
-        object_description,
+        object_description, reject_unverified,
     )
     if cache_key is not None and out["found"]:
         _cache_store(cache_key, out)
@@ -623,6 +625,7 @@ def _run_uncached(
     text_threshold: float,
     dino_prompt: str,
     object_description: str,
+    reject_unverified: bool = False,
 ) -> Output:
     """Existing perceive body — kept callable directly for cache-bypass paths."""
     if text_prompts is None:
@@ -657,7 +660,25 @@ def _run_uncached(
     # Non-LIBERO / single-view platforms: keep the historical per-camera
     # behavior unchanged (identify on non-wrist, segment_text on wrist).
     if not wrist_cams or not ext_cams:
-        return _finish([r for _, r in _collect(cameras, None)])
+        results = _collect(cameras, None)
+        # Terminal-reject gate (opt-in via reject_unverified). Run the chosen
+        # pick through the close-up verify using the same object_description
+        # that excludes the basket ("never the wicker basket..."). Once every
+        # item is packed and teleported away, the only candidate left is the
+        # basket itself — it fails the verify, so we report found=False and
+        # the caller's loop exits cleanly on "none" instead of grasping the
+        # basket until the iteration cap. default=True keeps a real pick on
+        # any VLM/infra error, so this never causes a spurious early stop.
+        if reject_unverified and results:
+            bc, br = max(results, key=lambda cr: cr[1].score)
+            if not _verify_pick(ctx, bc["rgb"], br.box,
+                                object_name, object_description, default=True):
+                logger.info(
+                    "single-view terminal-reject: pick failed '%s' verify "
+                    "-> found=False (table clear)", object_name)
+                return {"found": False, "cloud": _empty_cloud(),
+                        "mask": _empty_mask(), "score": 0.0}
+        return _finish([r for _, r in results])
 
     # --- safe gate ---
     ext = _collect(ext_cams, True)
