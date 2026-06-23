@@ -654,6 +654,20 @@ class FrankaLiberoEnv(BaseEnv):
         return self._sim_step_count / self._control_freq
 
     def task_completed(self) -> bool:
+        # Prefer the success the env already computed in step() (cached on
+        # _current_info). Re-invoking handle.env.check_success() RE-EVALUATES
+        # the task predicate, which for stateful predicates is a side effect on
+        # the sim: VAB's pack_all_into teleports every delivered object to a
+        # graveyard pose each time it is evaluated. A loop that polls task
+        # completion each iteration must therefore read the cached verdict, not
+        # trigger a fresh evaluation. Fall back to a live check only when the
+        # env surfaces no cached signal (non-LIBERO predicates).
+        info = self._current_info or {}
+        if "success" in info:
+            return bool(info["success"])
+        cr = info.get("completion_rate")
+        if cr is not None:
+            return float(cr) >= 1.0
         return self.handle.env.check_success()
 
     # ----------------------- Video Capture -----------------------
