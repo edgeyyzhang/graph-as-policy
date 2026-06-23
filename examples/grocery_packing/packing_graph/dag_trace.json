@@ -1,0 +1,4427 @@
+{
+  "nodes": [
+    {
+      "id": "n_0000",
+      "name": "container",
+      "node_type": "subgraph",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0001",
+      "name": "perceive_next",
+      "node_type": "subgraph",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0002",
+      "name": "grasp",
+      "node_type": "subgraph",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0003",
+      "name": "transport",
+      "node_type": "subgraph",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0004",
+      "name": "done",
+      "node_type": "end",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0005",
+      "name": "abort",
+      "node_type": "end",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0006",
+      "name": "container_sg.observe",
+      "node_type": "tool",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 1782192414.7370508,
+      "finished_at": 1782192415.0800195,
+      "duration_ms": 342.97,
+      "status": "ok",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": [
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/output_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/output_cameras_robot0_eye_in_hand_depth_depth.npy"
+      ]
+    },
+    {
+      "id": "n_0007",
+      "name": "container_sg.perceive",
+      "node_type": "script",
+      "service": null,
+      "method": null,
+      "script": "scripts/perceive_dino_vlm.py",
+      "started_at": 1782192415.5574114,
+      "finished_at": 1782192415.7462423,
+      "duration_ms": 188.83,
+      "status": "ok",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": [
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/output_cloud_cloud.npz",
+        "assets/output_mask_mask.png"
+      ]
+    },
+    {
+      "id": "n_0008",
+      "name": "container_sg.filter_obb",
+      "node_type": "tool",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 1782192415.7462797,
+      "finished_at": 1782192418.495972,
+      "duration_ms": 2749.69,
+      "status": "ok",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": [
+        "assets/input_points_cloud.npz"
+      ]
+    },
+    {
+      "id": "n_0009",
+      "name": "container_sg.found",
+      "node_type": "noop",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0010",
+      "name": "container_sg.exterior_view",
+      "node_type": "script",
+      "service": null,
+      "method": null,
+      "script": "scripts/exterior_view.py",
+      "started_at": 1782192415.080055,
+      "finished_at": 1782192415.5573707,
+      "duration_ms": 477.32,
+      "status": "ok",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": [
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/input_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/input_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy"
+      ]
+    },
+    {
+      "id": "n_0011",
+      "name": "grasp_sg.open",
+      "node_type": "tool",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 1782192896.0366328,
+      "finished_at": 1782192422.1744535,
+      "duration_ms": 2682.0,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": []
+    },
+    {
+      "id": "n_0012",
+      "name": "grasp_sg.compute_grasp",
+      "node_type": "tool",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 1782192898.574613,
+      "finished_at": 1782192422.1779985,
+      "duration_ms": 3.49,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": []
+    },
+    {
+      "id": "n_0013",
+      "name": "grasp_sg.goto_grasp",
+      "node_type": "script",
+      "service": null,
+      "method": null,
+      "script": "scripts/grasp_move.py",
+      "started_at": 1782192898.5786445,
+      "finished_at": 1782192480.908837,
+      "duration_ms": 58730.83,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": []
+    },
+    {
+      "id": "n_0014",
+      "name": "grasp_sg.observe",
+      "node_type": "tool",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 1782192936.017588,
+      "finished_at": 1782192481.1803727,
+      "duration_ms": 271.46,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": [
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/output_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/output_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/output_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/output_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/output_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/output_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/output_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/output_cameras_robot0_eye_in_hand_depth_depth.npy"
+      ]
+    },
+    {
+      "id": "n_0015",
+      "name": "grasp_sg.close",
+      "node_type": "tool",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 1782192936.275646,
+      "finished_at": 1782192484.836854,
+      "duration_ms": 3656.46,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": []
+    },
+    {
+      "id": "n_0016",
+      "name": "grasp_sg.grasped",
+      "node_type": "noop",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0017",
+      "name": "transport_sg.transport_move",
+      "node_type": "script",
+      "service": null,
+      "method": null,
+      "script": "scripts/transport_move.py",
+      "started_at": 1782192940.0642533,
+      "finished_at": 1782192532.675764,
+      "duration_ms": 47836.61,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": []
+    },
+    {
+      "id": "n_0018",
+      "name": "transport_sg.release",
+      "node_type": "script",
+      "service": null,
+      "method": null,
+      "script": "scripts/place_release.py",
+      "started_at": 1782192988.4531553,
+      "finished_at": 1782192549.0022502,
+      "duration_ms": 16326.42,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": []
+    },
+    {
+      "id": "n_0019",
+      "name": "transport_sg.placed",
+      "node_type": "noop",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0020",
+      "name": "perceive_next_sg.observe",
+      "node_type": "tool",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 1782193004.0212157,
+      "finished_at": 1782192418.8314269,
+      "duration_ms": 308.86,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": [
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/output_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/output_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/output_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/output_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/output_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/output_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/output_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/output_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/output_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/output_cameras_robot0_eye_in_hand_depth_depth.npy"
+      ]
+    },
+    {
+      "id": "n_0021",
+      "name": "perceive_next_sg.perceive",
+      "node_type": "script",
+      "service": null,
+      "method": null,
+      "script": "scripts/perceive_dino_vlm.py",
+      "started_at": 1782193004.7817879,
+      "finished_at": 1782192419.459811,
+      "duration_ms": 184.72,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": [
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/output_cloud_cloud.npz",
+        "assets/output_mask_mask.png",
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/output_cloud_cloud.npz",
+        "assets/output_mask_mask.png",
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/output_cloud_cloud.npz",
+        "assets/output_mask_mask.png",
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/output_cloud_cloud.npz",
+        "assets/output_mask_mask.png",
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/output_cloud_cloud.npz",
+        "assets/output_mask_mask.png"
+      ]
+    },
+    {
+      "id": "n_0022",
+      "name": "perceive_next_sg.decide",
+      "node_type": "router",
+      "service": null,
+      "method": null,
+      "script": "scripts/route_next_object.py",
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0023",
+      "name": "perceive_next_sg.filter_obb",
+      "node_type": "tool",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 1782192896.0010552,
+      "finished_at": 1782192419.4922338,
+      "duration_ms": 31.68,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": [
+        "assets/input_points_cloud.npz",
+        "assets/input_points_cloud.npz",
+        "assets/input_points_cloud.npz",
+        "assets/input_points_cloud.npz"
+      ]
+    },
+    {
+      "id": "n_0024",
+      "name": "perceive_next_sg.found",
+      "node_type": "noop",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0025",
+      "name": "perceive_next_sg.none",
+      "node_type": "noop",
+      "service": null,
+      "method": null,
+      "script": null,
+      "started_at": 0.0,
+      "finished_at": 0.0,
+      "duration_ms": 0.0,
+      "status": "pending",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": false,
+      "has_output": false,
+      "assets": []
+    },
+    {
+      "id": "n_0026",
+      "name": "perceive_next_sg.exterior_view",
+      "node_type": "script",
+      "service": null,
+      "method": null,
+      "script": "scripts/exterior_view.py",
+      "started_at": 1782193004.322506,
+      "finished_at": 1782192419.275059,
+      "duration_ms": 443.6,
+      "status": "running",
+      "condition": null,
+      "condition_result": null,
+      "error_message": null,
+      "has_inputs": true,
+      "has_output": true,
+      "assets": [
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/input_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/input_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/input_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/input_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/input_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/input_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/input_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/input_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy",
+        "assets/input_cameras_agentview_rgb_rgb.png",
+        "assets/input_cameras_agentview_depth_depth.npy",
+        "assets/input_cameras_robot0_eye_in_hand_rgb_rgb.png",
+        "assets/input_cameras_robot0_eye_in_hand_depth_depth.npy",
+        "assets/output_cameras_agentview_rgb_rgb.png",
+        "assets/output_cameras_agentview_depth_depth.npy"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "n_0000",
+      "to": "n_0001",
+      "from_id": "n_0000",
+      "to_id": "n_0001",
+      "from_name": "container",
+      "to_name": "perceive_next"
+    },
+    {
+      "from": "n_0000",
+      "to": "n_0005",
+      "from_id": "n_0000",
+      "to_id": "n_0005",
+      "from_name": "container",
+      "to_name": "abort"
+    },
+    {
+      "from": "n_0001",
+      "to": "n_0002",
+      "from_id": "n_0001",
+      "to_id": "n_0002",
+      "from_name": "perceive_next",
+      "to_name": "grasp"
+    },
+    {
+      "from": "n_0001",
+      "to": "n_0004",
+      "from_id": "n_0001",
+      "to_id": "n_0004",
+      "from_name": "perceive_next",
+      "to_name": "done"
+    },
+    {
+      "from": "n_0001",
+      "to": "n_0005",
+      "from_id": "n_0001",
+      "to_id": "n_0005",
+      "from_name": "perceive_next",
+      "to_name": "abort"
+    },
+    {
+      "from": "n_0002",
+      "to": "n_0003",
+      "from_id": "n_0002",
+      "to_id": "n_0003",
+      "from_name": "grasp",
+      "to_name": "transport"
+    },
+    {
+      "from": "n_0002",
+      "to": "n_0005",
+      "from_id": "n_0002",
+      "to_id": "n_0005",
+      "from_name": "grasp",
+      "to_name": "abort"
+    },
+    {
+      "from": "n_0003",
+      "to": "n_0001",
+      "from_id": "n_0003",
+      "to_id": "n_0001",
+      "from_name": "transport",
+      "to_name": "perceive_next"
+    },
+    {
+      "from": "n_0003",
+      "to": "n_0005",
+      "from_id": "n_0003",
+      "to_id": "n_0005",
+      "from_name": "transport",
+      "to_name": "abort"
+    },
+    {
+      "from": "n_0006",
+      "to": "n_0010",
+      "from_id": "n_0006",
+      "to_id": "n_0010",
+      "from_name": "container_sg.observe",
+      "to_name": "container_sg.exterior_view"
+    },
+    {
+      "from": "n_0010",
+      "to": "n_0007",
+      "from_id": "n_0010",
+      "to_id": "n_0007",
+      "from_name": "container_sg.exterior_view",
+      "to_name": "container_sg.perceive"
+    },
+    {
+      "from": "n_0007",
+      "to": "n_0008",
+      "from_id": "n_0007",
+      "to_id": "n_0008",
+      "from_name": "container_sg.perceive",
+      "to_name": "container_sg.filter_obb"
+    },
+    {
+      "from": "n_0008",
+      "to": "n_0009",
+      "from_id": "n_0008",
+      "to_id": "n_0009",
+      "from_name": "container_sg.filter_obb",
+      "to_name": "container_sg.found"
+    },
+    {
+      "from": "n_0011",
+      "to": "n_0012",
+      "from_id": "n_0011",
+      "to_id": "n_0012",
+      "from_name": "grasp_sg.open",
+      "to_name": "grasp_sg.compute_grasp"
+    },
+    {
+      "from": "n_0012",
+      "to": "n_0013",
+      "from_id": "n_0012",
+      "to_id": "n_0013",
+      "from_name": "grasp_sg.compute_grasp",
+      "to_name": "grasp_sg.goto_grasp"
+    },
+    {
+      "from": "n_0013",
+      "to": "n_0014",
+      "from_id": "n_0013",
+      "to_id": "n_0014",
+      "from_name": "grasp_sg.goto_grasp",
+      "to_name": "grasp_sg.observe"
+    },
+    {
+      "from": "n_0014",
+      "to": "n_0015",
+      "from_id": "n_0014",
+      "to_id": "n_0015",
+      "from_name": "grasp_sg.observe",
+      "to_name": "grasp_sg.close"
+    },
+    {
+      "from": "n_0015",
+      "to": "n_0016",
+      "from_id": "n_0015",
+      "to_id": "n_0016",
+      "from_name": "grasp_sg.close",
+      "to_name": "grasp_sg.grasped"
+    },
+    {
+      "from": "n_0017",
+      "to": "n_0018",
+      "from_id": "n_0017",
+      "to_id": "n_0018",
+      "from_name": "transport_sg.transport_move",
+      "to_name": "transport_sg.release"
+    },
+    {
+      "from": "n_0018",
+      "to": "n_0019",
+      "from_id": "n_0018",
+      "to_id": "n_0019",
+      "from_name": "transport_sg.release",
+      "to_name": "transport_sg.placed"
+    },
+    {
+      "from": "n_0020",
+      "to": "n_0026",
+      "from_id": "n_0020",
+      "to_id": "n_0026",
+      "from_name": "perceive_next_sg.observe",
+      "to_name": "perceive_next_sg.exterior_view"
+    },
+    {
+      "from": "n_0026",
+      "to": "n_0021",
+      "from_id": "n_0026",
+      "to_id": "n_0021",
+      "from_name": "perceive_next_sg.exterior_view",
+      "to_name": "perceive_next_sg.perceive"
+    },
+    {
+      "from": "n_0021",
+      "to": "n_0022",
+      "from_id": "n_0021",
+      "to_id": "n_0022",
+      "from_name": "perceive_next_sg.perceive",
+      "to_name": "perceive_next_sg.decide"
+    },
+    {
+      "from": "n_0023",
+      "to": "n_0024",
+      "from_id": "n_0023",
+      "to_id": "n_0024",
+      "from_name": "perceive_next_sg.filter_obb",
+      "to_name": "perceive_next_sg.found"
+    },
+    {
+      "from": "n_0022",
+      "to": "n_0023",
+      "from_id": "n_0022",
+      "to_id": "n_0023",
+      "from_name": "perceive_next_sg.decide",
+      "to_name": "perceive_next_sg.filter_obb"
+    },
+    {
+      "from": "n_0022",
+      "to": "n_0025",
+      "from_id": "n_0022",
+      "to_id": "n_0025",
+      "from_name": "perceive_next_sg.decide",
+      "to_name": "perceive_next_sg.none"
+    }
+  ],
+  "events": [
+    {
+      "seq": 0,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7341943,
+      "node_id": "n_0000",
+      "node_name": "container",
+      "status": null,
+      "detail": {
+        "node_type": "subgraph"
+      }
+    },
+    {
+      "seq": 1,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7342138,
+      "node_id": "n_0001",
+      "node_name": "perceive_next",
+      "status": null,
+      "detail": {
+        "node_type": "subgraph"
+      }
+    },
+    {
+      "seq": 2,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7342236,
+      "node_id": "n_0002",
+      "node_name": "grasp",
+      "status": null,
+      "detail": {
+        "node_type": "subgraph"
+      }
+    },
+    {
+      "seq": 3,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.734232,
+      "node_id": "n_0003",
+      "node_name": "transport",
+      "status": null,
+      "detail": {
+        "node_type": "subgraph"
+      }
+    },
+    {
+      "seq": 4,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7342415,
+      "node_id": "n_0004",
+      "node_name": "done",
+      "status": null,
+      "detail": {
+        "node_type": "end"
+      }
+    },
+    {
+      "seq": 5,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7342505,
+      "node_id": "n_0005",
+      "node_name": "abort",
+      "status": null,
+      "detail": {
+        "node_type": "end"
+      }
+    },
+    {
+      "seq": 6,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7342715,
+      "node_id": "n_0000",
+      "node_name": "container",
+      "status": null,
+      "detail": {
+        "from_name": "container",
+        "to_name": "perceive_next",
+        "to_id": "n_0001"
+      }
+    },
+    {
+      "seq": 7,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7342813,
+      "node_id": "n_0000",
+      "node_name": "container",
+      "status": null,
+      "detail": {
+        "from_name": "container",
+        "to_name": "abort",
+        "to_id": "n_0005"
+      }
+    },
+    {
+      "seq": 8,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.73429,
+      "node_id": "n_0001",
+      "node_name": "perceive_next",
+      "status": null,
+      "detail": {
+        "from_name": "perceive_next",
+        "to_name": "grasp",
+        "to_id": "n_0002"
+      }
+    },
+    {
+      "seq": 9,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.734296,
+      "node_id": "n_0001",
+      "node_name": "perceive_next",
+      "status": null,
+      "detail": {
+        "from_name": "perceive_next",
+        "to_name": "done",
+        "to_id": "n_0004"
+      }
+    },
+    {
+      "seq": 10,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.734301,
+      "node_id": "n_0001",
+      "node_name": "perceive_next",
+      "status": null,
+      "detail": {
+        "from_name": "perceive_next",
+        "to_name": "abort",
+        "to_id": "n_0005"
+      }
+    },
+    {
+      "seq": 11,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7343063,
+      "node_id": "n_0002",
+      "node_name": "grasp",
+      "status": null,
+      "detail": {
+        "from_name": "grasp",
+        "to_name": "transport",
+        "to_id": "n_0003"
+      }
+    },
+    {
+      "seq": 12,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.734311,
+      "node_id": "n_0002",
+      "node_name": "grasp",
+      "status": null,
+      "detail": {
+        "from_name": "grasp",
+        "to_name": "abort",
+        "to_id": "n_0005"
+      }
+    },
+    {
+      "seq": 13,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7343202,
+      "node_id": "n_0003",
+      "node_name": "transport",
+      "status": null,
+      "detail": {
+        "from_name": "transport",
+        "to_name": "perceive_next",
+        "to_id": "n_0001"
+      }
+    },
+    {
+      "seq": 14,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7343256,
+      "node_id": "n_0003",
+      "node_name": "transport",
+      "status": null,
+      "detail": {
+        "from_name": "transport",
+        "to_name": "abort",
+        "to_id": "n_0005"
+      }
+    },
+    {
+      "seq": 15,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7343388,
+      "node_id": "n_0006",
+      "node_name": "container_sg.observe",
+      "status": null,
+      "detail": {
+        "node_type": "tool"
+      }
+    },
+    {
+      "seq": 16,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7343538,
+      "node_id": "n_0007",
+      "node_name": "container_sg.perceive",
+      "status": null,
+      "detail": {
+        "node_type": "script"
+      }
+    },
+    {
+      "seq": 17,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7343621,
+      "node_id": "n_0008",
+      "node_name": "container_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "node_type": "tool"
+      }
+    },
+    {
+      "seq": 18,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.734369,
+      "node_id": "n_0009",
+      "node_name": "container_sg.found",
+      "status": null,
+      "detail": {
+        "node_type": "noop"
+      }
+    },
+    {
+      "seq": 19,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.734376,
+      "node_id": "n_0010",
+      "node_name": "container_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "node_type": "script"
+      }
+    },
+    {
+      "seq": 20,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7343833,
+      "node_id": "n_0006",
+      "node_name": "container_sg.observe",
+      "status": null,
+      "detail": {
+        "from_name": "container_sg.observe",
+        "to_name": "container_sg.exterior_view",
+        "to_id": "n_0010"
+      }
+    },
+    {
+      "seq": 21,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.734389,
+      "node_id": "n_0010",
+      "node_name": "container_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "from_name": "container_sg.exterior_view",
+        "to_name": "container_sg.perceive",
+        "to_id": "n_0007"
+      }
+    },
+    {
+      "seq": 22,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.734394,
+      "node_id": "n_0007",
+      "node_name": "container_sg.perceive",
+      "status": null,
+      "detail": {
+        "from_name": "container_sg.perceive",
+        "to_name": "container_sg.filter_obb",
+        "to_id": "n_0008"
+      }
+    },
+    {
+      "seq": 23,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.734399,
+      "node_id": "n_0008",
+      "node_name": "container_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "from_name": "container_sg.filter_obb",
+        "to_name": "container_sg.found",
+        "to_id": "n_0009"
+      }
+    },
+    {
+      "seq": 24,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7344081,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": null,
+      "detail": {
+        "node_type": "tool"
+      }
+    },
+    {
+      "seq": 25,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7344146,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": null,
+      "detail": {
+        "node_type": "tool"
+      }
+    },
+    {
+      "seq": 26,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7344205,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "node_type": "script"
+      }
+    },
+    {
+      "seq": 27,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.734427,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": null,
+      "detail": {
+        "node_type": "tool"
+      }
+    },
+    {
+      "seq": 28,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7344341,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": null,
+      "detail": {
+        "node_type": "tool"
+      }
+    },
+    {
+      "seq": 29,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7344415,
+      "node_id": "n_0016",
+      "node_name": "grasp_sg.grasped",
+      "status": null,
+      "detail": {
+        "node_type": "noop"
+      }
+    },
+    {
+      "seq": 30,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.734448,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": null,
+      "detail": {
+        "from_name": "grasp_sg.open",
+        "to_name": "grasp_sg.compute_grasp",
+        "to_id": "n_0012"
+      }
+    },
+    {
+      "seq": 31,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7344635,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": null,
+      "detail": {
+        "from_name": "grasp_sg.compute_grasp",
+        "to_name": "grasp_sg.goto_grasp",
+        "to_id": "n_0013"
+      }
+    },
+    {
+      "seq": 32,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7344687,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "from_name": "grasp_sg.goto_grasp",
+        "to_name": "grasp_sg.observe",
+        "to_id": "n_0014"
+      }
+    },
+    {
+      "seq": 33,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7344747,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": null,
+      "detail": {
+        "from_name": "grasp_sg.observe",
+        "to_name": "grasp_sg.close",
+        "to_id": "n_0015"
+      }
+    },
+    {
+      "seq": 34,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7344801,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": null,
+      "detail": {
+        "from_name": "grasp_sg.close",
+        "to_name": "grasp_sg.grasped",
+        "to_id": "n_0016"
+      }
+    },
+    {
+      "seq": 35,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.734505,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "node_type": "script"
+      }
+    },
+    {
+      "seq": 36,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7345126,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "node_type": "script"
+      }
+    },
+    {
+      "seq": 37,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.734519,
+      "node_id": "n_0019",
+      "node_name": "transport_sg.placed",
+      "status": null,
+      "detail": {
+        "node_type": "noop"
+      }
+    },
+    {
+      "seq": 38,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7345254,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "from_name": "transport_sg.transport_move",
+        "to_name": "transport_sg.release",
+        "to_id": "n_0018"
+      }
+    },
+    {
+      "seq": 39,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7345304,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "from_name": "transport_sg.release",
+        "to_name": "transport_sg.placed",
+        "to_id": "n_0019"
+      }
+    },
+    {
+      "seq": 40,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7345397,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "node_type": "tool"
+      }
+    },
+    {
+      "seq": 41,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7345476,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "node_type": "script"
+      }
+    },
+    {
+      "seq": 42,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7345552,
+      "node_id": "n_0022",
+      "node_name": "perceive_next_sg.decide",
+      "status": null,
+      "detail": {
+        "node_type": "router"
+      }
+    },
+    {
+      "seq": 43,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7345622,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "node_type": "tool"
+      }
+    },
+    {
+      "seq": 44,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.734569,
+      "node_id": "n_0024",
+      "node_name": "perceive_next_sg.found",
+      "status": null,
+      "detail": {
+        "node_type": "noop"
+      }
+    },
+    {
+      "seq": 45,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.734576,
+      "node_id": "n_0025",
+      "node_name": "perceive_next_sg.none",
+      "status": null,
+      "detail": {
+        "node_type": "noop"
+      }
+    },
+    {
+      "seq": 46,
+      "event_type": "node_registered",
+      "timestamp": 1782192414.7345824,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "node_type": "script"
+      }
+    },
+    {
+      "seq": 47,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7345886,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "from_name": "perceive_next_sg.observe",
+        "to_name": "perceive_next_sg.exterior_view",
+        "to_id": "n_0026"
+      }
+    },
+    {
+      "seq": 48,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7345927,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "from_name": "perceive_next_sg.exterior_view",
+        "to_name": "perceive_next_sg.perceive",
+        "to_id": "n_0021"
+      }
+    },
+    {
+      "seq": 49,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7345977,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "from_name": "perceive_next_sg.perceive",
+        "to_name": "perceive_next_sg.decide",
+        "to_id": "n_0022"
+      }
+    },
+    {
+      "seq": 50,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7346032,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "from_name": "perceive_next_sg.filter_obb",
+        "to_name": "perceive_next_sg.found",
+        "to_id": "n_0024"
+      }
+    },
+    {
+      "seq": 51,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7346184,
+      "node_id": "n_0022",
+      "node_name": "perceive_next_sg.decide",
+      "status": null,
+      "detail": {
+        "from_name": "perceive_next_sg.decide",
+        "to_name": "perceive_next_sg.filter_obb",
+        "to_id": "n_0023"
+      }
+    },
+    {
+      "seq": 52,
+      "event_type": "edge_registered",
+      "timestamp": 1782192414.7346246,
+      "node_id": "n_0022",
+      "node_name": "perceive_next_sg.decide",
+      "status": null,
+      "detail": {
+        "from_name": "perceive_next_sg.decide",
+        "to_name": "perceive_next_sg.none",
+        "to_id": "n_0025"
+      }
+    },
+    {
+      "seq": 53,
+      "event_type": "node_started",
+      "timestamp": 1782192414.7370534,
+      "node_id": "n_0006",
+      "node_name": "container_sg.observe",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 54,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192414.7385798,
+      "node_id": "n_0006",
+      "node_name": "container_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": []
+      }
+    },
+    {
+      "seq": 55,
+      "event_type": "output_recorded",
+      "timestamp": 1782192415.080001,
+      "node_id": "n_0006",
+      "node_name": "container_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 4
+      }
+    },
+    {
+      "seq": 56,
+      "event_type": "node_finished",
+      "timestamp": 1782192415.0800316,
+      "node_id": "n_0006",
+      "node_name": "container_sg.observe",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 342.97
+      }
+    },
+    {
+      "seq": 57,
+      "event_type": "node_started",
+      "timestamp": 1782192415.080057,
+      "node_id": "n_0010",
+      "node_name": "container_sg.exterior_view",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 58,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192415.386237,
+      "node_id": "n_0010",
+      "node_name": "container_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 4,
+        "keys": [
+          "cameras"
+        ]
+      }
+    },
+    {
+      "seq": 59,
+      "event_type": "output_recorded",
+      "timestamp": 1782192415.5573552,
+      "node_id": "n_0010",
+      "node_name": "container_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 60,
+      "event_type": "node_finished",
+      "timestamp": 1782192415.5573885,
+      "node_id": "n_0010",
+      "node_name": "container_sg.exterior_view",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 477.32
+      }
+    },
+    {
+      "seq": 61,
+      "event_type": "node_started",
+      "timestamp": 1782192415.5574129,
+      "node_id": "n_0007",
+      "node_name": "container_sg.perceive",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 62,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192415.7280447,
+      "node_id": "n_0007",
+      "node_name": "container_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2,
+        "keys": [
+          "cameras",
+          "object_name"
+        ]
+      }
+    },
+    {
+      "seq": 63,
+      "event_type": "output_recorded",
+      "timestamp": 1782192415.7462296,
+      "node_id": "n_0007",
+      "node_name": "container_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 64,
+      "event_type": "node_finished",
+      "timestamp": 1782192415.7462573,
+      "node_id": "n_0007",
+      "node_name": "container_sg.perceive",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 188.83
+      }
+    },
+    {
+      "seq": 65,
+      "event_type": "node_started",
+      "timestamp": 1782192415.7462811,
+      "node_id": "n_0008",
+      "node_name": "container_sg.filter_obb",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 66,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192415.751807,
+      "node_id": "n_0008",
+      "node_name": "container_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "asset_count": 1,
+        "keys": [
+          "points"
+        ]
+      }
+    },
+    {
+      "seq": 67,
+      "event_type": "output_recorded",
+      "timestamp": 1782192418.4959536,
+      "node_id": "n_0008",
+      "node_name": "container_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 68,
+      "event_type": "node_finished",
+      "timestamp": 1782192418.4959898,
+      "node_id": "n_0008",
+      "node_name": "container_sg.filter_obb",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 2749.69
+      }
+    },
+    {
+      "seq": 69,
+      "event_type": "node_started",
+      "timestamp": 1782192418.5225682,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 70,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192418.5238156,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": []
+      }
+    },
+    {
+      "seq": 71,
+      "event_type": "output_recorded",
+      "timestamp": 1782192418.8313966,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 4
+      }
+    },
+    {
+      "seq": 72,
+      "event_type": "node_finished",
+      "timestamp": 1782192418.8314414,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 308.86
+      }
+    },
+    {
+      "seq": 73,
+      "event_type": "node_started",
+      "timestamp": 1782192418.831463,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 74,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192419.1169806,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 4,
+        "keys": [
+          "cameras"
+        ]
+      }
+    },
+    {
+      "seq": 75,
+      "event_type": "output_recorded",
+      "timestamp": 1782192419.2750387,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 76,
+      "event_type": "node_finished",
+      "timestamp": 1782192419.2750688,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 443.6
+      }
+    },
+    {
+      "seq": 77,
+      "event_type": "node_started",
+      "timestamp": 1782192419.2750878,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 78,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192419.4391732,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2,
+        "keys": [
+          "cameras",
+          "object_name"
+        ]
+      }
+    },
+    {
+      "seq": 79,
+      "event_type": "output_recorded",
+      "timestamp": 1782192419.4598005,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 80,
+      "event_type": "node_finished",
+      "timestamp": 1782192419.4598188,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 184.72
+      }
+    },
+    {
+      "seq": 81,
+      "event_type": "node_started",
+      "timestamp": 1782192419.4605532,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 82,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192419.4637249,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "asset_count": 1,
+        "keys": [
+          "points"
+        ]
+      }
+    },
+    {
+      "seq": 83,
+      "event_type": "output_recorded",
+      "timestamp": 1782192419.4922216,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 84,
+      "event_type": "node_finished",
+      "timestamp": 1782192419.492242,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 31.68
+      }
+    },
+    {
+      "seq": 85,
+      "event_type": "node_started",
+      "timestamp": 1782192419.492453,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 86,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192419.4934793,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "settle_steps"
+        ]
+      }
+    },
+    {
+      "seq": 87,
+      "event_type": "output_recorded",
+      "timestamp": 1782192422.1744335,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 88,
+      "event_type": "node_finished",
+      "timestamp": 1782192422.1744611,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 2682.0
+      }
+    },
+    {
+      "seq": 89,
+      "event_type": "node_started",
+      "timestamp": 1782192422.1745088,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 90,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192422.175484,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "obb",
+          "z_offset"
+        ]
+      }
+    },
+    {
+      "seq": 91,
+      "event_type": "output_recorded",
+      "timestamp": 1782192422.1779904,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 92,
+      "event_type": "node_finished",
+      "timestamp": 1782192422.1780014,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 3.49
+      }
+    },
+    {
+      "seq": 93,
+      "event_type": "node_started",
+      "timestamp": 1782192422.1780112,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 94,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192422.1790645,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "grasp_pose"
+        ]
+      }
+    },
+    {
+      "seq": 95,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192422.1869636,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.get_ee_pose"
+      }
+    },
+    {
+      "seq": 96,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192438.6281865,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 97,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192456.4188733,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 98,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192456.7197852,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "robot.get_observation"
+      }
+    },
+    {
+      "seq": 99,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192466.0255854,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "curobo.plan_directed_linear"
+      }
+    },
+    {
+      "seq": 100,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192480.908023,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "robot.execute_trajectory"
+      }
+    },
+    {
+      "seq": 101,
+      "event_type": "output_recorded",
+      "timestamp": 1782192480.9088295,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 102,
+      "event_type": "node_finished",
+      "timestamp": 1782192480.908858,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 58730.83
+      }
+    },
+    {
+      "seq": 103,
+      "event_type": "node_started",
+      "timestamp": 1782192480.9089162,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 104,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192480.9095738,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": []
+      }
+    },
+    {
+      "seq": 105,
+      "event_type": "output_recorded",
+      "timestamp": 1782192481.180362,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 4
+      }
+    },
+    {
+      "seq": 106,
+      "event_type": "node_finished",
+      "timestamp": 1782192481.1803787,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 271.46
+      }
+    },
+    {
+      "seq": 107,
+      "event_type": "node_started",
+      "timestamp": 1782192481.1803932,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 108,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192481.1813781,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "settle_steps"
+        ]
+      }
+    },
+    {
+      "seq": 109,
+      "event_type": "output_recorded",
+      "timestamp": 1782192484.8368318,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 110,
+      "event_type": "node_finished",
+      "timestamp": 1782192484.8368604,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 3656.46
+      }
+    },
+    {
+      "seq": 111,
+      "event_type": "node_started",
+      "timestamp": 1782192484.8391545,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 112,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192484.8403125,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "container_obb",
+          "place_offset"
+        ]
+      }
+    },
+    {
+      "seq": 113,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192484.8480155,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.get_ee_pose"
+      }
+    },
+    {
+      "seq": 114,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192499.249545,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 115,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192519.4028857,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 116,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192519.7547066,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "robot.get_observation"
+      }
+    },
+    {
+      "seq": 117,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192519.840317,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "curobo.plan_directed_linear"
+      }
+    },
+    {
+      "seq": 118,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192532.6749244,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "robot.execute_trajectory"
+      }
+    },
+    {
+      "seq": 119,
+      "event_type": "output_recorded",
+      "timestamp": 1782192532.675749,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 120,
+      "event_type": "node_finished",
+      "timestamp": 1782192532.6757798,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 47836.61
+      }
+    },
+    {
+      "seq": 121,
+      "event_type": "node_started",
+      "timestamp": 1782192532.6758282,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 122,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192532.6765633,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "place_position"
+        ]
+      }
+    },
+    {
+      "seq": 123,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192536.313813,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.open_gripper"
+      }
+    },
+    {
+      "seq": 124,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192549.001597,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 125,
+      "event_type": "output_recorded",
+      "timestamp": 1782192549.0022442,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 126,
+      "event_type": "node_finished",
+      "timestamp": 1782192549.0022635,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": "ok",
+      "detail": {
+        "success": true,
+        "duration_ms": 16326.42
+      }
+    },
+    {
+      "seq": 127,
+      "event_type": "node_started",
+      "timestamp": 1782192549.003841,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 128,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192549.0044482,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": []
+      }
+    },
+    {
+      "seq": 129,
+      "event_type": "output_recorded",
+      "timestamp": 1782192549.2996094,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 4
+      }
+    },
+    {
+      "seq": 130,
+      "event_type": "node_started",
+      "timestamp": 1782192549.2996304,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 131,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192549.6000407,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 4,
+        "keys": [
+          "cameras"
+        ]
+      }
+    },
+    {
+      "seq": 132,
+      "event_type": "output_recorded",
+      "timestamp": 1782192549.7657394,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 133,
+      "event_type": "node_started",
+      "timestamp": 1782192549.7657616,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 134,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192549.9333756,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2,
+        "keys": [
+          "cameras",
+          "object_name"
+        ]
+      }
+    },
+    {
+      "seq": 135,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192560.0030968,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "grounding-dino.detect"
+      }
+    },
+    {
+      "seq": 136,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192562.4806645,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 137,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192564.1213896,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 138,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192565.9064338,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 139,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192569.00738,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 140,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192570.6293287,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 141,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192572.358919,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 6,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 142,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192573.942083,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 7,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 143,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192591.8383586,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 8,
+        "tool": "sam3.segment_box"
+      }
+    },
+    {
+      "seq": 144,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192591.8884468,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 9,
+        "tool": "geometry.mask_to_world_points"
+      }
+    },
+    {
+      "seq": 145,
+      "event_type": "output_recorded",
+      "timestamp": 1782192591.9037852,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 146,
+      "event_type": "node_started",
+      "timestamp": 1782192591.9045208,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 147,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192591.9061403,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "asset_count": 1,
+        "keys": [
+          "points"
+        ]
+      }
+    },
+    {
+      "seq": 148,
+      "event_type": "output_recorded",
+      "timestamp": 1782192591.9255044,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 149,
+      "event_type": "node_started",
+      "timestamp": 1782192591.9257262,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 150,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192591.9265256,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "settle_steps"
+        ]
+      }
+    },
+    {
+      "seq": 151,
+      "event_type": "output_recorded",
+      "timestamp": 1782192594.3870502,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 152,
+      "event_type": "node_started",
+      "timestamp": 1782192594.3870738,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 153,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192594.3880284,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "obb",
+          "z_offset"
+        ]
+      }
+    },
+    {
+      "seq": 154,
+      "event_type": "output_recorded",
+      "timestamp": 1782192594.3906295,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 155,
+      "event_type": "node_started",
+      "timestamp": 1782192594.3906448,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 156,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192594.3912203,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "grasp_pose"
+        ]
+      }
+    },
+    {
+      "seq": 157,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192594.3983278,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.get_ee_pose"
+      }
+    },
+    {
+      "seq": 158,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192595.773893,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 159,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192625.6413724,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 160,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192625.937359,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "robot.get_observation"
+      }
+    },
+    {
+      "seq": 161,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192626.024233,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "curobo.plan_directed_linear"
+      }
+    },
+    {
+      "seq": 162,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192692.356915,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "robot.execute_trajectory"
+      }
+    },
+    {
+      "seq": 163,
+      "event_type": "output_recorded",
+      "timestamp": 1782192692.3575618,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 164,
+      "event_type": "node_started",
+      "timestamp": 1782192692.3575935,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 165,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192692.3581157,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": []
+      }
+    },
+    {
+      "seq": 166,
+      "event_type": "output_recorded",
+      "timestamp": 1782192692.6112735,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 4
+      }
+    },
+    {
+      "seq": 167,
+      "event_type": "node_started",
+      "timestamp": 1782192692.611298,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 168,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192692.612148,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "settle_steps"
+        ]
+      }
+    },
+    {
+      "seq": 169,
+      "event_type": "output_recorded",
+      "timestamp": 1782192696.216742,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 170,
+      "event_type": "node_started",
+      "timestamp": 1782192696.2185237,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 171,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192696.2192223,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "container_obb",
+          "place_offset"
+        ]
+      }
+    },
+    {
+      "seq": 172,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192696.2262628,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.get_ee_pose"
+      }
+    },
+    {
+      "seq": 173,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192712.9388587,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 174,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192743.6287284,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 175,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192743.9278998,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "robot.get_observation"
+      }
+    },
+    {
+      "seq": 176,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192744.0228302,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "curobo.plan_directed_linear"
+      }
+    },
+    {
+      "seq": 177,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192756.9205866,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "robot.execute_trajectory"
+      }
+    },
+    {
+      "seq": 178,
+      "event_type": "output_recorded",
+      "timestamp": 1782192756.9213278,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 179,
+      "event_type": "node_started",
+      "timestamp": 1782192756.9213686,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 180,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192756.9219508,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "place_position"
+        ]
+      }
+    },
+    {
+      "seq": 181,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192760.6678374,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.open_gripper"
+      }
+    },
+    {
+      "seq": 182,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192773.7688277,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 183,
+      "event_type": "output_recorded",
+      "timestamp": 1782192773.7696328,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 184,
+      "event_type": "node_started",
+      "timestamp": 1782192773.7711794,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 185,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192773.7717083,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": []
+      }
+    },
+    {
+      "seq": 186,
+      "event_type": "output_recorded",
+      "timestamp": 1782192774.0582576,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 4
+      }
+    },
+    {
+      "seq": 187,
+      "event_type": "node_started",
+      "timestamp": 1782192774.058282,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 188,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192774.3351157,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 4,
+        "keys": [
+          "cameras"
+        ]
+      }
+    },
+    {
+      "seq": 189,
+      "event_type": "output_recorded",
+      "timestamp": 1782192774.4932535,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 190,
+      "event_type": "node_started",
+      "timestamp": 1782192774.4932747,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 191,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192774.650742,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2,
+        "keys": [
+          "cameras",
+          "object_name"
+        ]
+      }
+    },
+    {
+      "seq": 192,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192775.0486805,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "grounding-dino.detect"
+      }
+    },
+    {
+      "seq": 193,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192776.716674,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 194,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192778.3764396,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 195,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192780.1547961,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 196,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192781.836927,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 197,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192783.509958,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 198,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192785.2085133,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 6,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 199,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192786.5029716,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 7,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 200,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192786.7746067,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 8,
+        "tool": "sam3.segment_box"
+      }
+    },
+    {
+      "seq": 201,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192786.7965472,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 9,
+        "tool": "geometry.mask_to_world_points"
+      }
+    },
+    {
+      "seq": 202,
+      "event_type": "output_recorded",
+      "timestamp": 1782192786.805535,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 203,
+      "event_type": "node_started",
+      "timestamp": 1782192786.8064349,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 204,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192786.808776,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "asset_count": 1,
+        "keys": [
+          "points"
+        ]
+      }
+    },
+    {
+      "seq": 205,
+      "event_type": "output_recorded",
+      "timestamp": 1782192786.8315954,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 206,
+      "event_type": "node_started",
+      "timestamp": 1782192786.8317926,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 207,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192786.83263,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "settle_steps"
+        ]
+      }
+    },
+    {
+      "seq": 208,
+      "event_type": "output_recorded",
+      "timestamp": 1782192789.3783972,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 209,
+      "event_type": "node_started",
+      "timestamp": 1782192789.3784301,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 210,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192789.3793375,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "obb",
+          "z_offset"
+        ]
+      }
+    },
+    {
+      "seq": 211,
+      "event_type": "output_recorded",
+      "timestamp": 1782192789.3818614,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 212,
+      "event_type": "node_started",
+      "timestamp": 1782192789.3818767,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 213,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192789.382689,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "grasp_pose"
+        ]
+      }
+    },
+    {
+      "seq": 214,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192789.3896303,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.get_ee_pose"
+      }
+    },
+    {
+      "seq": 215,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192790.6448958,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 216,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192807.075297,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 217,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192807.367874,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "robot.get_observation"
+      }
+    },
+    {
+      "seq": 218,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192807.4566743,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "curobo.plan_directed_linear"
+      }
+    },
+    {
+      "seq": 219,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192822.0437899,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "robot.execute_trajectory"
+      }
+    },
+    {
+      "seq": 220,
+      "event_type": "output_recorded",
+      "timestamp": 1782192822.0444481,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 221,
+      "event_type": "node_started",
+      "timestamp": 1782192822.0444846,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 222,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192822.0449562,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": []
+      }
+    },
+    {
+      "seq": 223,
+      "event_type": "output_recorded",
+      "timestamp": 1782192822.3166754,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 4
+      }
+    },
+    {
+      "seq": 224,
+      "event_type": "node_started",
+      "timestamp": 1782192822.316697,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 225,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192822.3172107,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "settle_steps"
+        ]
+      }
+    },
+    {
+      "seq": 226,
+      "event_type": "output_recorded",
+      "timestamp": 1782192826.092504,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 227,
+      "event_type": "node_started",
+      "timestamp": 1782192826.094208,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 228,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192826.0948336,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "container_obb",
+          "place_offset"
+        ]
+      }
+    },
+    {
+      "seq": 229,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192826.1018176,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.get_ee_pose"
+      }
+    },
+    {
+      "seq": 230,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192841.0368915,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 231,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192857.600144,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 232,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192857.896192,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "robot.get_observation"
+      }
+    },
+    {
+      "seq": 233,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192857.973748,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "curobo.plan_directed_linear"
+      }
+    },
+    {
+      "seq": 234,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192871.0729907,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "robot.execute_trajectory"
+      }
+    },
+    {
+      "seq": 235,
+      "event_type": "output_recorded",
+      "timestamp": 1782192871.0736904,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 236,
+      "event_type": "node_started",
+      "timestamp": 1782192871.0737207,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 237,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192871.074327,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "place_position"
+        ]
+      }
+    },
+    {
+      "seq": 238,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192874.8482847,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.open_gripper"
+      }
+    },
+    {
+      "seq": 239,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192887.77106,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 240,
+      "event_type": "output_recorded",
+      "timestamp": 1782192887.7716649,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 241,
+      "event_type": "node_started",
+      "timestamp": 1782192887.7732284,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 242,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192887.7738001,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": []
+      }
+    },
+    {
+      "seq": 243,
+      "event_type": "output_recorded",
+      "timestamp": 1782192888.068538,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 4
+      }
+    },
+    {
+      "seq": 244,
+      "event_type": "node_started",
+      "timestamp": 1782192888.0685596,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 245,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192888.4026804,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 4,
+        "keys": [
+          "cameras"
+        ]
+      }
+    },
+    {
+      "seq": 246,
+      "event_type": "output_recorded",
+      "timestamp": 1782192888.5615659,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 247,
+      "event_type": "node_started",
+      "timestamp": 1782192888.5615833,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 248,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192888.719113,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2,
+        "keys": [
+          "cameras",
+          "object_name"
+        ]
+      }
+    },
+    {
+      "seq": 249,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192889.133509,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "grounding-dino.detect"
+      }
+    },
+    {
+      "seq": 250,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192890.8132896,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 251,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192892.5157495,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 252,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192894.0801737,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 253,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192895.69801,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 254,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192895.9693577,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "sam3.segment_box"
+      }
+    },
+    {
+      "seq": 255,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192895.9931676,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 6,
+        "tool": "geometry.mask_to_world_points"
+      }
+    },
+    {
+      "seq": 256,
+      "event_type": "output_recorded",
+      "timestamp": 1782192896.0004547,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 257,
+      "event_type": "node_started",
+      "timestamp": 1782192896.0010562,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 258,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192896.0031393,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "asset_count": 1,
+        "keys": [
+          "points"
+        ]
+      }
+    },
+    {
+      "seq": 259,
+      "event_type": "output_recorded",
+      "timestamp": 1782192896.0364146,
+      "node_id": "n_0023",
+      "node_name": "perceive_next_sg.filter_obb",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 260,
+      "event_type": "node_started",
+      "timestamp": 1782192896.0366344,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 261,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192896.0375347,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "settle_steps"
+        ]
+      }
+    },
+    {
+      "seq": 262,
+      "event_type": "output_recorded",
+      "timestamp": 1782192898.574577,
+      "node_id": "n_0011",
+      "node_name": "grasp_sg.open",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 263,
+      "event_type": "node_started",
+      "timestamp": 1782192898.5746136,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 264,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192898.5752735,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "obb",
+          "z_offset"
+        ]
+      }
+    },
+    {
+      "seq": 265,
+      "event_type": "output_recorded",
+      "timestamp": 1782192898.5786073,
+      "node_id": "n_0012",
+      "node_name": "grasp_sg.compute_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 266,
+      "event_type": "node_started",
+      "timestamp": 1782192898.578646,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 267,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192898.5792859,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "grasp_pose"
+        ]
+      }
+    },
+    {
+      "seq": 268,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192898.5906887,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.get_ee_pose"
+      }
+    },
+    {
+      "seq": 269,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192899.8715997,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 270,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192920.7904654,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 271,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192921.0864942,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "robot.get_observation"
+      }
+    },
+    {
+      "seq": 272,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192921.1742053,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "curobo.plan_directed_linear"
+      }
+    },
+    {
+      "seq": 273,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192936.0168643,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "robot.execute_trajectory"
+      }
+    },
+    {
+      "seq": 274,
+      "event_type": "output_recorded",
+      "timestamp": 1782192936.0175512,
+      "node_id": "n_0013",
+      "node_name": "grasp_sg.goto_grasp",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 275,
+      "event_type": "node_started",
+      "timestamp": 1782192936.0175889,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 276,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192936.0181048,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": []
+      }
+    },
+    {
+      "seq": 277,
+      "event_type": "output_recorded",
+      "timestamp": 1782192936.2756228,
+      "node_id": "n_0014",
+      "node_name": "grasp_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 4
+      }
+    },
+    {
+      "seq": 278,
+      "event_type": "node_started",
+      "timestamp": 1782192936.2756476,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 279,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192936.2766619,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "settle_steps"
+        ]
+      }
+    },
+    {
+      "seq": 280,
+      "event_type": "output_recorded",
+      "timestamp": 1782192940.0625322,
+      "node_id": "n_0015",
+      "node_name": "grasp_sg.close",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 281,
+      "event_type": "node_started",
+      "timestamp": 1782192940.0642545,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 282,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192940.0649517,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "container_obb",
+          "place_offset"
+        ]
+      }
+    },
+    {
+      "seq": 283,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192940.0726376,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.get_ee_pose"
+      }
+    },
+    {
+      "seq": 284,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192955.552143,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 285,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192976.1350522,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 286,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192976.4191568,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "robot.get_observation"
+      }
+    },
+    {
+      "seq": 287,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192976.5003295,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "curobo.plan_directed_linear"
+      }
+    },
+    {
+      "seq": 288,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192988.4522574,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "robot.execute_trajectory"
+      }
+    },
+    {
+      "seq": 289,
+      "event_type": "output_recorded",
+      "timestamp": 1782192988.4531255,
+      "node_id": "n_0017",
+      "node_name": "transport_sg.transport_move",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 290,
+      "event_type": "node_started",
+      "timestamp": 1782192988.453156,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 291,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782192988.454199,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": [
+          "place_position"
+        ]
+      }
+    },
+    {
+      "seq": 292,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782192992.169054,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "robot.open_gripper"
+      }
+    },
+    {
+      "seq": 293,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782193004.0176978,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "robot.go_to_pose_cartesian"
+      }
+    },
+    {
+      "seq": 294,
+      "event_type": "output_recorded",
+      "timestamp": 1782193004.0197856,
+      "node_id": "n_0018",
+      "node_name": "transport_sg.release",
+      "status": null,
+      "detail": {
+        "asset_count": 0
+      }
+    },
+    {
+      "seq": 295,
+      "event_type": "node_started",
+      "timestamp": 1782193004.0212166,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 296,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782193004.0221229,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 0,
+        "keys": []
+      }
+    },
+    {
+      "seq": 297,
+      "event_type": "output_recorded",
+      "timestamp": 1782193004.3224792,
+      "node_id": "n_0020",
+      "node_name": "perceive_next_sg.observe",
+      "status": null,
+      "detail": {
+        "asset_count": 4
+      }
+    },
+    {
+      "seq": 298,
+      "event_type": "node_started",
+      "timestamp": 1782193004.3225067,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 299,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782193004.6163218,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 4,
+        "keys": [
+          "cameras"
+        ]
+      }
+    },
+    {
+      "seq": 300,
+      "event_type": "output_recorded",
+      "timestamp": 1782193004.781767,
+      "node_id": "n_0026",
+      "node_name": "perceive_next_sg.exterior_view",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    },
+    {
+      "seq": 301,
+      "event_type": "node_started",
+      "timestamp": 1782193004.7817883,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": "running",
+      "detail": {}
+    },
+    {
+      "seq": 302,
+      "event_type": "inputs_recorded",
+      "timestamp": 1782193004.944811,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2,
+        "keys": [
+          "cameras",
+          "object_name"
+        ]
+      }
+    },
+    {
+      "seq": 303,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782193005.337348,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 0,
+        "tool": "grounding-dino.detect"
+      }
+    },
+    {
+      "seq": 304,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782193007.0515575,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 1,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 305,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782193008.8098943,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 2,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 306,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782193010.4408383,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 3,
+        "tool": "vlm.query"
+      }
+    },
+    {
+      "seq": 307,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782193010.7086005,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 4,
+        "tool": "sam3.segment_box"
+      }
+    },
+    {
+      "seq": 308,
+      "event_type": "subcall_recorded",
+      "timestamp": 1782193010.7361243,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "seq": 5,
+        "tool": "geometry.mask_to_world_points"
+      }
+    },
+    {
+      "seq": 309,
+      "event_type": "output_recorded",
+      "timestamp": 1782193010.7469537,
+      "node_id": "n_0021",
+      "node_name": "perceive_next_sg.perceive",
+      "status": null,
+      "detail": {
+        "asset_count": 2
+      }
+    }
+  ]
+}

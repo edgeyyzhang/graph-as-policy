@@ -361,6 +361,153 @@ def test_node_visit_cap_triggers(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Conditional back edges (loops)
+# ---------------------------------------------------------------------------
+
+_LOOP_ROUTER_PY = '''\
+def run(ctx, n):
+    return {"route": "done" if n >= 3 else "loop"}
+'''
+
+_FOREVER_ROUTER_PY = '''\
+def run(ctx, n):
+    return {"route": "loop"}
+'''
+
+
+def test_conditional_back_edge_loops_until_threshold(tmp_path: Path) -> None:
+    """A conditional edge to an already-completed node re-iterates the loop
+    body until the router routes to the exit."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "decide.py").write_text(_LOOP_ROUTER_PY)
+
+    count = {"n": 0}
+
+    def _step() -> dict:
+        count["n"] += 1
+        return {"n": count["n"]}
+
+    reg = _registry({"stub.step": _step})
+    wf_dir = _write_workflow(tmp_path, {
+        "version": 3,
+        "meta": {},
+        "nodes": {
+            "step": {"type": "tool", "tool": "stub.step", "inputs": {}},
+            "decide": {
+                "type": "router", "script": "scripts/decide.py",
+                "inputs": {"n": {"$ref": "step.n"}},
+            },
+            "done": {"type": "end", "status": "success"},
+        },
+        "edges": [["START", "step"], ["step", "decide"]],
+        "conditional_edges": {
+            # decide --loop--> step is the BACKWARD edge (step already ran).
+            "decide": {"router_field": None,
+                       "mapping": {"loop": "step", "done": "done"}},
+        },
+    })
+
+    ex = _executor(wf_dir, reg)
+    ex.execute()
+
+    assert ex.exit_status == "success"
+    # step re-ran on each loop iteration until n reached the threshold.
+    assert count["n"] == 3
+
+
+def test_unbounded_conditional_loop_trips_cap(tmp_path: Path) -> None:
+    """A conditional back edge whose router never exits still trips the
+    super-step cap — the runaway-loop guard survives loop support."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "decide.py").write_text(_FOREVER_ROUTER_PY)
+
+    def _step() -> dict:
+        return {"n": 1}
+
+    reg = _registry({"stub.step": _step})
+    wf_dir = _write_workflow(tmp_path, {
+        "version": 3,
+        "meta": {},
+        "nodes": {
+            "step": {"type": "tool", "tool": "stub.step", "inputs": {}},
+            "decide": {
+                "type": "router", "script": "scripts/decide.py",
+                "inputs": {"n": {"$ref": "step.n"}},
+            },
+            "done": {"type": "end", "status": "success"},
+        },
+        "edges": [["START", "step"], ["step", "decide"]],
+        "conditional_edges": {
+            "decide": {"router_field": None,
+                       "mapping": {"loop": "step", "done": "done"}},
+        },
+    })
+
+    ex = _executor(wf_dir, reg, node_visit_cap=5)
+    with pytest.raises(PipelineError, match="super-step cap"):
+        ex.execute()
+
+
+def test_subgraph_back_edge_loops(tmp_path: Path) -> None:
+    """A backward edge over SUBGRAPH nodes re-invokes the subgraph (fresh
+    inner scope) each iteration — the shape the grocery_packing example uses."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "decide.py").write_text(_LOOP_ROUTER_PY)
+
+    count = {"n": 0}
+
+    def _bump() -> dict:
+        count["n"] += 1
+        return {"n": count["n"]}
+
+    reg = _registry({"stub.bump": _bump})
+    wf_dir = _write_workflow(tmp_path, {
+        "version": 3,
+        "meta": {},
+        "nodes": {
+            "step": {"type": "subgraph", "ref": "step_sg"},
+            "decide": {
+                "type": "router", "script": "scripts/decide.py",
+                "inputs": {"n": {"$ref": "step.count"}},
+            },
+            "done": {"type": "end", "status": "success"},
+        },
+        "edges": [["START", "step"]],
+        "conditional_edges": {
+            "step": {"router_field": "exit", "mapping": {"ok": "decide"}},
+            # decide --loop--> step re-enters the completed subgraph node.
+            "decide": {"router_field": None,
+                       "mapping": {"loop": "step", "done": "done"}},
+        },
+        "subgraphs": {
+            "step_sg": {
+                "skill": "stub_skill",
+                "inputs": {},
+                "outputs": {"count": {"$ref": "bump.n"}},
+                "nodes": {
+                    "bump": {"type": "tool", "tool": "stub.bump", "inputs": {}},
+                    "ok": {"type": "noop"},
+                },
+                "edges": [["START", "bump"], ["bump", "ok"], ["ok", "END"]],
+                "conditional_edges": {},
+                "exit": {"router_field": None, "success_values": ["ok"]},
+                "on_error": "boom",
+            },
+        },
+    })
+
+    ex = _executor(wf_dir, reg)
+    ex.execute()
+
+    assert ex.exit_status == "success"
+    # The subgraph re-ran each iteration until its output crossed the threshold.
+    assert count["n"] == 3
+
+
+# ---------------------------------------------------------------------------
 # Recovery ToolCalls on a failure end node
 # ---------------------------------------------------------------------------
 

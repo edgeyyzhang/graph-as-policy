@@ -106,7 +106,10 @@ class FrankaLiberoEnv(BaseEnv):
         # log ~10× more sim steps per trial than qpos teleports, blowing the
         # video duration up by the same factor.
         self._record_frames = False
-        self._frame_buffer: list[np.ndarray] = []
+        # Captured frames are streamed to disk (one PNG each) under a
+        # per-session temp dir rather than held in memory; see _record_frame.
+        self._frames_dir: str | None = None
+        self._frames_seq: int = 0
         self._subsample_rate = 4
 
         # ``closed_loop`` (default) swaps in the JointPositionController and
@@ -654,46 +657,81 @@ class FrankaLiberoEnv(BaseEnv):
         return self.handle.env.check_success()
 
     # ----------------------- Video Capture -----------------------
+    #
+    # Each captured frame is written to disk as its own PNG (into a
+    # per-session temp dir) the moment it is rendered, instead of being
+    # accumulated in an in-memory buffer. This keeps memory flat on long
+    # rollouts and — crucially — means an interrupted or crashed run still
+    # leaves every captured frame on disk to assemble. ``get_video_frames``
+    # and ``save_video`` read the PNGs back from that dir.
 
     def enable_video_capture(
         self, enabled: bool = True, *, clear: bool = True
     ) -> None:
         self._record_frames = enabled
         if clear:
-            self._frame_buffer.clear()
+            self._reset_frames_dir()
         if enabled:
             self._record_frame()
 
+    def _reset_frames_dir(self) -> None:
+        """Start a fresh empty frames dir, removing any previous one."""
+        import shutil
+        import tempfile
+
+        prev = self._frames_dir
+        if prev and os.path.isdir(prev):
+            shutil.rmtree(prev, ignore_errors=True)
+        self._frames_dir = tempfile.mkdtemp(prefix="gap_video_frames_")
+        self._frames_seq = 0
+
+    def _frame_paths(self) -> list[str]:
+        """Sorted PNG paths captured so far (empty if nothing recorded)."""
+        d = self._frames_dir
+        if not d or not os.path.isdir(d):
+            return []
+        return [
+            os.path.join(d, f)
+            for f in sorted(os.listdir(d))
+            if f.startswith("frame_") and f.endswith(".png")
+        ]
+
     def get_video_frames(self, *, clear: bool = False) -> list[np.ndarray]:
-        frames = [frame.copy() for frame in self._frame_buffer]
+        import imageio.v3 as iio
+
+        frames = [np.asarray(iio.imread(p)) for p in self._frame_paths()]
         if clear:
-            self._frame_buffer.clear()
+            self._reset_frames_dir()
         return frames
 
     def save_video(
         self, output_path: str, *, fps: int = 20, clear: bool = False
     ) -> int:
-        """Encode the recorded frame buffer to ``output_path`` (mp4).
+        """Assemble the per-frame PNGs captured on disk into ``output_path``.
 
-        Returns the number of frames written (0 when the buffer is empty,
-        in which case no file is created). Mirrors the source bridge's
-        SaveVideo encoding (imageio / libx264, 20 fps default to pair with
-        ``_subsample_rate=4`` on a 20 Hz sim).
+        Returns the number of frames written (0 when none were captured, in
+        which case no file is created). 20 fps default pairs with
+        ``_subsample_rate=4`` on the 20 Hz sim.
         """
         from pathlib import Path
 
-        frames = self.get_video_frames(clear=clear)
-        if not frames:
+        paths = self._frame_paths()
+        if not paths:
             return 0
         import imageio.v3 as iio
 
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        iio.imwrite(output_path, np.stack(frames), fps=fps, codec="libx264")
-        return len(frames)
+        stack = np.stack([np.asarray(iio.imread(p)) for p in paths])
+        iio.imwrite(output_path, stack, fps=fps, codec="libx264")
+        if clear:
+            self._reset_frames_dir()
+        return len(paths)
 
     def _record_frame(self) -> None:
         if not self._record_frames:
             return
+        if self._frames_dir is None:
+            self._reset_frames_dir()
         # MuJoCo offscreen render: ~tens of ms per call on GPU. Sim-only
         # work (a real robot uses real cameras), so attribute to
         # ``sim_physics_wall_s`` so compute_overhead doesn't double-count it.
@@ -705,7 +743,14 @@ class FrankaLiberoEnv(BaseEnv):
             depth=False,
         )
         self._sim_physics_wall_s += time.perf_counter() - _t0
-        self._frame_buffer.append(frame[::-1])
+        import imageio.v3 as iio
+
+        assert self._frames_dir is not None
+        iio.imwrite(
+            os.path.join(self._frames_dir, f"frame_{self._frames_seq:06d}.png"),
+            frame[::-1],
+        )
+        self._frames_seq += 1
 
     def render(
         self, mode: str = "rgb_array", *, camera_name: str = "agentview"

@@ -356,6 +356,37 @@ class WorkflowExecutor:
     # Scope scheduler
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _forward_reachable(
+        start: str,
+        outgoing: dict[str, list[str]],
+        cond_edges: dict[str, Any],
+    ) -> set[str]:
+        """Return the set of nodes forward-reachable from ``start`` (inclusive).
+
+        Follows both static edges (``outgoing``) and conditional-edge mapping
+        targets; ``START``/``END`` are excluded. Used to compute a loop body
+        when a backward (conditional) edge re-enters a completed node.
+        """
+        seen: set[str] = set()
+        stack = [start]
+        while stack:
+            cur = stack.pop()
+            if cur in seen or cur in (START, END):
+                continue
+            seen.add(cur)
+            for dst in outgoing.get(cur, []):
+                if dst not in seen:
+                    stack.append(dst)
+            ce = cond_edges.get(cur)
+            if ce is not None:
+                for dst in ce.mapping.values():
+                    if dst not in seen:
+                        stack.append(dst)
+        seen.discard(START)
+        seen.discard(END)
+        return seen
+
     def _run_scope(
         self,
         scope: _ScopeState,
@@ -465,6 +496,27 @@ class WorkflowExecutor:
                             continue
                         if tgt == END:
                             terminal_node = node_name
+                            continue
+                        if tgt in scope.completed_nodes:
+                            # Backward (loop) edge: a conditional edge resolved
+                            # to a node that already ran in this scope. Reset
+                            # the loop body — every node forward-reachable from
+                            # the target — so it re-executes, then re-enqueue
+                            # the target. (Static edges to completed nodes keep
+                            # the silent-skip dedup; only conditional edges form
+                            # loops.) local_outputs are left intact: re-runs
+                            # overwrite them, matching the documented
+                            # "most recent run wins" semantics. The super-step
+                            # cap still bounds runaway loops.
+                            body = self._forward_reachable(
+                                tgt, outgoing, cond_edges,
+                            )
+                            for n in body:
+                                scope.completed_nodes.discard(n)
+                                seen_in_frontier.discard(n)
+                            if tgt not in next_frontier:
+                                next_frontier.append(tgt)
+                            seen_in_frontier.add(tgt)
                             continue
                         if tgt not in next_frontier:
                             next_frontier.append(tgt)

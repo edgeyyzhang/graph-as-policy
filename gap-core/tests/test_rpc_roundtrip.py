@@ -61,6 +61,31 @@ _BUNDLE_TOOLS = textwrap.dedent('''
     )
     def raise_runtime(why: str) -> dict:
         raise RuntimeError(f"intentional: {why}")
+
+
+    @tool(
+        name="fake.noisy",
+        summary="Pollute stdout (print + raw fd 1) then return",
+        tags=("test",),
+    )
+    def noisy(message: str) -> dict:
+        import os
+        import sys
+        print("stray python print to stdout")
+        os.write(1, b"raw bytes written straight to fd one")
+        sys.stdout.flush()
+        return {"echo": message}
+
+
+    @tool(
+        name="fake.sleep",
+        summary="Sleep (exercises the per-call timeout)",
+        tags=("test",),
+    )
+    def sleep_long(seconds: float) -> dict:
+        import time
+        time.sleep(seconds)
+        return {"slept": seconds}
 ''').lstrip()
 
 
@@ -156,7 +181,8 @@ def client(bundle_dir):
 
 def test_catalog_handshake_lists_every_tool(client):
     names = sorted(t["name"] for t in client.catalog)
-    assert names == ["fake.add", "fake.echo", "fake.numpy_double", "fake.raise_runtime"]
+    assert names == ["fake.add", "fake.echo", "fake.noisy", "fake.numpy_double",
+                     "fake.raise_runtime", "fake.sleep"]
     echo = next(t for t in client.catalog if t["name"] == "fake.echo")
     assert echo["summary"] == "Echo input back as result"
     assert "test" in echo["tags"]
@@ -200,3 +226,46 @@ def test_close_is_idempotent(client):
     in a finally block and may also call it elsewhere on error paths."""
     client.close()
     client.close()  # second close is a no-op
+
+
+def test_stdout_pollution_does_not_corrupt_frames(client):
+    """A tool that writes to stdout (Python print AND raw fd-1 bytes, the
+    way a CUDA/Warp C-extension would) must not desync the frame stream.
+
+    Without the server isolating its framing fd, the stray bytes land
+    mid-frame and the next read blocks forever (the real-world deadlock).
+    With isolation, fd 1 is redirected to stderr, so the call returns
+    normally and the channel stays usable for the next call."""
+    assert client.call("fake.noisy", message="hi") == {"echo": "hi"}
+    # The channel is still in sync: a follow-up call round-trips fine.
+    assert client.call("fake.add", a=1, b=2) == {"sum": 3}
+
+
+def test_call_timeout_terminates_hung_call(bundle_dir):
+    """A call that never returns is bounded by the per-call timeout: the
+    client kills the subprocess and raises ToolCallTimeout instead of
+    hanging forever. Uses the real ToolClient (use_uv=False to spawn the
+    server directly in the test venv)."""
+    import time
+
+    from gap_core.rpc.client import ToolCallTimeout, ToolClient
+
+    c = ToolClient(
+        bundle_name="fake",
+        bundle_dir=bundle_dir,
+        command=[sys.executable, "-m", "gap_core.rpc.server", "--bundle", "fake"],
+        use_uv=False,
+        call_timeout_s=2.0,
+    )
+    try:
+        # A short call still works through the real client.
+        assert c.call("fake.add", a=5, b=5) == {"sum": 10}
+
+        start = time.monotonic()
+        with pytest.raises(ToolCallTimeout):
+            c.call("fake.sleep", seconds=30)
+        elapsed = time.monotonic() - start
+        # Bounded by the timeout (+ teardown grace), nowhere near 30s.
+        assert elapsed < 15.0, f"timeout took {elapsed:.1f}s"
+    finally:
+        c.close()

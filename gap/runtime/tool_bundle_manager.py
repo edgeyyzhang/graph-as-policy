@@ -53,11 +53,15 @@ class ToolBundleManager:
 
     def __init__(self, skill_registry: Any, tool_registry: Any,
                  *, startup_timeout_s: float = 60.0,
-                 evict_grace_s: float = 5.0) -> None:
+                 evict_grace_s: float = 5.0,
+                 call_timeout_s: float | None = None) -> None:
         self._skill_registry = skill_registry
         self._tool_registry = tool_registry
         self._timeout = float(startup_timeout_s)
         self._grace = float(evict_grace_s)
+        # Per-call reply timeout passed to each ToolClient. None lets the
+        # client resolve GAP_TOOL_CALL_TIMEOUT_S / its built-in default.
+        self._call_timeout_s = call_timeout_s
         self._lock = threading.Lock()
         self._managed: dict[str, _Managed] = {}
 
@@ -86,6 +90,7 @@ class ToolBundleManager:
                         bundle_dir=info.meta.bundle_dir,
                         env=serving.env,
                         evict_grace_s=self._grace,
+                        call_timeout_s=self._call_timeout_s,
                     )
                 except BaseException as exc:
                     raise ToolBundleStartupError(

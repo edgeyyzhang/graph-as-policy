@@ -28,8 +28,43 @@ from .codec import FrameError, decode_frame, write_frame
 logger = logging.getLogger(__name__)
 
 
+#: Default per-call reply timeout (seconds). A single tool call that takes
+#: longer than this is almost always a hang (e.g. a deadlocked subprocess),
+#: not legitimate work — perception and planning calls finish in seconds to
+#: low minutes. Override with ``GAP_TOOL_CALL_TIMEOUT_S`` (set to ``0`` to
+#: disable) or the ``call_timeout_s`` constructor arg.
+DEFAULT_TOOL_CALL_TIMEOUT_S = 600.0
+
+
+def _resolve_call_timeout(explicit: float | None) -> float | None:
+    """Resolve the per-call reply timeout in seconds, or ``None`` to disable.
+
+    Precedence: explicit arg > ``GAP_TOOL_CALL_TIMEOUT_S`` env > default.
+    A non-positive value disables the timeout.
+    """
+    if explicit is not None:
+        return explicit if explicit > 0 else None
+    raw = os.environ.get("GAP_TOOL_CALL_TIMEOUT_S", "").strip()
+    if raw:
+        try:
+            v = float(raw)
+        except ValueError:
+            return DEFAULT_TOOL_CALL_TIMEOUT_S
+        return v if v > 0 else None
+    return DEFAULT_TOOL_CALL_TIMEOUT_S
+
+
 class ToolClientError(RuntimeError):
     """The bundle server died, mis-framed, or returned an unparseable result."""
+
+
+class ToolCallTimeout(ToolClientError):
+    """A tool call exceeded its reply timeout; the subprocess was terminated.
+
+    Subclass of :class:`ToolClientError` so existing protocol-failure handling
+    (a node raises → the subgraph's ``on_error`` exit fires) catches it, while
+    callers that care can still distinguish a hang from a crash.
+    """
 
 
 class ToolRemoteError(RuntimeError):
@@ -104,17 +139,24 @@ class ToolClient:
         command: Iterable[str] | None = None,
         env: dict[str, str] | None = None,
         evict_grace_s: float = 5.0,
+        call_timeout_s: float | None = None,
+        use_uv: bool = True,
     ) -> None:
         self.bundle_name = bundle_name
         self.bundle_dir = Path(bundle_dir)
         self._grace = float(evict_grace_s)
+        self._call_timeout_s = _resolve_call_timeout(call_timeout_s)
         self._lock = threading.Lock()
         self._req_counter = 0
 
         cmd = list(command) if command else [
             "python", "-m", "gap_core.rpc.server", "--bundle", bundle_name,
         ]
-        argv = ["uv", "run", "--project", str(self.bundle_dir), "--", *cmd]
+        # Default: run the server inside the bundle's own venv via uv. Tests
+        # (and callers that already resolved an interpreter) pass use_uv=False
+        # to spawn `cmd` directly.
+        argv = (["uv", "run", "--project", str(self.bundle_dir), "--", *cmd]
+                if use_uv else list(cmd))
         full_env = {**os.environ, **(env or {})}
         logger.info("[tool-bundle:%s] spawning: %s", bundle_name, " ".join(argv))
         self._proc = subprocess.Popen(
@@ -155,8 +197,41 @@ class ToolClient:
             self._req_counter += 1
             rid = f"req-{self._req_counter}"
             self._write({"id": rid, "kind": "call", "tool": tool, "args": kwargs})
-            reply = self._read_reply(rid)
-        return reply
+
+            if not self._call_timeout_s:
+                return self._read_reply(rid)
+
+            # Bound the blocking reply read with a watchdog. The read sits in
+            # a C-level pipe read that a cooperative flag can't interrupt, so
+            # on expiry we terminate the subprocess: closing its stdout makes
+            # the read return EOF, which unblocks _read_reply (it then raises
+            # ToolClientError, which we translate to ToolCallTimeout).
+            timed_out = threading.Event()
+
+            def _fire() -> None:
+                timed_out.set()
+                logger.warning(
+                    "[tool-bundle:%s] tool %r exceeded %.0fs timeout; "
+                    "terminating subprocess", self.bundle_name, tool,
+                    self._call_timeout_s,
+                )
+                _terminate_group(self._proc, self._grace)
+
+            timer = threading.Timer(self._call_timeout_s, _fire)
+            timer.daemon = True
+            timer.start()
+            try:
+                return self._read_reply(rid)
+            except ToolClientError:
+                if timed_out.is_set():
+                    raise ToolCallTimeout(
+                        f"[tool-bundle:{self.bundle_name}] tool {tool!r} "
+                        f"exceeded {self._call_timeout_s:.0f}s timeout; "
+                        f"subprocess terminated"
+                    ) from None
+                raise
+            finally:
+                timer.cancel()
 
     def close(self) -> None:
         """Terminate the subprocess. Idempotent."""
@@ -266,4 +341,11 @@ class ToolClient:
         )
 
 
-__all__ = ["CatalogEntry", "ToolClient", "ToolClientError", "ToolRemoteError"]
+__all__ = [
+    "CatalogEntry",
+    "DEFAULT_TOOL_CALL_TIMEOUT_S",
+    "ToolCallTimeout",
+    "ToolClient",
+    "ToolClientError",
+    "ToolRemoteError",
+]

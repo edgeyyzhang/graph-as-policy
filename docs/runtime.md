@@ -19,8 +19,9 @@ conditional edges; each subgraph is a self-contained inner graph of
 declared typed inputs/outputs, and a small set of **typed exit conditions**.
 Control flow — loops ("clean all items on the table"), retries
 ("re-perceive on grasp slip"), and fallbacks — is expressed entirely as
-edges between subgraphs routed on exit conditions. There are no retry
-counters, no `branch_on` constructs, and no magic strings.
+edges between subgraphs routed on exit conditions; a loop is just a
+conditional edge that routes back to an earlier node (see §7.2). There are
+no retry counters, no `branch_on` constructs, and no magic strings.
 
 Data flows two ways:
 
@@ -427,13 +428,25 @@ loop while frontier nonempty:
   (`max_node_workers`, default 8); a single ready node takes a no-thread
   hot path. The first exception cancels not-yet-started siblings and
   re-raises.
-- A node that already completed in this scope is never re-executed —
-  re-entry attempts are silently skipped. **Looping is done across
-  subgraphs** (each subgraph visit gets a fresh scope), not within one.
+- **Static** edges to an already-completed node are silently skipped
+  (frontier dedup) — a static back edge is never a loop. A **conditional**
+  edge that resolves to an already-completed node *is* a backward (loop)
+  edge: the scheduler resets the loop body — every node forward-reachable
+  from the target — by clearing it from the scope's completed/seen sets,
+  then re-enqueues the target so the body re-executes. `local_outputs` and
+  `cross_subgraph_outputs` are **not** cleared; a re-run overwrites them, so
+  the loop's later visit wins (see §7.4). Each subgraph visit also gets a
+  fresh inner scope, so subgraph-internal state resets per iteration.
 - Each scope counts super-steps against `node_visit_cap` (constructor arg,
-  else `GAP_ITERATION_CAP`, default 10000) as a runaway-loop guard.
-  Termination is otherwise a property of the graph's exit-condition wiring
-  — there is no `max_retries` anywhere in the schema.
+  else `GAP_ITERATION_CAP`, default 10000) as a runaway-loop guard — the
+  counter is the total number of super-steps across all loop iterations, so
+  a loop whose exit condition never fires trips the cap. Termination is
+  otherwise a property of the graph's exit-condition wiring — there is no
+  `max_retries` anywhere in the schema.
+- Streaming nodes living *directly* in a looping scope are not re-spawned on
+  loop re-entry (their slots persist for the scope's lifetime); put a
+  per-iteration stream inside a subgraph instead, where the fresh inner
+  scope re-spawns it each visit.
 
 ### 7.3 Conditional dispatch
 

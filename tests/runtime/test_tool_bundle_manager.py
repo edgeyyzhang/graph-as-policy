@@ -46,11 +46,13 @@ class _FakeToolClient:
     """
 
     def __init__(self, bundle_name, bundle_dir, env=None, evict_grace_s=5.0,
-                 catalog=None, on_call=None, raise_on_init: bool = False):
+                 call_timeout_s=None, catalog=None, on_call=None,
+                 raise_on_init: bool = False):
         if raise_on_init:
             raise RuntimeError(f"bundle {bundle_name}: synthetic boot failure")
         self.bundle_name = bundle_name
         self.bundle_dir = bundle_dir
+        self.call_timeout_s = call_timeout_s
         self.catalog = catalog or [
             _FakeCatalogEntry(name=f"{bundle_name}.echo", summary="echo")
         ]

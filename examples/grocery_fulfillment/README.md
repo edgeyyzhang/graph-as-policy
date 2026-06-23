@@ -36,17 +36,44 @@ the full 500-trial gate is the release procedure.
 (`target` / `expected_label` / `shape_hint` — these hints are appended to
 the codegen prompt and are load-bearing), 600 s trial timeout, video on.
 
-## What gets generated
+## The sample graph — direct top-down grasp
 
-[`sample_generated_graph/`](sample_generated_graph) is a real, unedited
-output of `gap.agent.generate` for task 0 ("Pick the blue and yellow
-alphabet soup can and place it in the basket"): the coordinator decomposed
-the task into `perceiving-objects` (target + basket) → `grasping-with-planner`
-→ `transporting-objects`, the subgraph agents authored the inner state
-machines + scripts, and the checkpoint agent attached `validate=True`
-postconditions (held-after-grasp, placed-in-basket) that
-`gap.execute(checkpoints="warn"|"raise")` enforces against simulator ground
-truth at every subgraph exit.
+[`sample_generated_graph/`](sample_generated_graph) began as a real
+`gap.agent.generate` output for task 0 ("Pick the blue and yellow alphabet
+soup can and place it in the basket"): the coordinator decomposed the task
+into `perceiving-objects` (target + basket) → grasp → `transporting-objects`,
+the subgraph agents authored the inner state machines + scripts, and the
+checkpoint agent attached `validate=True` postconditions (held-after-grasp,
+placed-in-basket) that `gap.execute(checkpoints="warn"|"raise")` enforces
+against simulator ground truth at every subgraph exit.
+
+Its grasp subgraph (`grasp_sg`) has since been **hand-modified to a direct
+top-down grasp**. The CuRobo planner stack — `build_world` (collision model)
+→ `plan` (trajectory optimization) → `execute_trajectory` — is replaced by a
+single `robot.go_to_pose` to the top-down pose from
+`geometry.top_down_grasp_candidates`:
+
+```
+open → compute_grasp → go_to_pose(top-down, z_approach=0.10) → observe → close
+```
+
+The subgraph's inputs/outputs (`ee_pose_at_grasp`, `grasp_pose`) and its
+`grasp_sg` checkpoints are untouched, so perception, transport, and the
+postconditions still apply. Run it directly — no generation needed (still
+needs the perception VLM credential):
+
+```bash
+MUJOCO_GL=egl uv run gap run examples/grocery_fulfillment/sample_generated_graph \
+  --sim libero_object_all_variance/0 --checkpoints warn
+```
+
+**Why direct?** On the can it matches the planner (reward 1.0) and runs
+~20 s faster (no world-build + trajectory opt). On a low-profile object —
+e.g. the cream-cheese box (task 1) — the planner can fail outright: CuRobo
+rejects every grasp candidate because the box's top-down pose sits at/below
+the table (read as a "table collision"), whereas the direct move just goes
+there and the gripper pinches the box. The trade-off is no collision
+avoidance, so it relies on an uncluttered straight-line approach.
 
 ## Next steps
 

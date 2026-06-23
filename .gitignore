@@ -17,3 +17,5 @@ node_modules/
 !gap/viz/frontend/dist/
 !gap/viz/frontend/dist/**
 curobo_debug/
+.llm_cache/
+node_data/

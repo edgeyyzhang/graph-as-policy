@@ -25,7 +25,9 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import io
 import logging
+import os
 import sys
 import traceback
 from typing import Any
@@ -33,6 +35,29 @@ from typing import Any
 from .codec import FrameError, decode_frame, write_frame
 
 logger = logging.getLogger(__name__)
+
+
+def _isolate_framing_stdout() -> io.BufferedWriter:
+    """Move the msgpack frame channel off the shared stdout fd.
+
+    The RPC protocol frames travel over the server's *original* stdout
+    (fd 1, piped to gap). Anything else that writes to fd 1 — a stray
+    ``print()`` in a tool, or (the common offender) a C-extension ``printf``
+    from CUDA / Warp / CuRobo — injects bytes mid-frame and desyncs the
+    length-prefixed protocol: the next ``decode_frame`` reads a bogus length
+    and blocks forever in ``read(length)`` while the client blocks waiting
+    for the reply (a both-sides-idle RPC deadlock).
+
+    Defuse it once at startup: dup the real stdout to a private fd used
+    solely for framing, then point fd 1 (and ``sys.stdout``) at stderr so
+    any pollution — Python- or C-level — becomes harmless log output. The
+    returned writer is buffered so ``write_frame``'s ``write``/``flush``
+    never short-writes a frame.
+    """
+    framing_fd = os.dup(1)
+    os.dup2(2, 1)  # fd 1 now aliases stderr; stray writes go there
+    sys.stdout = sys.stderr  # Python-level prints follow
+    return os.fdopen(framing_fd, "wb")  # buffered: write() consumes all bytes
 
 
 def _build_catalog(registry) -> list[dict[str, Any]]:
@@ -214,6 +239,10 @@ def main(argv: list[str] | None = None) -> int:
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     args = parser.parse_args(argv)
 
+    # Isolate the frame channel BEFORE importing the bundle — bundle import
+    # is exactly when CUDA / Warp / CuRobo print their init banners to stdout.
+    framing_out = _isolate_framing_stdout()
+
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format=f"%(asctime)s [%(levelname)s] gap_tool_server[{args.bundle}]: "
@@ -222,8 +251,8 @@ def main(argv: list[str] | None = None) -> int:
 
     _import_bundle_tools(args.bundle)
     registry = _drain_registry()
-    # Open stdin/stdout in binary mode for raw msgpack framing.
-    return _serve(registry, sys.stdin.buffer, sys.stdout.buffer)
+    # stdin stays raw binary for framing; stdout frames go over the isolated fd.
+    return _serve(registry, sys.stdin.buffer, framing_out)
 
 
 if __name__ == "__main__":
