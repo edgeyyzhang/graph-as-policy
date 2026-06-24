@@ -21,6 +21,14 @@
       "type": "subgraph",
       "ref": "transport_sg"
     },
+    "reperceive_basket": {
+      "type": "subgraph",
+      "ref": "container_sg"
+    },
+    "push": {
+      "type": "subgraph",
+      "ref": "push_sg"
+    },
     "done": {
       "type": "end",
       "status": "success"
@@ -57,16 +65,31 @@
     "perceive_next": {
       "router_field": "exit",
       "mapping": {
-        "found": "grasp",
+        "found": "push",
         "none": "done",
         "not_found": "abort"
+      }
+    },
+    "push": {
+      "router_field": "exit",
+      "mapping": {
+        "clear": "grasp",
+        "pushed": "container",
+        "blocked": "abort"
       }
     },
     "grasp": {
       "router_field": "exit",
       "mapping": {
-        "grasped": "transport",
+        "grasped": "reperceive_basket",
         "failed": "abort"
+      }
+    },
+    "reperceive_basket": {
+      "router_field": "exit",
+      "mapping": {
+        "found": "transport",
+        "not_found": "abort"
       }
     },
     "transport": {
@@ -172,9 +195,6 @@
       "outputs": {
         "ee_pose_at_grasp": {
           "$ref": "observe.arms.0.ee_pose"
-        },
-        "grasp_pose": {
-          "$ref": "compute_grasp.candidates.poses.0"
         }
       },
       "nodes": {
@@ -195,13 +215,33 @@
             "z_offset": -0.03
           }
         },
+        "select_short_axis": {
+          "type": "script",
+          "script": "scripts/select_short_axis.py",
+          "inputs": {
+            "target_obb": {
+              "$ref": "in.target_obb"
+            },
+            "candidate_poses": {
+              "$ref": "compute_grasp.candidates.poses"
+            },
+            "prefer": "short"
+          }
+        },
         "goto_grasp": {
           "type": "script",
           "script": "scripts/grasp_move.py",
           "inputs": {
             "grasp_pose": {
-              "$ref": "compute_grasp.candidates.poses.0"
-            }
+              "$ref": "select_short_axis.poses.0"
+            },
+            "candidate_poses": {
+              "$ref": "select_short_axis.poses"
+            },
+            "target_obb": {
+              "$ref": "in.target_obb"
+            },
+            "hover_z": 0.2
           }
         },
         "observe": {
@@ -230,6 +270,10 @@
         ],
         [
           "compute_grasp",
+          "select_short_axis"
+        ],
+        [
+          "select_short_axis",
           "goto_grasp"
         ],
         [
@@ -343,7 +387,7 @@
           "type": "script",
           "inputs": {
             "cameras": {
-              "$ref": "exterior_view.cameras"
+              "$ref": "observe.cameras"
             },
             "object_name": "grocery item",
             "object_description": "a packaged grocery product such as a can, box, carton, jar, or bottle. Never the wicker basket or storage container that the items are being packed into."
@@ -379,15 +423,6 @@
         },
         "none": {
           "type": "noop"
-        },
-        "exterior_view": {
-          "type": "script",
-          "script": "scripts/exterior_view.py",
-          "inputs": {
-            "cameras": {
-              "$ref": "observe.cameras"
-            }
-          }
         }
       },
       "edges": [
@@ -397,10 +432,6 @@
         ],
         [
           "observe",
-          "exterior_view"
-        ],
-        [
-          "exterior_view",
           "perceive"
         ],
         [
@@ -437,6 +468,65 @@
         ]
       },
       "on_error": "not_found"
+    },
+    "push_sg": {
+      "skill": "",
+      "inputs": {
+        "target_obb": "OrientedBoundingBox",
+        "container_obb": "OrientedBoundingBox"
+      },
+      "outputs": {},
+      "nodes": {
+        "decide_push": {
+          "type": "router",
+          "inputs": {
+            "target_obb": {
+              "$ref": "in.target_obb"
+            },
+            "container_obb": {
+              "$ref": "in.container_obb"
+            }
+          },
+          "script": "scripts/push_basket_away.py"
+        },
+        "clear": {
+          "type": "noop"
+        },
+        "pushed": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "decide_push"
+        ],
+        [
+          "clear",
+          "END"
+        ],
+        [
+          "pushed",
+          "END"
+        ]
+      ],
+      "conditional_edges": {
+        "decide_push": {
+          "router_field": null,
+          "mapping": {
+            "clear": "clear",
+            "pushed": "pushed"
+          }
+        }
+      },
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "clear",
+          "pushed"
+        ]
+      },
+      "on_error": "blocked"
     }
   }
 }

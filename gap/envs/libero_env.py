@@ -670,6 +670,17 @@ class FrankaLiberoEnv(BaseEnv):
             return float(cr) >= 1.0
         return self.handle.env.check_success()
 
+    def completion_rate(self) -> float:
+        """Fraction of items delivered (0..1), from the env's cached step info.
+        This is the authoritative progress metric (the sparse ``compute_reward``
+        only pays out at full completion). Falls back to the binary success flag
+        when the predicate exposes no rate."""
+        info = self._current_info or {}
+        cr = info.get("completion_rate")
+        if cr is not None:
+            return float(cr)
+        return 1.0 if info.get("success") else 0.0
+
     # ----------------------- Video Capture -----------------------
     #
     # Each captured frame is written to disk as its own PNG (into a

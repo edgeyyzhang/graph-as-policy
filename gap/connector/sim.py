@@ -157,7 +157,14 @@ class SimConnector(Connector):
 
     def _tool_check_success(self) -> dict:
         completed, reward = self.check_success()
-        return {"task_completed": completed, "reward": reward}
+        out = {"task_completed": completed, "reward": reward}
+        cr_fn = getattr(self.env, "completion_rate", None)
+        if cr_fn is not None:
+            try:
+                out["completion_rate"] = float(cr_fn())
+            except Exception:
+                pass
+        return out
 
     def _tool_apply_policy_action(self, action: list[float]) -> None:
         """Forward a single low-level action to the env's controller.
