@@ -4,6 +4,7 @@
 [submodule "third_party/Variational-Automation-Benchmark"]
 	path = third_party/Variational-Automation-Benchmark
 	url = https://github.com/ehehee/Variational-Automation-Benchmark.git
+	branch = packing_v0.1
 [submodule "third_party/robosuite"]
 	path = third_party/robosuite
 	url = https://github.com/Max-Fu/robosuite.git
