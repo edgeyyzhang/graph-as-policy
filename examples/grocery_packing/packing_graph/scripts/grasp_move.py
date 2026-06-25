@@ -16,12 +16,22 @@ but another in the fan succeeds.
 import logging
 from typing import TypedDict
 
+import numpy as np
 from gap import NodeContext
 from gap_core.types import OrientedBoundingBox, Se3Pose
 
 logger = logging.getLogger(__name__)
 
 _DOWN = {"w": 0.0, "x": 1.0, "y": 0.0, "z": 0.0}
+
+# An item OBB wider than this (full size, m) is almost certainly two adjacent
+# objects the front camera fused into one box; a single grocery item is ~0.05-0.08.
+_MERGE_WIDTH = 0.12
+# Lift the wrist THIS high over a fused region before looking down. Low over the
+# merged centroid puts each object at the camera's FOV edge (grazing -> degenerate
+# cloud); from up here the top-down FOV covers BOTH objects and measures their
+# heights, so we can split them and pick the graspable one.
+_WRIST_RAISE_Z = 0.42
 
 # Grasp depth tuning. _GRASP_DEEPEN is how far BELOW the top-down candidate Z the
 # gripper descends -- smaller = shallower grip, closer to the perceived top. Set
@@ -73,6 +83,83 @@ def _descend_linear(ctx: NodeContext, target_z: float, from_z: float,
         _cartesian(ctx, ee["x"], ee["y"], target_z, rotation)
 
 
+def _wrist_world_cloud(ctx: NodeContext) -> np.ndarray:
+    """Project the eye-in-hand (wrist) depth to a world-frame cloud at the arm's
+    CURRENT pose. Returns (N,3) (empty on failure)."""
+    obs = ctx.tool("robot.get_observation")
+    cams = obs.get("cameras") or []
+    if isinstance(cams, dict):
+        cams = list(cams.values())
+    cam = next((c for c in cams if "eye_in_hand" in (c.get("name") or "")), None)
+    if cam is None:
+        return np.empty((0, 3), dtype=float)
+    cf = ctx.tool("geometry.depth_to_point_cloud",
+                  depth=cam["depth"], intrinsics=cam["intrinsics"])["points"]
+    world = ctx.tool("geometry.transform_points", points=cf, transform=cam["pose"])["points"]
+    return np.asarray(world["points"], dtype=float).reshape(-1, 3)
+
+
+def _raised_wrist_pick(ctx: NodeContext, target_obb: OrientedBoundingBox):
+    """Wide-OBB merge fallback. Lift the wrist to ``_WRIST_RAISE_Z`` over the fused
+    region for a top-down look that covers BOTH objects (a low hover put each at
+    the FOV edge), crop to the OBB footprint, split at the gap along the long axis,
+    and return the OBB of the TALLEST cluster -- height is what the top-down view
+    measures directly and what makes an object graspable (a carton beats a flat
+    box). Returns None when the OBB isn't a merge or the split fails."""
+    c, e = target_obb["center"], target_obb["extent"]
+    ex, ey, ez = float(e["x"]), float(e["y"]), float(e["z"])
+    if max(ex, ey) * 2.0 <= _MERGE_WIDTH:
+        return None
+    cx, cy, cz = float(c["x"]), float(c["y"]), float(c["z"])
+    try:
+        _cartesian(ctx, cx, cy, _WRIST_RAISE_Z, _DOWN)        # lift high over the merge centroid
+        pts = _wrist_world_cloud(ctx)
+        if len(pts) < 80:
+            return None
+        base_z = cz - ez
+        reg = pts[(np.abs(pts[:, 0] - cx) <= ex + 0.04) &
+                  (np.abs(pts[:, 1] - cy) <= ey + 0.04) &
+                  (pts[:, 2] > base_z + 0.006) &              # drop the table plane
+                  (pts[:, 2] < cz + ez + 0.06)]               # drop the gripper, well above the objects
+        if len(reg) < 50:
+            return None
+        axis = 0 if ex >= ey else 1
+        vals = reg[:, axis]
+        h, edges = np.histogram(vals, bins=20, range=(float(vals.min()), float(vals.max())))
+        pop = h >= max(4, h.max() * 0.04)
+        pi = np.where(pop)[0]
+        if len(pi) < 2:
+            return None
+        first, last, best_len, best_mid, run = int(pi[0]), int(pi[-1]), 0, None, None
+        for i in range(first + 1, last):
+            if not pop[i]:
+                run = i if run is None else run
+                if i - run + 1 >= best_len:
+                    best_len, best_mid = i - run + 1, (run + i) // 2
+            else:
+                run = None
+        if best_mid is None:
+            return None
+        split = float(edges[best_mid + 1])
+        cands = []
+        for side in (reg[reg[:, axis] < split], reg[reg[:, axis] >= split]):
+            if len(side) >= 30:
+                cands.append(ctx.tool("geometry.filter_and_compute_obb",
+                                      points={"points": side.tolist()})["obb"])
+        if not cands:
+            return None
+        pick = max(cands, key=lambda o: float(o["extent"]["z"]))   # tallest = most graspable
+        pc, pe = pick["center"], pick["extent"]
+        logger.info("[grasp] merged %.0fmm -> raised-wrist split (%d obj) -> tallest @ (%.3f,%.3f) "
+                    "h=%.0fmm %.0fx%.0fmm",
+                    max(ex, ey) * 2000, len(cands), float(pc["x"]), float(pc["y"]),
+                    float(pe["z"]) * 2000, float(pe["x"]) * 2000, float(pe["y"]) * 2000)
+        return pick
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[grasp] raised-wrist split failed (%s); keeping original OBB", exc)
+        return None
+
+
 def _cartesian_grasp(ctx: NodeContext, grasp_pose: Se3Pose,
                      target_obb: OrientedBoundingBox, hover_z: float) -> None:
     """Fast path: rise -> XY over object (rotating to the grasp yaw) -> descend.
@@ -85,11 +172,20 @@ def _cartesian_grasp(ctx: NodeContext, grasp_pose: Se3Pose,
     cream cheese) that floor is ~mid-height, preserving a real side grip."""
     g = grasp_pose["position"]
     rot = grasp_pose.get("rotation") or _DOWN      # grasp orientation (top-down candidate yaw)
+    gx, gy = float(g["x"]), float(g["y"])
     base_z = float(target_obb["center"]["z"]) - float(target_obb["extent"]["z"])
     grasp_z = max(float(g["z"]) - _GRASP_DEEPEN, base_z + _BASE_CLEARANCE)  # shallow grip near top, still clear of table
+    # Merged-OBB fallback: a too-wide item OBB fused two objects, so (gx,gy) is the
+    # empty gap. A raised top-down wrist look isolates the most graspable (tallest)
+    # object -- re-aim onto it. Keep grasp_z from the merged OBB, whose top ~ the
+    # tall object's top (the front camera's height is reliable; the wrist's isn't).
+    picked = _raised_wrist_pick(ctx, target_obb)
+    if picked is not None:
+        pc = picked["center"]
+        gx, gy, rot = float(pc["x"]), float(pc["y"]), _DOWN
     cur = ctx.tool("robot.get_ee_pose")["pose"]["position"]
     _cartesian(ctx, cur["x"], cur["y"], hover_z, _DOWN)   # Seg 0: rise to hover (keep down)
-    _cartesian(ctx, g["x"], g["y"], hover_z, rot)         # Seg 1: XY over object + rotate to grasp yaw
+    _cartesian(ctx, gx, gy, hover_z, rot)                 # Seg 1: XY over object + rotate to grasp yaw
     _descend_linear(ctx, grasp_z, hover_z, rot)           # Seg 2: descend INTO it (clamped; LOCK keeps yaw)
 
 
