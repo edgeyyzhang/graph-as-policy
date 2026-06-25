@@ -287,6 +287,11 @@ class DagTrace:
         self._events: list[TraceEvent] = []
         self._counter: int = 0
         self._event_counter: int = 0
+        # Per-node visit counter so a node that runs many times in a loop (e.g.
+        # reperceive_basket each pack cycle) no longer overwrites its earlier
+        # iterations. Top-level node_data/<name>/ keeps the LATEST visit (viz
+        # back-compat); the full per-iteration history lives under .../iters/<NNN>/.
+        self._visit_counts: dict[str, int] = {}
 
         # Lifecycle hooks — used by harnesses (rehearsal, comparison tools)
         # to capture extra state at node boundaries without modifying the
@@ -348,6 +353,10 @@ class DagTrace:
     # --- Lifecycle ---
 
     def start_node(self, name: str) -> None:
+        # New visit of this node -> bump its visit index so the per-visit
+        # resolved_inputs/output snapshots land in a fresh iters/<NNN>/ dir
+        # instead of clobbering the previous loop iteration.
+        self._visit_counts[name] = self._visit_counts.get(name, -1) + 1
         node = self._node_map.get(name)
         if node:
             node.started_at = time.time()
@@ -408,6 +417,15 @@ class DagTrace:
         d.mkdir(parents=True, exist_ok=True)
         return d
 
+    def _iter_dir(self, name: str) -> Path:
+        """Per-visit snapshot dir for ``name``'s current visit. Mirrors the
+        node's resolved_inputs/output so loop iterations are all preserved;
+        the top-level node_data/<name>/ still holds the latest visit."""
+        v = self._visit_counts.get(name, 0)
+        d = self._node_data_dir / name / "iters" / f"{v:03d}"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
     def record_resolved_inputs(self, name: str, resolved: dict[str, Any]) -> None:
         """Serialize resolved inputs to disk and extract visual assets."""
         node = self._node_map.get(name)
@@ -422,9 +440,12 @@ class DagTrace:
             for key, val in resolved.items():
                 all_assets += _extract_assets(val, assets_dir, f"input_{key}")
 
-            # Serialize inputs as JSON
+            # Serialize inputs as JSON. Write the latest to the top-level dir
+            # (back-compat) and a per-visit copy under iters/<NNN>/ (history).
             serialized = _serialize_value(resolved)
             with open(node_dir / "resolved_inputs.json", "w") as f:
+                json.dump(serialized, f, indent=2, default=_json_default)
+            with open(self._iter_dir(name) / "resolved_inputs.json", "w") as f:
                 json.dump(serialized, f, indent=2, default=_json_default)
 
             node.has_inputs = True
@@ -455,9 +476,12 @@ class DagTrace:
             else:
                 all_assets += _extract_assets(output, assets_dir, "output")
 
-            # Serialize output as JSON
+            # Serialize output as JSON. Latest to the top-level dir (back-compat),
+            # per-visit copy under iters/<NNN>/ so loop iterations are preserved.
             serialized = _serialize_value(output)
             with open(node_dir / "output.json", "w") as f:
+                json.dump(serialized, f, indent=2, default=_json_default)
+            with open(self._iter_dir(name) / "output.json", "w") as f:
                 json.dump(serialized, f, indent=2, default=_json_default)
 
             node.has_output = True
