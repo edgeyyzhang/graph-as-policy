@@ -2,13 +2,9 @@
   "version": 3,
   "meta": {
     "name": "grocery_packing",
-    "description": "Pick up every grocery item on the table and place each in the basket, looping until only the basket remains. Reuses grocery_fulfillment's perceive/grasp/transport subgraphs verbatim; the loop head perceives a 'grocery item' (never the basket) and exits 'none' when the table is clear."
+    "description": "Pick up every grocery item on the table and place each in the basket, looping until only the basket remains. Each loop's perceive_next observes the basket AND the next grocery item from one clean pre-grasp viewpoint (a single get_observation), so the basket OBB is never polluted by the extended arm of a post-grasp reperception; grasp then transport places into that freshly-perceived basket."
   },
   "nodes": {
-    "container": {
-      "type": "subgraph",
-      "ref": "container_sg"
-    },
     "perceive_next": {
       "type": "subgraph",
       "ref": "perceive_next_sg"
@@ -20,14 +16,6 @@
     "transport": {
       "type": "subgraph",
       "ref": "transport_sg"
-    },
-    "reperceive_basket": {
-      "type": "subgraph",
-      "ref": "container_sg"
-    },
-    "push": {
-      "type": "subgraph",
-      "ref": "push_sg"
     },
     "done": {
       "type": "end",
@@ -51,45 +39,23 @@
   "edges": [
     [
       "START",
-      "container"
+      "perceive_next"
     ]
   ],
   "conditional_edges": {
-    "container": {
-      "router_field": "exit",
-      "mapping": {
-        "found": "perceive_next",
-        "not_found": "abort"
-      }
-    },
     "perceive_next": {
       "router_field": "exit",
       "mapping": {
-        "found": "push",
+        "found": "grasp",
         "none": "done",
         "not_found": "abort"
-      }
-    },
-    "push": {
-      "router_field": "exit",
-      "mapping": {
-        "clear": "grasp",
-        "pushed": "container",
-        "blocked": "abort"
       }
     },
     "grasp": {
       "router_field": "exit",
       "mapping": {
-        "grasped": "reperceive_basket",
+        "grasped": "transport",
         "failed": "abort"
-      }
-    },
-    "reperceive_basket": {
-      "router_field": "exit",
-      "mapping": {
-        "found": "transport",
-        "not_found": "abort"
       }
     },
     "transport": {
@@ -101,46 +67,30 @@
     }
   },
   "subgraphs": {
-    "container_sg": {
+    "perceive_next_sg": {
       "skill": "perceiving-objects",
       "inputs": {},
       "outputs": {
+        "target_obb": {
+          "$ref": "filter_obb_item.obb"
+        },
+        "target_mask": {
+          "$ref": "perceive_item.mask"
+        },
         "container_obb": {
-          "$ref": "filter_obb.obb"
+          "$ref": "filter_obb_basket.obb"
         },
         "container_mask": {
-          "$ref": "perceive.mask"
+          "$ref": "perceive_basket.mask"
         },
         "container_cloud": {
-          "$ref": "perceive.cloud"
+          "$ref": "perceive_basket.cloud"
         }
       },
       "nodes": {
         "observe": {
           "type": "tool",
           "tool": "robot.get_observation"
-        },
-        "perceive": {
-          "type": "script",
-          "inputs": {
-            "cameras": {
-              "$ref": "exterior_view.cameras"
-            },
-            "object_name": "basket"
-          },
-          "script": "scripts/perceive_dino_vlm.py"
-        },
-        "filter_obb": {
-          "type": "tool",
-          "inputs": {
-            "points": {
-              "$ref": "perceive.cloud"
-            }
-          },
-          "tool": "geometry.filter_and_compute_obb"
-        },
-        "found": {
-          "type": "noop"
         },
         "exterior_view": {
           "type": "script",
@@ -150,6 +100,66 @@
               "$ref": "observe.cameras"
             }
           }
+        },
+        "perceive_basket": {
+          "type": "script",
+          "script": "scripts/perceive_dino_vlm.py",
+          "inputs": {
+            "cameras": {
+              "$ref": "exterior_view.cameras"
+            },
+            "object_name": "basket"
+          }
+        },
+        "filter_obb_basket": {
+          "type": "tool",
+          "tool": "geometry.filter_and_compute_obb",
+          "inputs": {
+            "points": {
+              "$ref": "perceive_basket.cloud"
+            }
+          }
+        },
+        "perceive_item": {
+          "type": "script",
+          "script": "scripts/perceive_dino_vlm.py",
+          "inputs": {
+            "cameras": {
+              "$ref": "observe.cameras"
+            },
+            "object_name": "grocery item",
+            "object_description": "a packaged grocery product such as a can, box, carton, jar, or bottle. Never the wicker basket or storage container that the items are being packed into."
+          }
+        },
+        "decide": {
+          "type": "router",
+          "script": "scripts/route_next_object.py",
+          "inputs": {
+            "found": {
+              "$ref": "perceive_item.found"
+            },
+            "cloud": {
+              "$ref": "perceive_item.cloud"
+            },
+            "container_obb": {
+              "$ref": "filter_obb_basket.obb"
+            }
+          }
+        },
+        "filter_obb_item": {
+          "type": "tool",
+          "tool": "geometry.filter_and_compute_obb",
+          "inputs": {
+            "points": {
+              "$ref": "perceive_item.cloud"
+            }
+          }
+        },
+        "found": {
+          "type": "noop"
+        },
+        "none": {
+          "type": "noop"
         }
       },
       "edges": [
@@ -163,26 +173,47 @@
         ],
         [
           "exterior_view",
-          "perceive"
+          "perceive_basket"
         ],
         [
-          "perceive",
-          "filter_obb"
+          "perceive_basket",
+          "filter_obb_basket"
         ],
         [
-          "filter_obb",
+          "filter_obb_basket",
+          "perceive_item"
+        ],
+        [
+          "perceive_item",
+          "decide"
+        ],
+        [
+          "filter_obb_item",
           "found"
         ],
         [
           "found",
           "END"
+        ],
+        [
+          "none",
+          "END"
         ]
       ],
-      "conditional_edges": {},
+      "conditional_edges": {
+        "decide": {
+          "router_field": null,
+          "mapping": {
+            "found": "filter_obb_item",
+            "none": "none"
+          }
+        }
+      },
       "exit": {
         "router_field": null,
         "success_values": [
-          "found"
+          "found",
+          "none"
         ]
       },
       "on_error": "not_found"
@@ -215,28 +246,15 @@
             "z_offset": -0.03
           }
         },
-        "select_short_axis": {
-          "type": "script",
-          "script": "scripts/select_short_axis.py",
-          "inputs": {
-            "target_obb": {
-              "$ref": "in.target_obb"
-            },
-            "candidate_poses": {
-              "$ref": "compute_grasp.candidates.poses"
-            },
-            "prefer": "short"
-          }
-        },
         "goto_grasp": {
           "type": "script",
           "script": "scripts/grasp_move.py",
           "inputs": {
             "grasp_pose": {
-              "$ref": "select_short_axis.poses.0"
+              "$ref": "compute_grasp.candidates.poses.0"
             },
             "candidate_poses": {
-              "$ref": "select_short_axis.poses"
+              "$ref": "compute_grasp.candidates.poses"
             },
             "target_obb": {
               "$ref": "in.target_obb"
@@ -270,10 +288,6 @@
         ],
         [
           "compute_grasp",
-          "select_short_axis"
-        ],
-        [
-          "select_short_axis",
           "goto_grasp"
         ],
         [
@@ -364,169 +378,6 @@
       },
       "on_error": "blocked",
       "stage": "place"
-    },
-    "perceive_next_sg": {
-      "skill": "perceiving-objects",
-      "inputs": {
-        "container_obb": "OrientedBoundingBox"
-      },
-      "outputs": {
-        "target_obb": {
-          "$ref": "filter_obb.obb"
-        },
-        "target_mask": {
-          "$ref": "perceive.mask"
-        }
-      },
-      "nodes": {
-        "observe": {
-          "type": "tool",
-          "tool": "robot.get_observation"
-        },
-        "perceive": {
-          "type": "script",
-          "inputs": {
-            "cameras": {
-              "$ref": "observe.cameras"
-            },
-            "object_name": "grocery item",
-            "object_description": "a packaged grocery product such as a can, box, carton, jar, or bottle. Never the wicker basket or storage container that the items are being packed into."
-          },
-          "script": "scripts/perceive_dino_vlm.py"
-        },
-        "decide": {
-          "type": "router",
-          "inputs": {
-            "found": {
-              "$ref": "perceive.found"
-            },
-            "cloud": {
-              "$ref": "perceive.cloud"
-            },
-            "container_obb": {
-              "$ref": "in.container_obb"
-            }
-          },
-          "script": "scripts/route_next_object.py"
-        },
-        "filter_obb": {
-          "type": "tool",
-          "inputs": {
-            "points": {
-              "$ref": "perceive.cloud"
-            }
-          },
-          "tool": "geometry.filter_and_compute_obb"
-        },
-        "found": {
-          "type": "noop"
-        },
-        "none": {
-          "type": "noop"
-        }
-      },
-      "edges": [
-        [
-          "START",
-          "observe"
-        ],
-        [
-          "observe",
-          "perceive"
-        ],
-        [
-          "perceive",
-          "decide"
-        ],
-        [
-          "filter_obb",
-          "found"
-        ],
-        [
-          "found",
-          "END"
-        ],
-        [
-          "none",
-          "END"
-        ]
-      ],
-      "conditional_edges": {
-        "decide": {
-          "router_field": null,
-          "mapping": {
-            "found": "filter_obb",
-            "none": "none"
-          }
-        }
-      },
-      "exit": {
-        "router_field": null,
-        "success_values": [
-          "found",
-          "none"
-        ]
-      },
-      "on_error": "not_found"
-    },
-    "push_sg": {
-      "skill": "",
-      "inputs": {
-        "target_obb": "OrientedBoundingBox",
-        "container_obb": "OrientedBoundingBox"
-      },
-      "outputs": {},
-      "nodes": {
-        "decide_push": {
-          "type": "router",
-          "inputs": {
-            "target_obb": {
-              "$ref": "in.target_obb"
-            },
-            "container_obb": {
-              "$ref": "in.container_obb"
-            }
-          },
-          "script": "scripts/push_basket_away.py"
-        },
-        "clear": {
-          "type": "noop"
-        },
-        "pushed": {
-          "type": "noop"
-        }
-      },
-      "edges": [
-        [
-          "START",
-          "decide_push"
-        ],
-        [
-          "clear",
-          "END"
-        ],
-        [
-          "pushed",
-          "END"
-        ]
-      ],
-      "conditional_edges": {
-        "decide_push": {
-          "router_field": null,
-          "mapping": {
-            "clear": "clear",
-            "pushed": "pushed"
-          }
-        }
-      },
-      "exit": {
-        "router_field": null,
-        "success_values": [
-          "clear",
-          "pushed"
-        ]
-      },
-      "on_error": "blocked"
     }
   }
 }

@@ -1,6 +1,6 @@
 """Grasp with a fast path and a robust fallback.
 
-PRIMARY — VAB-style cartesian descend on the chosen (long-axis) pose:
+PRIMARY — VAB-style cartesian descend on the first top-down candidate pose:
 rise (Z) -> XY over the object -> LINEAR descend onto it. Fast, leaves a clean
 down-facing config, and (unlike the planner's goalset) happily grasps a flat
 object by simply lowering onto it.
@@ -23,10 +23,14 @@ logger = logging.getLogger(__name__)
 
 _DOWN = {"w": 0.0, "x": 1.0, "y": 0.0, "z": 0.0}
 
-# Grasp depth tuning. Drop this far below the top-down candidate Z for a firmer
-# hold, but keep the fingertips at least _BASE_CLEARANCE above the object base
-# (~the table) so the jaws never ram into the surface.
-_GRASP_DEEPEN = 0.02
+# Grasp depth tuning. _GRASP_DEEPEN is how far BELOW the top-down candidate Z the
+# gripper descends -- smaller = shallower grip, closer to the perceived top. Set
+# to 0.0 so the grip sits at the candidate (~0.03 m below the perceived OBB top):
+# descending deeper rams the panda_hand into tall cartons that perception
+# under-measures (they read ~8 cm but are ~17 cm) and topples them -> jaws shut on
+# air. _BASE_CLEARANCE keeps the grip above the object base so the fingers never
+# strike the table (a very flat box thus still gets a mid-height grip).
+_GRASP_DEEPEN = 0.0
 _BASE_CLEARANCE = 0.012
 
 
@@ -73,16 +77,16 @@ def _cartesian_grasp(ctx: NodeContext, grasp_pose: Se3Pose,
                      target_obb: OrientedBoundingBox, hover_z: float) -> None:
     """Fast path: rise -> XY over object (rotating to the grasp yaw) -> descend.
 
-    Descend DEEPER than the candidate for a firmer hold: the default -0.03
-    z-offset sits just under the OBB top, a shallow grip that lets taller items
-    pivot out of the jaws, so drop a further _GRASP_DEEPEN. The floor is
-    _BASE_CLEARANCE above the object base so the fingers never ram the table;
-    for a very flat box (e.g. the 18 mm cream cheese) that floor is ~mid-height,
-    preserving the old "grip the sides, not empty space" behaviour."""
+    Grip just under the candidate Z (~0.03 m below the perceived OBB top) -- a
+    SHALLOW grip (``_GRASP_DEEPEN`` adds no extra descent). A deeper grasp rams
+    the panda_hand into tall cartons that perception under-measures and topples
+    them, so the jaws close on air. The floor is _BASE_CLEARANCE above the object
+    base so the fingers never ram the table; for a very flat box (e.g. the 18 mm
+    cream cheese) that floor is ~mid-height, preserving a real side grip."""
     g = grasp_pose["position"]
-    rot = grasp_pose.get("rotation") or _DOWN      # grasp orientation (short-axis yaw)
+    rot = grasp_pose.get("rotation") or _DOWN      # grasp orientation (top-down candidate yaw)
     base_z = float(target_obb["center"]["z"]) - float(target_obb["extent"]["z"])
-    grasp_z = max(float(g["z"]) - _GRASP_DEEPEN, base_z + _BASE_CLEARANCE)  # deeper, still clear of table
+    grasp_z = max(float(g["z"]) - _GRASP_DEEPEN, base_z + _BASE_CLEARANCE)  # shallow grip near top, still clear of table
     cur = ctx.tool("robot.get_ee_pose")["pose"]["position"]
     _cartesian(ctx, cur["x"], cur["y"], hover_z, _DOWN)   # Seg 0: rise to hover (keep down)
     _cartesian(ctx, g["x"], g["y"], hover_z, rot)         # Seg 1: XY over object + rotate to grasp yaw
