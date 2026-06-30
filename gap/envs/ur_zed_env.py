@@ -21,12 +21,13 @@ environment variable (path to a UR URDF) or falls back to
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 from scipy.spatial.transform import Rotation
+
+from gap import env_config
 
 from gap.envs.base_env import BaseEnv
 
@@ -159,7 +160,7 @@ def _load_ur_urdf():
     """Load the UR URDF for FK: ``GAP_UR_URDF`` path or ur5e_description."""
     import yourdfpy
 
-    urdf_path = os.environ.get("GAP_UR_URDF")
+    urdf_path = env_config.ur_urdf()
     if urdf_path:
         logger.info("[URZedEnv] Loading URDF from GAP_UR_URDF=%s", urdf_path)
         return yourdfpy.URDF.load(urdf_path)
@@ -206,7 +207,7 @@ class URZedEnv(BaseEnv):
         self._urdf = _load_ur_urdf()
 
         # --- Camera calibration (4x4 camera→wrist) ---
-        calibration_path = calibration_path or os.environ.get("GAP_UR_ZED_CALIB")
+        calibration_path = calibration_path or env_config.ur_zed_calib()
         if calibration_path:
             self._T_cam_to_wrist = np.load(str(calibration_path))
             logger.info("[URZedEnv] Loaded calibration from %s", calibration_path)
@@ -387,7 +388,7 @@ def make_env(
         action_mode="absolute_joints",
         control_freq=15.0,
         home_joints=_UR_HOME_JOINTS,
-        robot_urdf_path=os.environ.get("GAP_UR_URDF") or "ur5e_description",
+        robot_urdf_path=env_config.ur_urdf() or "ur5e_description",
         default_cameras=tuple(env.camera_names),
         is_real=True,
     )

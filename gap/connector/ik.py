@@ -656,6 +656,12 @@ class CuRoboBackend:
         self._home_joints = list(home_joints) if home_joints is not None else None
         self._arm_bases = list(arm_bases) if arm_bases is not None else None
         self._robot_file = robot_file
+        # Opt-in cuRobo CUDA-graph capture for the v0.8 pose planner. After a
+        # one-time capture warmup, repeated same-config plans run far faster.
+        # Valid for the free-space (world=off) IK path used by go_to_pose
+        # (fixed shapes). ``GAP_CUROBO_CUDA_GRAPH=1`` enables it.
+        from gap import env_config
+        self._use_cuda_graph = env_config.curobo_cuda_graph()
         # robot_urdf / robot_urdf_path / target_link accepted for interface
         # parity with PyRokiBackend but unused: cuRobo resolves the model from
         # robot_file. Stash for diagnostics.
@@ -810,6 +816,7 @@ class CuRoboBackend:
                 start_joint_position=seed_arr,
                 robot_file=self._robot_file,
                 tcp_offset=None,  # already applied in _pose_for_curobo
+                use_cuda_graph=self._use_cuda_graph,
             )
         except Exception:
             logger.exception("CuRoboBackend.solve_ik: plan_to_pose raised")
@@ -899,6 +906,7 @@ class CuRoboBackend:
                 start_joint_position=seed_arr,
                 robot_file=self._robot_file,
                 tcp_offset=None,  # already applied in _pose_for_curobo
+                use_cuda_graph=self._use_cuda_graph,
             )
         except Exception:
             logger.exception(
@@ -938,6 +946,7 @@ class CuRoboBackend:
                 start_joint_position=seed_arr,
                 robot_file=self._robot_file,
                 tcp_offset=None,  # already applied in _pose_for_curobo
+                use_cuda_graph=self._use_cuda_graph,
             )
         except Exception:
             logger.exception("CuRoboBackend.plan_to_pose raised")

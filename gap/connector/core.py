@@ -24,6 +24,7 @@ connector preserves that and never re-encodes image buffers.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import math
 from collections.abc import Callable
@@ -32,6 +33,7 @@ from typing import Any
 
 import numpy as np
 
+from gap import env_config
 from gap_core.errors import ToolError
 from gap_core.tools import ToolRegistry
 from gap_core.types import (
@@ -156,6 +158,14 @@ class Connector:
             [tuple(float(v) for v in b) for b in bases] if bases is not None else None
         )
         self.is_real: bool = bool(getattr(config, "is_real", False))
+        # Opt-in policy-like OSC Cartesian servo for straight-line moves
+        # (``go_to_pose_cartesian``): streams clamped OSC deltas through the
+        # env's ``apply_policy_action`` with NO IK/planning. Off by default —
+        # it drops collision-checking on the servo'd segment, so enable only
+        # where the straight-line path is known clear. Falls back to the
+        # cuRobo linear plan on stall/non-convergence.
+        self._servo_enabled = env_config.libero_servo()
+        self._cam_suspend_depth = 0  # reentrancy guard for _quiet_motion
 
         # Pluggable IK backend (cuRobo by default; lazy). Pass ``ik=`` to
         # opt into PyRoKi or any other backend implementing the same surface.
@@ -501,8 +511,7 @@ class Connector:
             # Let physics settle after convergence (YAM needs this; Panda doesn't)
             if settle_steps is None:
                 settle_steps = 30 if dof == 6 else 0
-            for _ in range(settle_steps):
-                self.step_once()
+            self._settle(settle_steps)
             return
 
         # Manual convergence loop (single-arm fallback for sim envs)
@@ -578,6 +587,19 @@ class Connector:
                 pass
         return obs, reward, bool(done), truncated, info
 
+    def _settle(self, n: int) -> None:
+        """Advance ``n`` hold steps (physics + video frame only). Skips the
+        per-step ``get_observation`` + ``compute_reward`` + callback emit that
+        ``step_once`` does — a hold-in-place settle needs none of it — UNLESS a
+        step callback (e.g. a DataCollector) is attached, in which case each
+        step is recorded via the full ``step_once`` path."""
+        if self._step_callbacks or not hasattr(self.env, "_step_once"):
+            for _ in range(int(n)):
+                self.step_once()
+        else:
+            for _ in range(int(n)):
+                self.env._step_once()
+
     def set_gripper(self, fraction: float, arm_id: int = 0) -> None:
         """Set gripper open fraction (0 closed, 1 open). Local call."""
         self._gripper_fraction = float(np.clip(fraction, 0.0, 1.0))
@@ -588,12 +610,43 @@ class Connector:
     # Gripper (absorbed GripperServicer)
     # ------------------------------------------------------------------
 
+    @contextlib.contextmanager
+    def _quiet_motion(self):
+        """Suspend the env's per-step camera rendering for a motion/settle
+        segment (``GAP_LIBERO_MOTION_RENDER=0``), restoring + refreshing on exit
+        so the next perception read sees fresh frames. Reentrant; a no-op when
+        the env doesn't support it or rendering-in-motion is on."""
+        env = self.env
+        setf = getattr(env, "set_cameras_active", None)
+        if (
+            setf is None
+            or getattr(env, "_motion_render", True)
+            or self._cam_suspend_depth > 0
+        ):
+            self._cam_suspend_depth += 1
+            try:
+                yield
+            finally:
+                self._cam_suspend_depth -= 1
+            return
+        self._cam_suspend_depth += 1
+        setf(False)
+        try:
+            yield
+        finally:
+            setf(True)
+            self._cam_suspend_depth -= 1
+            try:
+                env.refresh_camera_obs()
+            except Exception:
+                logger.debug("refresh_camera_obs failed", exc_info=True)
+
     def open_gripper(self, settle_steps: int = 40, arm_id: int = 0) -> dict:
         """Open the gripper and run the settle loop (default 40 steps)."""
         settle = settle_steps if settle_steps > 0 else 40
         self.set_gripper(1.0, arm_id=arm_id)
-        for _ in range(settle):
-            self.step_once()
+        with self._quiet_motion():
+            self._settle(settle)
         position = self.get_gripper_fraction(arm_id=arm_id)
         logger.info(
             "robot.open_gripper arm=%d settle=%d -> position=%.4f",
@@ -605,8 +658,8 @@ class Connector:
         """Close the gripper and run the settle loop (default 60 steps)."""
         settle = settle_steps if settle_steps > 0 else 60
         self.set_gripper(0.0, arm_id=arm_id)
-        for _ in range(settle):
-            self.step_once()
+        with self._quiet_motion():
+            self._settle(settle)
         position = self.get_gripper_fraction(arm_id=arm_id)
         logger.info(
             "robot.close_gripper arm=%d settle=%d -> position=%.4f",
@@ -718,7 +771,9 @@ class Connector:
             # Streaming path: ignore `subsample` — the dense interpolation IS
             # the control sequence; one final settle on the last waypoint
             # replaces the per-waypoint convergence loop.
-            if hasattr(self.env, "stream_joint_trajectory"):
+            if getattr(self.env, "_stream_enabled", True) and hasattr(
+                self.env, "stream_joint_trajectory"
+            ):
                 wps_all: list[list[float]] = []
                 for waypoint in waypoints:
                     joints = _as_positions(waypoint)
@@ -777,6 +832,11 @@ class Connector:
         """
         if not pose:
             raise ToolError("robot.go_to_pose", "pose required")
+        # NB: ``go_to_pose`` is NOT servo'd. It is the contact-rich grasp
+        # descend (and precision hand-off) path, which needs cuRobo's IK +
+        # controlled approach; an OSC straight-line servo onto the object
+        # stalls on contact and misses the grasp (measured reward 1.0 -> 0.0).
+        # Only the free-space straight legs (``go_to_pose_cartesian``) servo.
 
         if tcp_offset is None:
             # Use the env's configured TCP (franka_real: -0.157, libero: -0.1)
@@ -794,22 +854,23 @@ class Connector:
         else:
             max_steps = max_steps if max_steps > 0 else (300 if is_yam else 120)
 
-        # z_approach: first move above target
-        if z_approach > 0 and pose.get("position"):
-            p = pose["position"]
-            approach_pose: Se3Pose = {
-                "position": {"x": p["x"], "y": p["y"], "z": p["z"] + z_approach},
-                "rotation": dict(pose["rotation"]),
-            }
-            joints = self._solve_ik(approach_pose, tcp_offset, arm_id=arm_id)
-            if joints is None:
-                raise ToolError("robot.go_to_pose", "IK failed for approach pose")
-            self.move_to_joints(joints, tolerance=tolerance, max_steps=max_steps, arm_id=arm_id)
+        with self._quiet_motion():
+            # z_approach: first move above target
+            if z_approach > 0 and pose.get("position"):
+                p = pose["position"]
+                approach_pose: Se3Pose = {
+                    "position": {"x": p["x"], "y": p["y"], "z": p["z"] + z_approach},
+                    "rotation": dict(pose["rotation"]),
+                }
+                joints = self._solve_ik(approach_pose, tcp_offset, arm_id=arm_id)
+                if joints is None:
+                    raise ToolError("robot.go_to_pose", "IK failed for approach pose")
+                self.move_to_joints(joints, tolerance=tolerance, max_steps=max_steps, arm_id=arm_id)
 
-        joints = self._solve_ik(pose, tcp_offset, arm_id=arm_id)
-        if joints is None:
-            raise ToolError("robot.go_to_pose", "IK failed for target pose")
-        self.move_to_joints(joints, tolerance=tolerance, max_steps=max_steps, arm_id=arm_id)
+            joints = self._solve_ik(pose, tcp_offset, arm_id=arm_id)
+            if joints is None:
+                raise ToolError("robot.go_to_pose", "IK failed for target pose")
+            self.move_to_joints(joints, tolerance=tolerance, max_steps=max_steps, arm_id=arm_id)
 
         # Post-move verification: log actual EE position vs target. Skip in
         # nonblocking mode — the arm hasn't reached the target yet.
@@ -827,6 +888,93 @@ class Connector:
                 arm_id, tp["x"], tp["y"], tp["z"], ap["x"], ap["y"], ap["z"], err,
             )
 
+    def _servo_to_pose(
+        self,
+        pose: Se3Pose,
+        *,
+        arm_id: int = 0,
+        pos_tol: float = 0.005,
+        rot_tol: float = 0.05,
+        max_ticks: int = 200,
+        stall_ticks: int = 25,
+    ) -> None:
+        """Drive the EE to ``pose`` (world frame) by streaming clamped OSC
+        deltas through the env's ``apply_policy_action`` — the policy's own
+        actuator, NO IK/planning. Policy-like and fast, but collision-UNAWARE,
+        so it is used only for known-safe straight-line segments; on stall or
+        non-convergence it raises :class:`ToolError` so the caller can fall
+        back to the collision-aware cuRobo linear plan.
+
+        Frames: ``get_ee_pose`` and the target are both world-frame, and the
+        LIBERO Franka base is axis-aligned with world, so a world-frame
+        position delta is exactly the OSC ``control_delta`` the controller
+        expects (output_max 0.05 m / 0.5 rad per step). Orientation uses
+        robosuite's own ``orientation_error`` to match the OSC convention.
+        """
+        apply = getattr(self.env, "apply_policy_action", None)
+        if apply is None:
+            raise ToolError(
+                "robot.go_to_pose_cartesian",
+                "servo path requires env.apply_policy_action (OSC passthrough)",
+            )
+        from robosuite.utils.control_utils import orientation_error
+        from robosuite.utils.transform_utils import quat2mat
+
+        def _mat(q: Any) -> np.ndarray:
+            if not q:
+                return np.eye(3)
+            return quat2mat(
+                np.array([q["x"], q["y"], q["z"], q["w"]], dtype=np.float64)
+            )
+
+        tp = pose["position"]
+        target_pos = np.array(
+            [float(tp["x"]), float(tp["y"]), float(tp["z"])], dtype=np.float64
+        )
+        rot = pose.get("rotation")
+        target_mat = _mat(rot) if rot else None  # None → hold current orientation
+        gcmd = 1.0 - 2.0 * float(getattr(self.env, "_gripper_fraction", 1.0))
+        out_p, out_r = 0.05, 0.5  # OSC output_max (m, rad)
+
+        best = float("inf")
+        stuck = 0
+        pos_err = float("inf")
+        for _ in range(int(max_ticks)):
+            cur = self.get_ee_pose(arm_id=arm_id)
+            cp = cur["position"]
+            cur_pos = np.array(
+                [float(cp["x"]), float(cp["y"]), float(cp["z"])], dtype=np.float64
+            )
+            dpos = target_pos - cur_pos
+            dori = (
+                orientation_error(target_mat, _mat(cur.get("rotation")))
+                if target_mat is not None
+                else np.zeros(3)
+            )
+            pos_err = float(np.linalg.norm(dpos))
+            rot_err = float(np.linalg.norm(dori))
+            if pos_err < pos_tol and rot_err < rot_tol:
+                return
+            action = np.empty(7, dtype=np.float64)
+            action[:3] = np.clip(dpos / out_p, -1.0, 1.0)
+            action[3:6] = np.clip(dori / out_r, -1.0, 1.0)
+            action[6] = gcmd
+            apply(action)
+            if pos_err < best - 1e-4:
+                best, stuck = pos_err, 0
+            else:
+                stuck += 1
+                if stuck >= int(stall_ticks):
+                    raise ToolError(
+                        "robot.go_to_pose_cartesian",
+                        f"servo stalled at pos_err={pos_err:.4f} "
+                        "(joint limit / singularity?)",
+                    )
+        raise ToolError(
+            "robot.go_to_pose_cartesian",
+            f"servo did not converge in {max_ticks} ticks (pos_err={pos_err:.4f})",
+        )
+
     def go_to_pose_cartesian(self, pose: Se3Pose, arm_id: int = 0) -> None:
         """Move along a straight Cartesian line to ``pose``.
 
@@ -836,6 +984,19 @@ class Connector:
         """
         if not pose:
             raise ToolError("robot.go_to_pose_cartesian", "pose required")
+        # Policy-like OSC servo fast-path (opt-in via GAP_LIBERO_SERVO): stream
+        # clamped OSC deltas with NO IK/planning for this straight-line move.
+        # Falls back to the collision-aware cuRobo linear plan on stall.
+        if self._servo_enabled and hasattr(self.env, "apply_policy_action"):
+            try:
+                with self._quiet_motion():
+                    self._servo_to_pose(pose, arm_id=arm_id)
+                return
+            except ToolError as exc:
+                logger.warning(
+                    "[servo] cartesian servo failed (%s); falling back to "
+                    "cuRobo linear plan", exc,
+                )
         if self.ik is None:
             raise ToolError("robot.go_to_pose_cartesian", "IK backend not configured")
 
@@ -853,11 +1014,12 @@ class Connector:
             raise ToolError("robot.go_to_pose_cartesian", "linear plan failed")
         tolerance = 0.03 if is_yam else 0.01
         max_steps = 200 if is_yam else 120
-        self._execute_trajectory(
-            trajectory, 1, tolerance, max_steps,
-            arm_id=arm_id,
-            reverse_joints=self.ik.trajectory_needs_joint_reverse,
-        )
+        with self._quiet_motion():
+            self._execute_trajectory(
+                trajectory, 1, tolerance, max_steps,
+                arm_id=arm_id,
+                reverse_joints=self.ik.trajectory_needs_joint_reverse,
+            )
 
     def _tool_execute_trajectory(
         self,
@@ -895,8 +1057,9 @@ class Connector:
             logger.warning("go_home skipped on real robot suite (safety)")
             return
         home = self._home_joints or _FRANKA_HOME_JOINTS
-        for arm_id in range(self.num_arms):
-            self.move_to_joints(home, tolerance=0.01, max_steps=200, arm_id=arm_id)
+        with self._quiet_motion():
+            for arm_id in range(self.num_arms):
+                self.move_to_joints(home, tolerance=0.01, max_steps=200, arm_id=arm_id)
 
     # ------------------------------------------------------------------
     # Lifecycle

@@ -94,6 +94,24 @@ Two variables in this area are **set by GaP itself**, not by you:
   pickles.
 :::
 
+### Fast execution mode (LIBERO sim)
+
+Execution-speed optimizations for the LIBERO connector/env, all resolved in one
+place (`gap/env_config.py`) and each validated to preserve task success on the
+grocery pick-and-place. **`GAP_FAST=1`** flips all of them to their fast values
+in a single switch; any individual flag explicitly set in the environment still
+**wins** over the unified default — so you can enable fast mode and selectively
+turn one thing back off, e.g. `GAP_FAST=1 GAP_CUROBO_CUDA_GRAPH=0 gap run ...`.
+
+| Variable | Type / default | `GAP_FAST` | Effect |
+|---|---|---|---|
+| `GAP_FAST` | `1`/`true`/`yes`/`on`; default off | — | Unified switch: turns on streaming + OSC servo + no-motion-render + cuRobo CUDA graph at once. The individual flags below override it. |
+| `GAP_LIBERO_STREAM` | bool; default **on** | on | Follow a planned joint trajectory with a continuous path-following servo (no per-waypoint convergence + settle). `0` restores the legacy per-waypoint tracking. |
+| `GAP_LIBERO_STREAM_MAX_STEP_FRAC` | float `[0.05, 1.0]`; default `1.0` | `1.0` | Per-tick joint-step clamp as a fraction of the joint controller's `output_max`. Lower it to be gentler on a carried payload, at some speed cost. |
+| `GAP_LIBERO_SERVO` | bool; default **off** | on | OSC Cartesian servo on `go_to_pose_cartesian` straight legs — the policy's own actuator (no IK/planning). Collision-**unaware**, so safe-segment only; stalls fall back to the cuRobo linear plan. |
+| `GAP_LIBERO_MOTION_RENDER` | bool; default **on** | off | Whether to render the cameras during motion segments. `0` skips the per-step offscreen render (faster); cameras are restored + refreshed before the next perception read. |
+| `GAP_CUROBO_CUDA_GRAPH` | bool; default **off** | on | Capture cuRobo's v0.8 pose planner into a CUDA graph — ~8× faster warm plans after a one-time capture. Biggest win at batch scale; only valid when the collision world is fixed across plans (e.g. the free-space `world=off` IK path). |
+
 ## Policies
 
 | Variable | Type / default | Effect |

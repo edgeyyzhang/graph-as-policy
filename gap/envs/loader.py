@@ -34,6 +34,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from gap import env_config
+
 os.environ.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "1")
 
 # Root of the gap repo (gap/envs/ -> ../..). Holds the vendored LIBERO
@@ -43,13 +45,11 @@ os.environ.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "1")
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 _VAB_ROOT = Path(
-    os.environ.get(
-        "GAP_VAB_ROOT",
-        _REPO_ROOT / "third_party" / "Variational-Automation-Benchmark",
-    )
+    env_config.vab_root()
+    or (_REPO_ROOT / "third_party" / "Variational-Automation-Benchmark")
 )
 _LIBERO_PRO_ROOT = Path(
-    os.environ.get("GAP_LIBERO_PRO_ROOT", _REPO_ROOT / "third_party" / "LIBERO-PRO")
+    env_config.libero_pro_root() or (_REPO_ROOT / "third_party" / "LIBERO-PRO")
 )
 
 # Installed-package root of the classic fork (contains bddl_files/,

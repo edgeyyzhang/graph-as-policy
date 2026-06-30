@@ -23,6 +23,8 @@ from typing import Any
 import numpy as np
 import viser.transforms as vtf
 
+from gap import env_config
+
 from .base_env import BaseEnv
 from .loader import load_libero_task
 from .registry import EnvConfig
@@ -126,6 +128,25 @@ class FrankaLiberoEnv(BaseEnv):
                 f"got {joint_motion_mode!r}"
             )
         self._joint_motion_mode = joint_motion_mode
+
+        # Policy-like streaming execution. When enabled, planned joint
+        # trajectories are followed by a synchronous path-following servo
+        # (``stream_joint_trajectory``) at near-max controller speed instead of
+        # per-waypoint convergence + settling — the dominant motion-time sink.
+        # Kill-switch ``GAP_LIBERO_STREAM=0`` restores the legacy per-waypoint
+        # path (gated in ``WorldAdapter._execute_trajectory``).
+        self._stream_enabled = env_config.libero_stream()
+        # Per-tick joint-step clamp as a fraction of ``output_max`` (≤1.0).
+        # Lower it to be gentler on a carried payload at some speed cost.
+        self._stream_max_step_frac = env_config.libero_stream_max_step_frac()
+
+        # Skip per-step camera rendering during pure motion. robosuite renders
+        # both cameras inside every ``handle.step`` (~16 ms/step here); geometric
+        # moves don't need camera obs, so the connector deactivates the camera
+        # observables for the duration of a motion/settle segment (and refreshes
+        # once before perception). ``GAP_LIBERO_MOTION_RENDER=0`` enables it.
+        self._motion_render = env_config.libero_motion_render()
+        self._cam_obs_names: list[str] | None = None
 
         # Robot link indices for transforms
         self.gripper_metric_length = 0.04
@@ -333,6 +354,46 @@ class FrankaLiberoEnv(BaseEnv):
 
     # ----------------------- Control Interface -----------------------
 
+    def _camera_observable_names(self) -> list[str]:
+        """Camera image/depth/segmentation observable names (cached)."""
+        if self._cam_obs_names is None:
+            try:
+                rs = self.handle.env.env
+                self._cam_obs_names = [
+                    n for n in getattr(rs, "_observables", {})
+                    if any(k in n for k in ("image", "depth", "segmentation"))
+                ]
+            except Exception:
+                self._cam_obs_names = []
+        return self._cam_obs_names
+
+    def set_cameras_active(self, active: bool) -> None:
+        """Activate/deactivate robosuite camera observables. Deactivating skips
+        the per-step offscreen render (the dominant per-step wall cost); proprio
+        observables stay active, so motion control is unaffected."""
+        try:
+            rs = self.handle.env.env
+        except Exception:
+            return
+        for n in self._camera_observable_names():
+            try:
+                rs.modify_observable(n, "active", active)
+                rs.modify_observable(n, "enabled", active)
+            except Exception:
+                pass
+
+    def refresh_camera_obs(self) -> None:
+        """One hold-step so ``_current_obs`` carries fresh camera images for the
+        next perception read (cameras were off during a motion segment)."""
+        action = np.zeros(self._robot.action_dim, dtype=np.float64)
+        action[-1] = 1.0 - self._gripper_fraction * 2.0
+        _t0 = time.perf_counter()
+        self._current_obs, self._current_reward, self._current_done, self._current_info = (
+            self.handle.step(action)
+        )
+        self._sim_physics_wall_s += time.perf_counter() - _t0
+        self._sim_step_count += 1
+
     def move_to_joints_blocking(
         self,
         joints: np.ndarray,
@@ -426,6 +487,118 @@ class FrankaLiberoEnv(BaseEnv):
             if self._record_frames and self._sim_step_count % self._subsample_rate == 0:
                 self._record_frame()
             steps += 1
+
+    def stream_joint_trajectory(
+        self,
+        waypoints: list,
+        *,
+        settle_tolerance: float = 0.01,
+        settle_max_steps: int = 60,
+        arm_id: int = 0,
+    ) -> None:
+        """Feed-forward joint-space path-following servo — policy-like motion.
+
+        Streams a planned joint polyline at near-max JointPositionController
+        speed instead of converging + settling at every waypoint. Each sim tick
+        commands the clamped delta toward the *current* target waypoint and
+        advances the pointer once the arm is within ~half a controller step of
+        it, so a dense path runs ≈1 sim tick per waypoint and a coarse path
+        never lags (the controller keeps moving at ``output_max``). One bounded
+        final settle converges the LAST waypoint to ``settle_tolerance`` — that
+        is what preserves grasp-pose / policy hand-off precision.
+
+        This is the env hook ``WorldAdapter._execute_trajectory`` prefers when
+        present (``gap/connector/core.py``): without it, trajectories fall back
+        to per-waypoint convergence — the dominant motion-time sink. Mirrors
+        the real-robot streaming model (``franka_real_env``) but stays
+        synchronous (the sim only advances when we ``handle.step``); no
+        background thread.
+
+        Instrumentation: each *streamed* (commanded) tick counts one
+        ``_command_count`` — matching the per-tick ``apply_policy_action``
+        convention, so ``_command_count / control_freq`` stays an honest
+        real-robot motion time and is directly comparable to a policy run.
+        Final-settle ticks count toward ``_sim_step_count`` only (convergence
+        tracking, like the closed-loop tail).
+        """
+        wps = [np.asarray(w, dtype=np.float64).reshape(-1) for w in waypoints]
+        wps = [w for w in wps if w.shape[0] >= 7]
+        if not wps:
+            return
+        wps = [w[:7] for w in wps]
+
+        self._use_controller("joint")
+        sim = self.handle.env.sim
+        addrs = self._panda_joint_qpos_addrs
+        output_max = self._joint_output_max
+        # Per-tick joint-step clamp (≤ output_max). 1.0 = full controller speed.
+        max_step = max(1e-4, output_max * self._stream_max_step_frac)
+        advance_thresh = 0.5 * output_max
+
+        def _tick(target: np.ndarray, *, command: bool) -> float:
+            current = np.array(sim.data.qpos[addrs], dtype=np.float64)
+            step_delta = np.clip(target - current, -max_step, max_step)
+            normalized = np.clip(step_delta / output_max, -1.0, 1.0)
+            gripper_cmd = 1.0 - self._gripper_fraction * 2.0
+            action = np.concatenate([normalized, [gripper_cmd]])
+            _t0 = time.perf_counter()
+            self._current_obs, self._current_reward, self._current_done, self._current_info = (
+                self.handle.step(action)
+            )
+            self._sim_physics_wall_s += time.perf_counter() - _t0
+            self._sim_step_count += 1
+            if command:
+                self._command_count += 1
+            self.gripper_link_wxyz_xyz = np.concatenate([
+                self.handle.env.sim.data.xquat[self.gripper_link_idx],
+                self.handle.env.sim.data.xpos[self.gripper_link_idx],
+            ])
+            if self._record_frames and self._sim_step_count % self._subsample_rate == 0:
+                self._record_frame()
+            new = np.array(sim.data.qpos[addrs], dtype=np.float64)
+            return float(np.linalg.norm(new - target))
+
+        # ── Pursuit: stream along the polyline at clamped-max speed ──
+        last = len(wps) - 1
+        k = 0
+        # Runaway guard only (joint-limit / singular target won't converge).
+        max_pursuit = 10 * len(wps) + 50
+        ticks = 0
+        stuck = 0
+        best_err = float("inf")
+        while ticks < max_pursuit:
+            current = np.array(sim.data.qpos[addrs], dtype=np.float64)
+            if float(np.max(np.abs(wps[k] - current))) < advance_thresh:
+                if k < last:
+                    k += 1
+                    stuck = 0
+                    best_err = float("inf")
+                    continue
+                break  # within a controller step of the final waypoint
+            err = _tick(wps[k], command=True)
+            ticks += 1
+            # No-progress guard: skip an unreachable waypoint (or stop at the
+            # last) rather than spinning the full budget against a joint limit.
+            if err < best_err - 1e-4:
+                best_err = err
+                stuck = 0
+            else:
+                stuck += 1
+                if stuck >= 15:
+                    if k < last:
+                        k += 1
+                        stuck = 0
+                        best_err = float("inf")
+                    else:
+                        break
+
+        # ── Final convergence settle (tracking-only) on the last waypoint ──
+        target = wps[last]
+        settle = 0
+        while settle < settle_max_steps:
+            if _tick(target, command=False) < settle_tolerance:
+                break
+            settle += 1
 
     def apply_policy_action(self, action: np.ndarray) -> None:
         """Send a single 7-dim OSC_POSE action to the underlying env.
@@ -821,19 +994,9 @@ def make_env(
     env constructor.
     """
     if joint_motion_mode is None:
-        joint_motion_mode = os.environ.get(
-            "GAP_LIBERO_JOINT_MOTION_MODE", "closed_loop",
-        ).lower()
-        if joint_motion_mode not in ("teleport", "closed_loop"):
-            logger.warning(
-                "Unknown GAP_LIBERO_JOINT_MOTION_MODE=%r; "
-                "falling back to 'closed_loop'", joint_motion_mode,
-            )
-            joint_motion_mode = "closed_loop"
+        joint_motion_mode = env_config.libero_joint_motion_mode()
     if perturbed is None:
-        perturbed = os.environ.get("GAP_LIBERO_PERTURBED", "").lower() in (
-            "1", "true", "yes",
-        )
+        perturbed = env_config.libero_perturbed()
 
     if perturbed:
         from .libero_perturbed_env import FrankaLiberoPerturbedEnv
