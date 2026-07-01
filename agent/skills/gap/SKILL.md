@@ -76,8 +76,8 @@ Gotchas: cloning without `--recurse-submodules` breaks `uv sync`
 `git submodule update --init`; `--extra grocery|all` need `CUDA_HOME` set
 (cuRobo compiles CUDA at install); sim runs want `MUJOCO_GL=egl`.
 
-Env vars that matter: `ANTHROPIC_API_KEY` (default codegen provider) /
-`OPENAI_API_KEY` / Vertex via gcloud ADC + `GOOGLE_CLOUD_PROJECT`;
+Env vars that matter: `OPENROUTER_API_KEY` (default codegen provider) /
+Vertex via gcloud ADC + `GOOGLE_CLOUD_PROJECT`;
 `GAP_LLM_PROVIDER` + `GAP_LLM_MODEL` pin a non-default provider per
 shell (vertex also needs `uv run --extra vertex`); `GAP_SKILLS_PATH`
 (colon-separated registry roots); `HF_TOKEN` (gated weights);
@@ -152,7 +152,7 @@ Claude in the loop.
 ```bash
 # headless only — NOT the path to use from inside Claude Code:
 uv run gap generate "pick up the alphabet soup and put it in the basket" \
-    --provider anthropic --out outputs/soup
+    --provider openrouter --out outputs/soup
 ```
 
 ## 4. Author a graph (gap.builder) — the default path

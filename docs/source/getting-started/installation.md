@@ -127,8 +127,7 @@ LLM provider. Set one of:
 
 | Provider | Setup |
 |---|---|
-| `anthropic` (default) | `export ANTHROPIC_API_KEY=...` |
-| `openai` (incl. OpenRouter / vLLM) | `export OPENAI_API_KEY=...`; custom endpoints via config YAML |
+| `openrouter` (default) | `export OPENROUTER_API_KEY=...`; point at any other OpenAI-compatible server (e.g. a local vLLM) by overriding the endpoint/base URL in the config YAML |
 | `vertex` | `gcloud auth application-default login` + `GOOGLE_CLOUD_PROJECT`; needs the `vertex` extra |
 
 See [LLM providers](../authoring/llm-providers.md) for per-call

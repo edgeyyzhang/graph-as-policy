@@ -85,9 +85,20 @@ def run(
         zone_floor = zone_center["z"] - container_interior_obb["extent"]["z"]
         zone_ceiling = zone_center["z"] + container_interior_obb["extent"]["z"]
     else:
+        # Bare container (no interior OBB): estimate the interior placement
+        # zone from the exterior box so the held object is lowered INTO the
+        # basket — a real place — instead of being released above the rim.
+        # The prior ``zone_floor = container_top`` put the object's BOTTOM
+        # ~5 cm ABOVE the rim (``margin + held extent`` stacked on the rim)
+        # and relied on the drop to settle it; recorded runs show that
+        # release-from-height bounces items back out — a place succeeded only
+        # when the drop happened to be small. Model the interior as a floor
+        # ~2 cm above the box bottom (basket-wall lip) with the ceiling AT the
+        # rim, so the held object's center is kept strictly inside the cavity.
         zone_center = container_obb["center"]
-        zone_floor = container_top  # exterior top
-        zone_ceiling = zone_floor + 0.10  # arbitrary headroom for fallback path
+        container_bottom = container_obb["center"]["z"] - container_obb["extent"]["z"]
+        zone_floor = container_bottom + 0.02   # 2 cm lip above the basket floor
+        zone_ceiling = container_top           # the rim — keep the object inside
 
     # Measure the at-grasp EE height LIVE. This node runs right after the
     # grasp subgraph closes the gripper and before any lift, so the
@@ -121,7 +132,7 @@ def run(
         #       center than the wall-clearance floor would suggest,
         #       otherwise the end-leg IK has too few feasible joint
         #       configurations.
-        margin = max(0.03, drop_clearance)  # 3 cm above wall top
+        margin = max(0.03, drop_clearance)  # clearance above the zone floor
         desired_obj_z = zone_floor + margin + held_obb["extent"]["z"]
         # Hard ceiling: never push the held object's center past the zone
         # top — the In() predicate would fail.

@@ -15,7 +15,7 @@ modes: seed `i` maps to the same LIBERO initial state in every cell.
 
 :::{note} Requirements
 Linux + NVIDIA GPU with EGL headless rendering (`MUJOCO_GL=egl`), an LLM API
-key (Anthropic / OpenAI-compatible / Vertex), and the `grocery` extra for the
+key (OpenRouter — the default OpenAI-compatible provider — or Vertex), and the `grocery` extra for the
 benchmark families (`CUDA_HOME=/usr/local/cuda uv sync --extra grocery` — they
 plan with CuRobo). The `llm_plus_policy` / `policy_only` modes additionally
 need a running VLA policy server (see [Learned Policies](policies.md)).
@@ -54,7 +54,7 @@ A minimal grid config:
 task: "auto"            # prompts resolved from LIBERO metadata
 
 llm:
-  provider: anthropic
+  provider: openrouter
 
 benchmark:
   families: [grocery_packing]

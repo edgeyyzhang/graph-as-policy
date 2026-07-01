@@ -87,9 +87,9 @@ async def generate(
             so resolution failure raises :class:`FileNotFoundError`
             listing what was tried.
         model: Optional LLM model override (default: provider default,
-            ``claude-opus-4-8`` on anthropic).
+            ``gemini-3.1-flash-lite-preview``).
         provider: Optional LLM provider override
-            (``anthropic`` | ``openai`` | ``vertex``).
+            (``openrouter`` | ``vertex``).
         out_dir: Output directory; the workflow folder is written to
             ``<out_dir>/task_00``. Defaults to
             ``outputs/generated_<timestamp>``.

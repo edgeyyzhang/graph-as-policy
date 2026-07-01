@@ -16,7 +16,7 @@ The same kind of artifact, executing for real — vision models, IK, and the
 sim in one process:
 
 ```bash
-export ANTHROPIC_API_KEY=...          # or another provider, see "LLM providers"
+export OPENROUTER_API_KEY=...          # or another provider, see "LLM providers"
 
 MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
   --sim libero_object_all_variance/0

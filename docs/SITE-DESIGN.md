@@ -52,7 +52,7 @@ results table. Architecture diagram (ASCII from README, styled code block).
 
 **Generating & Authoring** (`authoring/`)
 21. `generation` — `gap generate` / `gap.agent.generate`: coordinator → subgraph agents → checkpoint agent → validate/fix loop; agent trace artifacts; missing-capability abort; LLM cache (GAP_LLM_CACHE_DIR / NO_CACHE)
-22. `llm-providers` — anthropic/openai-compatible/vertex; default model; config YAML (composition, per-role models); VLM perception provider env vars (GAP_VLM_*)
+22. `llm-providers` — openrouter (OpenAI-compatible, default) / vertex; default model; custom OpenAI-compatible endpoints (e.g. vLLM) via endpoint/base-URL override; config YAML (composition, per-role models); VLM perception provider env vars (GAP_VLM_*)
 23. `builder` — gap.builder guide: Workflow/Subgraph/Ref, edges & conditional edges, exits (`add_exit` vs `set_exit_router`), on_error, recovery, checkpoints + sidecars, save/validate
 24. `patterns` — graph patterns & pitfalls: $ref paths, by-name cross-subgraph binding, on_error-as-semantic-exit, loops via subgraph revisits, streaming + Send, settle_steps not sleep, wxyz quaternions, OBB half-extents
 

@@ -47,7 +47,7 @@ under a 300-second timeout (`timeout = 300`, via pytest-timeout).
 | *(none)* | nothing (CPU, core deps) | `pytest tests -q` — the PR gate, py3.10/3.11/3.12 |
 | `sim` | `[libero]` extra (MuJoCo/EGL) | `pytest tests -q -m sim` |
 | `gpu` | model weights + NVIDIA GPU | `pytest tests -q -m gpu` |
-| `llm` | `ANTHROPIC_API_KEY` (token budget!) | `pytest tests -q -m llm` |
+| `llm` | `OPENROUTER_API_KEY` (token budget!) | `pytest tests -q -m llm` |
 | `real` | robot hardware | manual release checklist |
 
 The split follows one design rule: **every LLM boundary has a recorded

@@ -9,7 +9,7 @@ authors = [{ name = "graph-as-policy authors" }]
 
 # Keep this list tight. Every tool / policy bundle's .venv inherits these,
 # so anything added here multiplies across all bundles. Heavy ML deps
-# (torch, transformers, jax, mujoco, fastapi, anthropic, …) belong in the
+# (torch, transformers, jax, mujoco, fastapi, …) belong in the
 # `graph-as-policy` runtime distribution, NOT here.
 dependencies = [
   # Numeric vocabulary — gap_core.types.* are TypedDicts over numpy arrays.

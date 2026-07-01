@@ -119,7 +119,7 @@ for how the pipeline works and
 |---|---|---|
 | `INSTRUCTION` | string, required | The task, e.g. `"pick up the alphabet soup and put it in the basket"`. |
 | `--skills PATH` | repeatable; default: resolved registries | See [Common options](#common-options-registries). A `skills:` entry in `--config` also works. |
-| `--provider {anthropic,openai,vertex}` | choice; default: `anthropic` | LLM provider override. |
+| `--provider {openrouter,vertex}` | choice; default: `openrouter` | LLM provider override. |
 | `--model MODEL` | string; default: the provider default | LLM model override. |
 | `--out DIR` | path; default: `outputs/generated_<timestamp>` | Output directory. |
 | `--config YAML` | path; default: none | Pipeline config YAML (llm / composition / skills knobs). |
@@ -137,8 +137,8 @@ run it with: gap run outputs/generated_20260612_103000
 ```
 
 :::{note}
-Requires an LLM credential: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or
-Vertex application-default credentials. The `vertex` provider needs the
+Requires an LLM credential: `OPENROUTER_API_KEY` or Vertex
+application-default credentials. The `vertex` provider needs the
 `[vertex]` extra.
 :::
 
@@ -150,7 +150,7 @@ gap check [--skills PATH] [--registry NAME] [--format {pretty,json}] [--strict]
 
 The capability report: which tool bundles are operational on this
 machine, and which skills are therefore runnable. It probes the
-environment (Python and GaP versions, GPU, LLM credentials for all three
+environment (Python and GaP versions, GPU, LLM credentials for both
 providers), lists active registries, reports each bundle as
 `READY` / `NOT READY` / `SHADOWED` with dependency, requirement, and
 weights probes plus fix hints, and rolls blocked skills up to the tools

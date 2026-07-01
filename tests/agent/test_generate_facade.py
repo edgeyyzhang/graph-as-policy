@@ -70,13 +70,13 @@ class TestGenerateFacade:
         agent.generate_sync(
             "Pick up the alphabet soup",
             skills=skills_root,
-            model="claude-haiku-4-5",
-            provider="anthropic",
+            model="gemini-2.5-flash",
+            provider="vertex",
             out_dir=tmp_path / "out",
         )
         cfgs = [c["cfg"] for c in stub.calls]
-        assert all(c.provider == "anthropic" for c in cfgs)
-        assert all(c.model == "claude-haiku-4-5" for c in cfgs)
+        assert all(c.provider == "vertex" for c in cfgs)
+        assert all(c.model == "gemini-2.5-flash" for c in cfgs)
 
     def test_failure_raises(self, skills_root, stub_llm, tmp_path):
         # Three garbage coordinator responses exhaust the retry budget.

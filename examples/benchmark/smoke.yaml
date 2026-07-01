@@ -13,8 +13,8 @@ task: "auto"   # per-task prompts resolved from LIBERO metadata
 skills: ../../../open-robot-skills
 
 llm:
-  provider: anthropic
-  # model: claude-opus-4-8        # default; uncomment to pin
+  provider: openrouter
+  # model: gemini-3.1-flash-lite-preview   # default; uncomment to pin
 
 benchmark:
   families: [grocery_packing]

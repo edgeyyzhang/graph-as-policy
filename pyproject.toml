@@ -66,9 +66,6 @@ dependencies = [
   "msgpack>=1.0",
   "msgpack-numpy>=0.4.8",
 
-  # LLM (agent library default provider)
-  "anthropic>=0.40",
-
   # NotRequired backport for py3.10
   "typing_extensions>=4.10; python_version < '3.11'",
 
@@ -127,8 +124,8 @@ pyroki = [
 ray = ["ray[serve]>=2.30"]
 # Real hardware (UR + RTDE; pyzed is a manual ZED SDK install — lazy import).
 real = ["ur-rtde>=1.5"]
-# Vertex AI provider (Claude-on-Vertex + Gemini).
-vertex = ["anthropic[vertex]>=0.40", "google-genai>=1.0,<1.60"]
+# Vertex AI provider (Gemini via google-genai).
+vertex = ["google-genai>=1.0,<1.60"]
 # Learned-policy nodes — OpenPI websocket client (thin, no JAX).
 policy = [
   "openpi-client @ git+https://github.com/Physical-Intelligence/openpi.git#subdirectory=packages/openpi-client",

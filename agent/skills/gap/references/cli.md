@@ -88,9 +88,9 @@ options:
   --strict              Exit 1 when any non-shadowed bundle is not ready (CI gating)
   --probe               Issue a 1-token API ping to each configured LLM and VLM provider (default
                         is a static env-var/ADC presence check). Use this to catch stale creds and
-                        wrong model names without running a full job — the dev-era milk-vs-soup
-                        misconfig (VLM bundle silently fell through to the anthropic default with
-                        no API key) would surface here.
+                        wrong model names without running a full job — a VLM bundle silently
+                        falling through to the openrouter default with no API key would surface
+                        here.
 ```
 
 ## gap skills
@@ -338,7 +338,7 @@ options:
 ## gap generate
 
 ```text
-usage: gap generate [-h] [--skills PATH] [--provider {anthropic,openai,vertex}] [--model MODEL]
+usage: gap generate [-h] [--skills PATH] [--provider {openrouter,vertex}] [--model MODEL]
                     [--out DIR] [--config YAML] [-v]
                     instruction
 
@@ -351,8 +351,8 @@ options:
                         resolved registry set — $GAP_SKILLS_PATH, project [tool.gap], user config,
                         or an open-robot-skills checkout next to the graph-as-policy checkout;
                         --config skills: also works
-  --provider {anthropic,openai,vertex}
-                        LLM provider override (default: anthropic)
+  --provider {openrouter,vertex}
+                        LLM provider override (default: openrouter)
   --model MODEL         LLM model override (default: the provider default)
   --out DIR             Output directory (default: outputs/generated_<timestamp>)
   --config YAML         Optional pipeline config YAML (llm/composition/skills knobs)

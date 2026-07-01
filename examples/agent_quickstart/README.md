@@ -37,7 +37,7 @@ Pick an LLM provider for generation and the VLM perception bundle
 (`gap check` tells you what is configured):
 
 ```bash
-export ANTHROPIC_API_KEY=...          # simplest: one key drives both
+export OPENROUTER_API_KEY=...         # simplest: one key drives both
 ```
 
 Or Vertex AI (no API key — uses gcloud ADC). Set once per shell (or

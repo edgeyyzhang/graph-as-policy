@@ -12,13 +12,13 @@ public quickstart task. The coordinator picks
 `perceiving-objects` + `grasping-with-planner` + `transporting-objects`
 from the registry without any prompt hinting; the runtime then runs the
 generated workflow in sim against LLM-authored postcondition
-checkpoints. `gemini-3.1-flash-lite-preview` on Vertex is the
-default and the fastest path; other providers work too — see
+checkpoints. `gemini-3.1-flash-lite-preview` on the default `openrouter`
+provider is the fastest path; Vertex works too — see
 [Providers](#providers).
 :::
 
 :::{note} Requirements
-An LLM credential (`ANTHROPIC_API_KEY` by default — see
+An LLM credential (`OPENROUTER_API_KEY` by default — see
 [Providers](#providers)) plus the engine install (`uv sync`) and the
 open-robot-skills checkout. Generation runs without the simulator — only an
 LLM credential and the open-robot-skills checkout are required; running
@@ -31,7 +31,7 @@ Source: [examples/generate_a_graph](gh-engine:examples/generate_a_graph).
 ## CLI
 
 ```bash
-export ANTHROPIC_API_KEY=...    # default provider; see "Providers" below
+export OPENROUTER_API_KEY=...   # default provider; see "Providers" below
 
 uv run gap generate "pick up the alphabet soup can and place it in the basket" --out my_graph
 ```
@@ -44,7 +44,7 @@ precedence-ordered). Other flags:
 | Flag | Default | Meaning |
 |---|---|---|
 | `--skills PATH` | resolved registry set | Skill registry root(s); repeatable |
-| `--provider` | `anthropic` | `anthropic` \| `openai` \| `vertex` |
+| `--provider` | `openrouter` | `openrouter` \| `vertex` |
 | `--model` | provider default | LLM model override |
 | `--out DIR` | `outputs/generated_<timestamp>` | Output directory |
 | `--config YAML` | — | Pipeline config (llm/composition/skills knobs) |
@@ -153,13 +153,12 @@ Or in Python:
 
 | Provider | Setup |
 |---|---|
-| `anthropic` (default) | `export ANTHROPIC_API_KEY=...`; the default model is `claude-opus-4-8` |
-| `openai` (incl. OpenRouter / vLLM) | `export OPENAI_API_KEY=...` and pass `--model`; custom endpoints via a `--config` YAML with `llm: {provider: openai, endpoint: ...}` |
-| `vertex` | `gcloud auth application-default login`, the `vertex` extra, and a `--config` YAML setting `llm: {provider: vertex, project_id: ..., region: ...}`; claude-* and gemini-* models both route correctly |
+| `openrouter` (default) | `export OPENROUTER_API_KEY=...`; the default model is `gemini-3.1-flash-lite-preview` (on OpenRouter the slug may need a `google/` prefix). Reach any other OpenAI-compatible server (e.g. local vLLM) via a `--config` YAML with `llm: {provider: openrouter, endpoint: ...}` |
+| `vertex` | `gcloud auth application-default login`, the `vertex` extra, and a `--config` YAML setting `llm: {provider: vertex, project_id: ..., region: ...}`; GEMINI models only |
 
-Only `anthropic` has a default model — for `openai` and `vertex` the
-endpoints serve arbitrary models, so set `--model` (or `llm: {model: ...}`
-in the config) explicitly.
+Both providers default to `gemini-3.1-flash-lite-preview`; override per call
+with `--model` (or `llm: {model: ...}` in the config). On `openrouter` the
+model slug may need a `google/` prefix.
 
 Pick per call with `--provider`/`--model`, or pin everything (endpoint,
 temperature, max tokens, concurrency, per-agent models) in a config YAML
@@ -167,7 +166,7 @@ passed via `--config`:
 
 ```yaml
 llm:
-  provider: openai
+  provider: openrouter
   model: my-model
   endpoint: http://localhost:8000/v1
 ```

@@ -43,10 +43,10 @@ The LLM used for graph codegen (`llm_generation` mode and suites mode). See
 
 | Key | Type | Default | Notes |
 |---|---|---|---|
-| `llm.provider` | str | `anthropic` | `anthropic` \| `openai` \| `vertex` |
-| `llm.model` | str | `claude-opus-4-8` (anthropic only) | **Required** for `openai` / `vertex` — omitting it raises `ValueError`. |
-| `llm.endpoint` | str | null | OpenAI-compatible base URL or full `/chat/completions` URL. |
-| `llm.api_key` | str | null | Falls back to `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`. |
+| `llm.provider` | str | `openrouter` | `openrouter` \| `vertex` |
+| `llm.model` | str | `gemini-3.1-flash-lite-preview` (openrouter) | **Required** for `vertex` — omitting it raises `ValueError`. |
+| `llm.endpoint` | str | null | OpenAI-compatible base URL or full `/chat/completions` URL; set it to reach a local vLLM or other OpenAI-compatible server. |
+| `llm.api_key` | str | null | Falls back to `OPENROUTER_API_KEY`. |
 | `llm.project_id` | str | null | GCP project (vertex). |
 | `llm.region` | str | null (`"global"` at call time) | Vertex region. |
 | `llm.temperature` | float | `0.7` | Silently omitted for models that reject sampling params. |

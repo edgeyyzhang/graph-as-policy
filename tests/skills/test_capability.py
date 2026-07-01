@@ -25,8 +25,7 @@ from gap.skills.capability import (
 )
 
 _PROVIDER_VARS = (
-    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS",
-    "CLOUDSDK_CONFIG",
+    "OPENROUTER_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "CLOUDSDK_CONFIG",
 )
 
 
@@ -105,17 +104,17 @@ def test_probe_gpu_nonzero_and_timeout(monkeypatch):
 def test_probe_llm_providers_all_missing():
     probes = probe_llm_providers()
     assert {p.status for p in probes.values()} == {"missing"}
-    assert "export ANTHROPIC_API_KEY" in probes["anthropic"].fix_hint
+    assert "export OPENROUTER_API_KEY" in probes["openrouter"].fix_hint
     assert "gcloud auth application-default login" in probes["vertex"].fix_hint
 
 
 def test_probe_llm_providers_keys_and_adc(monkeypatch, tmp_path):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     creds = tmp_path / "adc.json"
     creds.write_text("{}")
     monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(creds))
     probes = probe_llm_providers()
-    assert probes["anthropic"].ok
+    assert probes["openrouter"].ok
     assert probes["vertex"].ok
     assert "GOOGLE_APPLICATION_CREDENTIALS" in probes["vertex"].detail
 

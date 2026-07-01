@@ -550,8 +550,7 @@ def _llm_env_for_workers(config: PipelineConfig) -> dict[str, str]:
     llm = config.llm
     if llm.api_key:
         key_var = {
-            "anthropic": "ANTHROPIC_API_KEY",
-            "openai": "OPENAI_API_KEY",
+            "openrouter": "OPENROUTER_API_KEY",
         }.get(llm.provider)
         if key_var:
             env[key_var] = str(llm.api_key)

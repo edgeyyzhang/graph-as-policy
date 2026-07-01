@@ -31,7 +31,7 @@ bundles are runnable from each bundle's `gap.requires` declaration.
 | [grounding-dino](#grounding-dino) | perception | 1 | `gpu`, `weights` | `GAP_DINO_DEVICE` (`cuda`), `GAP_DINO_MODEL` (`IDEA-Research/grounding-dino-base`) |
 | [gemini-er](#gemini-er) | perception | 1 | `env_any: [GOOGLE_API_KEY, GEMINI_API_KEY]` | `GAP_GEMINI_ER_MODEL` (`gemini-robotics-er-1.5-preview`) |
 | [molmo](#molmo) | perception | 3 | `env: [GAP_MOLMO_BASE_URL]` | `GAP_MOLMO_BASE_URL` (required), `GAP_MOLMO_MODEL` (`allenai/Molmo2-8B`) |
-| [vlm](#vlm) | perception | 2 | `env_any: [ANTHROPIC_API_KEY, GAP_VLM_BASE_URL, GAP_VLM_PROJECT_ID]` | `GAP_VLM_*` — see below |
+| [vlm](#vlm) | perception | 2 | `env_any: [OPENROUTER_API_KEY, GAP_VLM_API_KEY, GAP_VLM_PROJECT_ID]` | `GAP_VLM_*` — see below |
 | [curobo](#curobo) | planning | 10 | `gpu` | — (`CUDA_HOME` at install time) |
 | [geometry](#geometry) | perception | 18 | none (CPU, no weights) | — |
 
@@ -164,31 +164,33 @@ after 3 retries (exponential backoff) raises `ToolError`.
 ## vlm
 
 Free-form and yes/no visual Q&A against a hosted VLM, behind a
-three-provider switch. Zero GPU. Source: [tools/vlm](gh-skills:tools/vlm).
+two-provider switch. Zero GPU. Source: [tools/vlm](gh-skills:tools/vlm).
 
 | Tool | Signature | Returns |
 |---|---|---|
 | `vlm.query` | `(prompt, image=None, images=None, provider=None, model=None)` | `{text}` |
 | `vlm.query_yes_no` | `(prompt, image=None, images=None, provider=None, model=None)` | `{answer, text}` |
 
-**Requirements.** `gap.requires: {env_any: [ANTHROPIC_API_KEY,
-GAP_VLM_BASE_URL, GAP_VLM_PROJECT_ID]}` — one provider must be
+**Requirements.** `gap.requires: {env_any: [OPENROUTER_API_KEY,
+GAP_VLM_API_KEY, GAP_VLM_PROJECT_ID]}` — one provider must be
 configured. Six env vars:
 
 | Env var | Meaning | Default |
 |---|---|---|
-| `GAP_VLM_PROVIDER` | `anthropic` \| `openai` \| `vertex` | `anthropic` |
-| `GAP_VLM_MODEL` | Model name | `claude-opus-4-8` (anthropic); required for openai/vertex |
-| `GAP_VLM_BASE_URL` | OpenAI-compatible endpoint (openai provider) | — |
-| `GAP_VLM_API_KEY` | API key for the openai provider | — |
+| `GAP_VLM_PROVIDER` | `openrouter` \| `vertex` | `openrouter` |
+| `GAP_VLM_MODEL` | Model name (on OpenRouter the slug may need a `google/` prefix) | `gemini-3.1-flash-lite-preview` |
+| `GAP_VLM_BASE_URL` | OpenAI-compatible endpoint (openrouter provider) | `https://openrouter.ai/api/v1` |
+| `GAP_VLM_API_KEY` | API key for the openrouter provider (or `OPENROUTER_API_KEY`) | — |
 | `GAP_VLM_PROJECT_ID` | GCP project (vertex provider) | — |
 | `GAP_VLM_REGION` | Vertex region | `global` |
 
-The `anthropic` provider uses GaP core's bundled SDK
-(`ANTHROPIC_API_KEY`); the `vertex` provider routes `claude-*` models
-through AnthropicVertex and others through google-genai, and needs the
-engine's vertex extra (`pip install "graph-as-policy[vertex]"`). An
-unknown provider name raises `ToolError` listing the valid choices.
+The `openrouter` provider talks to OpenRouter's OpenAI-compatible
+chat-completions API (`OPENROUTER_API_KEY`, or `GAP_VLM_API_KEY`), and
+points at any other OpenAI-compatible server (e.g. local vLLM) via
+`GAP_VLM_BASE_URL`; the `vertex` provider routes GEMINI models through
+google-genai and needs the engine's vertex extra
+(`pip install "graph-as-policy[vertex]"`). An unknown provider name
+raises `ToolError` listing the valid choices.
 
 **Behavior.** All providers pin temperature 0.0 and max_tokens 1024;
 there is no system-prompt knob by design. `images=` accepts multiple

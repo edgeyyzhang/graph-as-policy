@@ -99,7 +99,7 @@ key missing) — also check the rr-session log it points at.
 The perception subgraphs call Grounding-DINO + SAM3 + a hosted VLM
 through the open-robot-skills tool bundles: you need a GPU with the model
 weights for `grounding-dino` and `sam3`, and a configured VLM provider
-(`ANTHROPIC_API_KEY` or a vertex setup) — see the open-robot-skills README.
+(`OPENROUTER_API_KEY` or a vertex setup) — see the open-robot-skills README.
 
 ## v2 → v3 migration notes
 

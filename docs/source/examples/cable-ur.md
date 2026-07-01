@@ -10,7 +10,7 @@ viewer.
 A UR arm reachable over the network, a wrist-mounted ZED camera, the ZED SDK
 (manual install — `pyzed` is not on PyPI), a GPU with weights for the
 `grounding-dino` and `sam3` tool bundles, and a VLM provider credential
-(`ANTHROPIC_API_KEY` or a Vertex setup). The graph itself validates with no
+(`OPENROUTER_API_KEY` or a Vertex setup). The graph itself validates with no
 hardware at all.
 :::
 

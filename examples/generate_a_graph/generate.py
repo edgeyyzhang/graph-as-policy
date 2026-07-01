@@ -6,8 +6,8 @@ the coordinator → subgraph agents → checkpoint agent pipeline and writes
 a validated workflow directory (``workflow.json`` + ``scripts/`` +
 ``checkpoints/``).
 
-Needs an LLM credential (``ANTHROPIC_API_KEY`` by default — see the
-README for openai / vertex). The open-robot-skills checkout is auto-discovered
+Needs an LLM credential (``OPENROUTER_API_KEY`` by default — see the
+README for vertex). The open-robot-skills checkout is auto-discovered
 (``$GAP_SKILLS_PATH`` or the checkout next to the graph-as-policy checkout).
 
     python examples/generate_a_graph/generate.py \\
@@ -32,8 +32,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--skills", default=None,
                         help="open-robot-skills checkout (default: auto-discovered)")
     parser.add_argument("--provider", default=None,
-                        choices=["anthropic", "openai", "vertex"],
-                        help="LLM provider (default: anthropic)")
+                        choices=["openrouter", "vertex"],
+                        help="LLM provider (default: openrouter)")
     parser.add_argument("--model", default=None,
                         help="model override (default: the provider default)")
     args = parser.parse_args(argv)

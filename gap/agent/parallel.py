@@ -145,7 +145,7 @@ class WorkerSetupConfig:
 
     extra_env: dict[str, str] = field(default_factory=dict)
     """Environment variables applied in :func:`worker_setup` before any
-    heavy import — VLM/LLM credentials (``ANTHROPIC_API_KEY``,
+    heavy import — VLM/LLM credentials (``OPENROUTER_API_KEY``,
     ``GOOGLE_CLOUD_PROJECT``, …) and sim knobs the bundles read."""
 
     device_slot_offset: int = 0

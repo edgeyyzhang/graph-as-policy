@@ -18,7 +18,7 @@ gap.viz.serve("outputs/")
 ```
 
 Principles (user-set):
-- **As easy to use as `models`**: pip install + 4 lines + `ANTHROPIC_API_KEY`. Quickstart needs zero self-hosted servers, zero extra terminals.
+- **As easy to use as `models`**: pip install + 4 lines + `OPENROUTER_API_KEY`. Quickstart needs zero self-hosted servers, zero extra terminals.
 - **In-process by default**: env + models in one Python process. Ray is opt-in scale-out, never a prerequisite.
 - **Plain Python, no protos**: gRPC/protobuf deleted everywhere. Typed dicts + numpy are the data contract. The only wire protocol left is the msgpack bridge to real robots.
 - **Two repos**: `gap` (engine) and `open-robot-skills` (contributable skill library in Anthropic Agent Skills format, discovered by path).
@@ -31,7 +31,7 @@ Distribution name `graph-as-policy`, import `gap`, Python ≥3.10 (isaaclab pin 
 - **G1 — Grocery fulfillment ≥90%.** `gap benchmark` in `llm_generation` mode on the variational-automation (posvar) grocery-fulfillment suites (`libero_object_all_variance`, `grocery_packing` families) achieves **>90% success** with CuRobo-only motion planning + grasping/transport skills in the prompt (the **curobo tool bundle is required for the gate**, even though the quickstart stays curobo-free).
 - **G2 — Correct generation.** `gap.agent.generate` on grocery-fulfillment instructions produces graphs that pass the equivalence suite and execute to success (the generated code, not just hand-ported graphs, clears G1).
 - **G3 — Steered policy works.** The hover-then-handover example (perceive → approach above target → hand control to the learned policy) runs end to end.
-- **G4 — Quickstart is one command** on the stated hardware floor: **1× NVIDIA RTX 4090 (≥24 GB VRAM) + Linux + EGL**, `ANTHROPIC_API_KEY` (+ `HF_TOKEN` for gated weights), the two repos cloned side by side, and a one-time several-GB weight download (`gap skills check --download`). The README states this floor up front — no pretending it runs on a laptop CPU.
+- **G4 — Quickstart is one command** on the stated hardware floor: **1× NVIDIA RTX 4090 (≥24 GB VRAM) + Linux + EGL**, `OPENROUTER_API_KEY` (+ `HF_TOKEN` for gated weights), the two repos cloned side by side, and a one-time several-GB weight download (`gap skills check --download`). The README states this floor up front — no pretending it runs on a laptop CPU.
 
 ## 2. Concepts
 
@@ -45,7 +45,7 @@ Distribution name `graph-as-policy`, import `gap`, Python ≥3.10 (isaaclab pin 
 | **Checkpoint** | LLM-authored postcondition predicate attached to a subgraph (`validate=True`), evaluated against sim ground truth at subgraph exit. |
 | **Trial / trace** | One execution with tracing: `workflow.json`, `dag_trace.json`, `node_data/<id>/` (inputs/outputs + PNG/NPZ assets). |
 
-**Two distributions, one workspace.** graph-as-policy is a uv workspace with two pip distributions: **`gap-core`** is the bundle-author surface (`gap_core.tools`/`types`/`errors`/`schema`/`skills`/`rpc`, ~150 MB installed) — the stable, narrow API that open-robot-skills bundles depend on — and **`graph-as-policy`** is the runtime (`gap.runtime`/`agent`/`connector`/`cli`/`builder`/`viz`/`benchmark`) that consumes gap-core and ships the agent/executor/viz stack. Bundles depend only on `gap-core`, so the heavy runtime stack (fastapi, JAX, MuJoCo, pyroki, opencv, anthropic) stays out of bundle venvs; bundle authors and CI install just `gap-core`, while end users running graphs install `graph-as-policy` (which pulls gap-core transitively).
+**Two distributions, one workspace.** graph-as-policy is a uv workspace with two pip distributions: **`gap-core`** is the bundle-author surface (`gap_core.tools`/`types`/`errors`/`schema`/`skills`/`rpc`, ~150 MB installed) — the stable, narrow API that open-robot-skills bundles depend on — and **`graph-as-policy`** is the runtime (`gap.runtime`/`agent`/`connector`/`cli`/`builder`/`viz`/`benchmark`) that consumes gap-core and ships the agent/executor/viz stack. Bundles depend only on `gap-core`, so the heavy runtime stack (fastapi, JAX, MuJoCo, pyroki, opencv) stays out of bundle venvs; bundle authors and CI install just `gap-core`, while end users running graphs install `graph-as-policy` (which pulls gap-core transitively).
 
 **Tools vs skills — a first-class split, mirrored in the repo layout.** open-robot-skills has two top-level categories:
 - **Tools** (`open-robot-skills/tools/<bundle>/`) = *what the robot can compute*: model-backed callables with no task strategy. **Tool bundles are named after the model**: `sam3`, `grounding-dino`, `gemini-er`, `molmo`, `vlm` (generic API VLM), `curobo` (motion planning), `geometry` (pure math). A tool bundle exposes typed functions via `@tool` in `tools.py`; its SKILL.md documents when to call them. (IK is NOT a tool bundle — it's built into the connector, see §7.)
@@ -155,10 +155,10 @@ open-robot-skills/
 │   │                         #   in-tree; this bundle implements detect() directly on the SDK
 │   │                         #   (usage extracted from perceive_gemini_er.py)
 │   ├── molmo/                #   pointing VLM (point_prompt/query/query_yes_no). OPTIONAL:
-│   │                         #   self-hosted vLLM; Claude can't point — gemini-er is the
+│   │                         #   self-hosted vLLM; the generic API VLM can't point — gemini-er is the
 │   │                         #   API-based alternative for detection
-│   ├── vlm/                  #   generic API VLM (query/query_yes_no); provider = anthropic
-│   │                         #   default / openai / vertex; zero VRAM
+│   ├── vlm/                  #   generic API VLM (query/query_yes_no); provider = openrouter
+│   │                         #   default / vertex; zero VRAM
 │   ├── curobo/               #   collision-aware MOTION PLANNING (plan_to_grasp_poses,
 │   │                         #   plan_with_grasped_object, plan_linear, plan_to_pose…)
 │   │                         #   — REQUIRED for the G1 gate; CUDA-JIT documented.
@@ -252,14 +252,13 @@ Pipeline ports as-is: coordinator (topology + subgraph declarations) → per-sub
 class LLMClient(Protocol):
     async def complete(self, *, system, messages, **gen_kw) -> str
     async def complete_with_tools(self, *, system, messages, tools, tool_handler, **gen_kw) -> str
-def make_llm(cfg: LlmConfig) -> LLMClient      # cfg.provider: anthropic | openai | vertex
+def make_llm(cfg: LlmConfig) -> LLMClient      # cfg.provider: openrouter | vertex
 ```
-- `anthropic` (default): `AsyncAnthropic`, streaming for long codegen, model default `claude-opus-4-8`, native tool-use loop (the checkpoint agent's meta-tools need `complete_with_tools` — Vertex-gated today, reimplemented per provider).
-- `openai`: existing httpx chat-completions path (native OpenAI / OpenRouter / vLLM via `base_url`); tools via the OpenAI tools API.
-- `vertex`: today's `_call_vertex_async` ported as-is (AnthropicVertex for claude-*, google-genai for gemini); `[vertex]` extra.
+- `openrouter` (default): httpx OpenAI-compatible chat-completions path against `https://openrouter.ai/api/v1`, model default `gemini-3.1-flash-lite-preview`, native tool-use loop via the OpenAI tools API (the checkpoint agent's meta-tools need `complete_with_tools`); point `endpoint:`/`base_url` at any other OpenAI-compatible server (native OpenAI, a local vLLM) to reuse the same path.
+- `vertex`: google-genai for gemini models only; `[vertex]` extra.
 - Disk response cache kept across providers; GRPO/logprobs path dropped. Auth via standard env vars.
 
-`gap.agent.generate(instruction, *, skills, model=None, provider=None, out_dir=None, config=None) -> GeneratedGraph{path, workflow, code}` (+ `generate_sync`). The same provider layer serves the `vlm` tool bundle — quickstart perception (letter-based selection, deliberately coordinate-free) verified Claude-compatible.
+`gap.agent.generate(instruction, *, skills, model=None, provider=None, out_dir=None, config=None) -> GeneratedGraph{path, workflow, code}` (+ `generate_sync`). The same provider layer serves the `vlm` tool bundle — quickstart perception (letter-based selection, deliberately coordinate-free) verified against the hosted VLM.
 
 Graph authoring by humans is first-class: `gap.builder` (WorkflowSpec/Subgraph, ports as-is — prompt-referenced API names stay stable) is documented alongside `gap generate`.
 
@@ -281,8 +280,8 @@ FastAPI + React 19 trial browser ports as-is (backup branch's redesigned swimlan
 
 ## 14. Packaging
 
-- **GaP core deps**: numpy, scipy, pyyaml, httpx, anthropic, fastapi, uvicorn, pillow, opencv-python-headless, robot_descriptions, yourdfpy, **pyroki + jax (CPU — the connector's in-process IK)**, matplotlib, h5py, msgpack(+numpy), viser. No grpcio/protobuf/protoc/cargo anywhere.
-- **Extras**: `[libero]` mujoco/robosuite/posvar-fork/bddl/robomimic/imageio[ffmpeg]; `[ray]`; `[real]` ur-rtde (pyzed = documented manual ZED SDK install, lazy import); `[vertex]` anthropic[vertex] + google-genai; `[dev]` pytest/ruff/mypy.
+- **GaP core deps**: numpy, scipy, pyyaml, httpx, fastapi, uvicorn, pillow, opencv-python-headless, robot_descriptions, yourdfpy, **pyroki + jax (CPU — the connector's in-process IK)**, matplotlib, h5py, msgpack(+numpy), viser. No grpcio/protobuf/protoc/cargo anywhere.
+- **Extras**: `[libero]` mujoco/robosuite/posvar-fork/bddl/robomimic/imageio[ffmpeg]; `[ray]`; `[real]` ur-rtde (pyzed = documented manual ZED SDK install, lazy import); `[vertex]` google-genai; `[dev]` pytest/ruff/mypy.
 - **open-robot-skills dependency mechanism (clean by construction)**: open-robot-skills is one pip distribution; **each bundle = one extra** (extra name == bundle name: `[sam3]`, `[grounding-dino]`, `[curobo]`, `[gemini-er]`, `[pi05-libero]`, `[molmoact-libero]` — the last two both pull `openpi-client`, …) plus meta-extras `[quickstart]` (sam3+grounding-dino+geometry), `[grocery]` (quickstart+curobo — the G1 set), `[all]` (now including both policy skills). Non-PyPI deps (the sam3 fork, nvidia-curobo) are **pinned `git+https` entries inside those extras** — one resolver run surfaces cross-bundle conflicts at install time, and CI installs `[all]` to prove co-installability (dev's docker venv already proved these deps coexist). `uv.lock` pins the exact G1-gate environment. **Ownership split: pip owns code; `gap skills check` only verifies** (import probe + weight presence per bundle, mapping bundle→extra by name); `--download` prefetches **weights only** (HF_TOKEN documented) — nothing ever pip-installs behind the user's back. Quickstart is literally `pip install -e gap -e "open-robot-skills[quickstart]"` → `gap skills check --download` → `gap run …`. The one documented wart: curobo's CUDA JIT (`--no-build-isolation`, `CUDA_HOME`) lives on that extra alone. P2 task: diff the dev tree's vendored sam3 against upstream — if patched, publish the fork (or vendor under `tools/sam3/_vendor/`) and pin that.
 - Submodules: `robots_realtime`, `Variational-Automation-Benchmark` (both pinned). `py.typed` shipped. uv-first docs, pip supported.
 
@@ -297,7 +296,7 @@ FastAPI + React 19 trial browser ports as-is (backup branch's redesigned swimlan
 | *(none)* | nothing (CPU, no heavy deps) | locally + PR gate, 3.10/3.11/3.12 |
 | `sim` | `[libero]` (mujoco/EGL) | nightly GPU runner; locally on demand |
 | `gpu` | model weights (torch/sam3/dino) | nightly GPU runner |
-| `llm` | `ANTHROPIC_API_KEY` (openai/vertex variants opt-in) | nightly, small token budget |
+| `llm` | `OPENROUTER_API_KEY` (vertex variant opt-in) | nightly, small token budget |
 | `real` | hardware | manual checklist before release |
 
 `pyproject`: `addopts = "-m 'not llm and not gpu and not sim and not real'"`.
@@ -320,7 +319,7 @@ FastAPI + React 19 trial browser ports as-is (backup branch's redesigned swimlan
 - **verify/checkpoints**: World/Body/Robot fixture vocabulary tests ported from eval_lib's coverage (`is_grasped/is_in/is_on/is_above/eventually/always`, cavity bounds); `evaluate_checkpoint` arity-2 predicates + outputs dict + eval-error capture + diagnostics; `load_checkpoints` sidecar exec isolation; hook integration: `FakeConnector` with scripted enter/exit world snapshots → warn vs raise modes; transition checks (held-after-grasp, released-after-place).
 - **connector/envs**: env registry resolve/prefix/default + lazy factories (**import the registry with mujoco absent** — must not raise); `EnvConfig` application (tcp offset/rotation, home joints); msgpack bridge round-trip against a mocked rr client speaking recorded protocol frames (obs in, 50 Hz action frames out, heartbeat staleness detection); `rr_launcher` lifecycle on a fake script (spawn, log tee, process-group kill); data collector (HDF5 schema, obs/action length sync, episode boundaries).
 - **agent (no LLM)**: prompt-assembly snapshots from a stub skill catalog (coordinator/subgraph/checkpoint prompts contain the right tool schemas and SKILL.md bodies); **response parsing on canned LLM outputs** (coordinator WorkflowSpec extraction, subgraph + inline-script extraction, missing-capability block); script-fix loop driven by canned validation errors; builder→JSON round-trip; every golden graph passes `validate_workflow`.
-- **llm providers**: mocked-HTTP contract tests per provider — request shaping (system/messages/max_tokens), streaming assembly, the tool-use loop with scripted `tool_use`→`tool_result` rounds (anthropic) and OpenAI tools API equivalents, vertex claude/gemini routing, 429 retry/backoff, disk-cache hit/miss keys.
+- **llm providers**: mocked-HTTP contract tests per provider — request shaping (system/messages/max_tokens), streaming assembly, the tool-use loop via the OpenAI tools API (openrouter), vertex gemini routing, 429 retry/backoff, disk-cache hit/miss keys.
 - **benchmark** (ported from progress + extended): config/family expansion (posvar×4, libero, libero_pro, grocery), mode×policy axis collapse, report math (success_rate, trial-weighted completion_rate, per-task pivots) on synthetic results, TSV/JSON writers.
 - **viz**: `graph_builder` on golden graphs → WorkflowGraph snapshot (swimlanes, control vs data edges); `trial_loader` discovery on a fixture outputs tree; FastAPI endpoints via TestClient (trials list, node data, assets); `render.py` smoke (PDF bytes non-empty) on each golden graph.
 - **CLI**: every subcommand `--help` without heavy imports (lazy-dispatch regression); arg→config plumbing.
@@ -337,8 +336,8 @@ FastAPI + React 19 trial browser ports as-is (backup branch's redesigned swimlan
 
 - **Graph equivalence, not text equality** — `gap/testing/equivalence.py`: normalize both graphs (canonical node ordering; name-insensitive DAG isomorphism per subgraph; compare the *skill multiset*, exit-condition wiring, and top-level topology), then a behavioral gate (generated graph validates and, under `sim`, executes to success). LLM output is stochastic → tests generate K graphs per golden instruction and assert a pass-rate threshold (e.g. ≥2/3 structurally equivalent + executable), recorded per-model so regressions are visible without flaking CI.
 - Golden instruction set: the quickstart task + 2–3 libero tasks with checked-in reference graphs (regenerated by a documented `make goldens` script).
-- Checkpoint-agent tool-use regression per provider (anthropic in nightly; openai/vertex opt-in): generated sidecars load and their predicates evaluate against fixture Worlds.
-- Claude-as-VLM probe: letter-based box selection on a fixture image with known answer.
+- Checkpoint-agent tool-use regression per provider (openrouter in nightly; vertex opt-in): generated sidecars load and their predicates evaluate against fixture Worlds.
+- VLM probe: letter-based box selection on a fixture image with known answer.
 
 ### 15.5 open-robot-skills repo tests
 
@@ -354,7 +353,7 @@ Ported from dev tree: `tests/runtime` (11 files), `tests/builder`, `tests/compos
 
 | Example | Content | Key deps |
 |---|---|---|
-| `libero_quickstart/` | **A NEW graph, authored for v1** — no curobo-free LIBERO graph exists anywhere in the dev tree (every `graph_cartesian_obb` variant calls `curobo.PlanToGraspPoses` via `grasp_curobo_obb`). Base it on graph_cartesian_obb's topology but swap the grasp subgraph to a grasping-direct-ik-style top-down descend. **Fallback decided**: if direct-IK grasp success is poor on libero_object/0 (<~80% in P4 testing), the quickstart documents the curobo install (CUDA-JIT toolchain) rather than shipping a flaky demo — G4's "one command" then includes that install step. | `[libero]` + sam3/grounding-dino/geometry bundles + `ANTHROPIC_API_KEY` (vlm) |
+| `libero_quickstart/` | **A NEW graph, authored for v1** — no curobo-free LIBERO graph exists anywhere in the dev tree (every `graph_cartesian_obb` variant calls `curobo.PlanToGraspPoses` via `grasp_curobo_obb`). Base it on graph_cartesian_obb's topology but swap the grasp subgraph to a grasping-direct-ik-style top-down descend. **Fallback decided**: if direct-IK grasp success is poor on libero_object/0 (<~80% in P4 testing), the quickstart documents the curobo install (CUDA-JIT toolchain) rather than shipping a flaky demo — G4's "one command" then includes that install step. | `[libero]` + sam3/grounding-dino/geometry bundles + `OPENROUTER_API_KEY` (vlm) |
 | `grocery_fulfillment/` | the G1 flagship: posvar all-variance / grocery_packing tasks via `gap generate` + the acceptance benchmark configs (ported `grocery_packing*.yaml`); uses perceiving-objects-oneshot + grasping-with-planner (curobo) + transporting-objects | `[libero]`, curobo backend |
 | `steered_policy/` | G3: `graph_obb_policy_loop` (+ `_grasp` variant) — perceive (perceiving-objects-oneshot) → `approach_above` hover over target → **handover to the learned-policy skill** (`{{policy_id}}.run`, e.g. `pi05-libero.run`; no `policy_id` input; gripper-cycle termination). The launcher auto-boots the skill's preset (downloads the checkpoint + spawns the server); `gap policy serve pi05-libero` runs it by hand | `[libero]`, `[pi05-libero]` (or run `gap policy serve pi05-libero`) |
 | `cable_ur/` | master's cable example; standalone-connector showcase (perception-only) | `[real]`, ZED SDK |

@@ -14,7 +14,7 @@ hint. Second stop: the trace of the failing run.
 | sam3 install conflicts on numpy | Expected — the registry pyproject overrides sam3's strict pin (`numpy>=1.26`); use `uv sync`, don't hand-pip |
 | Gated HF weights 401 | `export HF_TOKEN=...`, then `gap skills check --download` |
 | Triton/JIT `FileNotFoundError` mentioning a compiler | Stale `$CC` pointing at a missing compiler → unset `CC` or point it at a real one (sam3 NMS JIT) |
-| `gap generate` errors about credentials | No provider configured → `export ANTHROPIC_API_KEY=...` (or `--provider openai|vertex`; vertex uses gcloud ADC: `gcloud auth application-default login`) |
+| `gap generate` errors about credentials | No provider configured → `export OPENROUTER_API_KEY=...` (or `--provider vertex`; vertex uses gcloud ADC: `gcloud auth application-default login`) |
 | Bundle NOT READY: missing deps | `uv sync --extra <bundle>` in the registry (or `pip install '<dist>[<bundle>]'`) — `gap check` prints the right one |
 | Weights "unknown / not cached" | `gap skills check --download` prefetches; harmless otherwise (download on first use) |
 

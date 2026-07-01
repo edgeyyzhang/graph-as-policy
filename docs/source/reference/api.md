@@ -218,7 +218,7 @@ Used by the [collect-and-train example](../examples/collect-and-train.md).
 
 Source: [gap/agent/\_\_init\_\_.py](gh-engine:gap/agent/__init__.py)
 
-Requires an LLM API key (`ANTHROPIC_API_KEY` by default — see
+Requires an LLM API key (`OPENROUTER_API_KEY` by default — see
 [LLM providers](../authoring/llm-providers.md)) and at least one skill
 registry (resolution failure raises `FileNotFoundError`).
 
@@ -245,8 +245,8 @@ sidecars, then the result is validated with a bounded LLM script-fix loop.
 See [Generation](../authoring/generation.md).
 
 - **model** — LLM model override (default: the provider default,
-  `claude-opus-4-8` on anthropic).
-- **provider** — `"anthropic"` | `"openai"` | `"vertex"`.
+  `gemini-3.1-flash-lite-preview` on openrouter).
+- **provider** — `"openrouter"` | `"vertex"`.
 - **out_dir** — the workflow folder is written to `<out_dir>/task_00`;
   defaults to `outputs/generated_<timestamp>`.
 - **config** — a `PipelineConfig` or YAML path for full control; the
@@ -292,10 +292,10 @@ box-drawing terminal text via `gap.viz.to_text`.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `provider` | `"anthropic"` | `"anthropic"` \| `"openai"` \| `"vertex"` |
-| `model` | `None` | `None` uses the provider default (anthropic only: `claude-opus-4-8`) |
-| `endpoint` | `None` | OpenAI-compatible base URL (or full `.../chat/completions` URL) |
-| `api_key` | `None` | falls back to `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` per provider |
+| `provider` | `"openrouter"` | `"openrouter"` \| `"vertex"` |
+| `model` | `None` | `None` uses the provider default (openrouter: `gemini-3.1-flash-lite-preview`) |
+| `endpoint` | `None` | OpenAI-compatible base URL (or full `.../chat/completions` URL); set it to reach a local vLLM or other OpenAI-compatible server |
+| `api_key` | `None` | falls back to `OPENROUTER_API_KEY` (openrouter) |
 | `project_id`, `region` | `None` | Vertex AI only |
 | `temperature` | `0.7` | omitted for models that reject sampling parameters; `None` always omits |
 | `max_tokens` | `20480` | |

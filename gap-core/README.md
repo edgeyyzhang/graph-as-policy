@@ -4,7 +4,7 @@ The bundle-author surface for gap (graph-as-policy). Every per-bundle `.venv`
 (tool servers, policy servers) installs this distribution alone — they get
 the `@tool` decorator, the typed value vocabulary, the error hierarchy, the
 skill metadata dataclasses, and the msgpack-RPC primitives, but none of the
-heavy runtime stack (no fastapi, no JAX, no MuJoCo, no anthropic, no
+heavy runtime stack (no fastapi, no JAX, no MuJoCo, no
 opencv/matplotlib/viser).
 
 ## Public modules

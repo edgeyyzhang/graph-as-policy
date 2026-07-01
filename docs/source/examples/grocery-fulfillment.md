@@ -3,8 +3,8 @@
 :::{note} Requirements
 A CUDA GPU (MuJoCo EGL rendering + CuRobo planning + perception weights), the
 `grocery` dependency extra, and an LLM credential for graph generation. The
-reference runs used Vertex (`gemini-3.1-flash-lite-preview`); `anthropic` works
-by switching the config's `llm:` block.
+reference runs used Vertex (`gemini-3.1-flash-lite-preview`); the default
+`openrouter` provider works by switching the config's `llm:` block.
 :::
 
 This is GaP's flagship acceptance family — and its release gate. The task:

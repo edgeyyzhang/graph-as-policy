@@ -132,7 +132,7 @@ pages.
 | Requirement | Details |
 |---|---|
 | **GPU** | 1× NVIDIA RTX 4090-class GPU (**≥ 24 GB VRAM**), Linux + EGL. |
-| **LLM** | An API key for a coding LLM — **Anthropic** (default), OpenAI-compatible, or Vertex — drives the multi-agent codegen harness. |
+| **LLM** | An API key for a coding LLM — **OpenRouter** (default, OpenAI-compatible) or Vertex — drives the multi-agent codegen harness. |
 | **VLM** | A vision-language model for perception (object identification & grounding), plus local **SAM3 + Grounding DINO** weights. A free [HuggingFace token](https://huggingface.co/settings/tokens) is needed for the gated SAM3 weights. |
 | **Tooling** | [uv](https://docs.astral.sh/uv/); the first run downloads ~3.5 GB of model weights. |
 
@@ -149,7 +149,7 @@ cd graph-as-policy
 uv sync                                   # engine + LIBERO sim
 uv run gap skills install --all           # per-bundle venvs (sam3, cuRobo, vlm, …)
 export HF_TOKEN=...                        # gated SAM3 weights
-export ANTHROPIC_API_KEY=...              # codegen + in-graph VLM (anthropic is the default)
+export OPENROUTER_API_KEY=...             # codegen + in-graph VLM (openrouter is the default)
 MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph --sim libero_object_all_variance/0
 uv run gap viz                            # browse the trial at localhost:9432
 ```

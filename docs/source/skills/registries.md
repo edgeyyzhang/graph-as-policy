@@ -260,8 +260,8 @@ Every probe is fast and offline:
 
 - **GPU** — one `nvidia-smi` subprocess (5 s timeout, deliberately
   torch-free).
-- **LLM credentials** — environment lookups: `ANTHROPIC_API_KEY`,
-  `OPENAI_API_KEY` (custom OpenAI-compatible endpoints may not need
+- **LLM credentials** — environment lookups: `OPENROUTER_API_KEY`
+  (custom OpenAI-compatible endpoints like a local vLLM may not need
   it), and Vertex via `$GOOGLE_APPLICATION_CREDENTIALS` or the gcloud
   ADC file.
 - **Bundle deps** — an isolated per-bundle import probe. Bundles

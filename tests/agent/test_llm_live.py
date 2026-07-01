@@ -1,4 +1,4 @@
-"""Live anthropic smoke tests — skipped without ANTHROPIC_API_KEY.
+"""Live openrouter smoke tests — skipped without OPENROUTER_API_KEY.
 
 Run with: pytest -m llm tests/agent/test_llm_live.py
 """
@@ -15,14 +15,16 @@ from gap.agent.llm import LlmConfig, complete, complete_with_tools
 pytestmark = [
     pytest.mark.llm,
     pytest.mark.skipif(
-        not os.environ.get("ANTHROPIC_API_KEY"),
-        reason="ANTHROPIC_API_KEY not set",
+        not os.environ.get("OPENROUTER_API_KEY"),
+        reason="OPENROUTER_API_KEY not set",
     ),
 ]
 
-# Cheap, fast model for the smoke round-trip; the pipeline default
-# (claude-opus-4-8) is exercised by the mocked contract tests.
-_CFG = LlmConfig(provider="anthropic", model="claude-haiku-4-5", max_tokens=256)
+# A cheap, fast model for the smoke round-trip; the pipeline default is
+# exercised by the mocked contract tests. Override with GAP_LLM_MODEL if
+# your OpenRouter account needs a different slug (e.g. a `google/` prefix).
+_MODEL = os.environ.get("GAP_LLM_MODEL", "gemini-3.1-flash-lite-preview")
+_CFG = LlmConfig(provider="openrouter", model=_MODEL, max_tokens=256)
 
 
 def test_tiny_completion():

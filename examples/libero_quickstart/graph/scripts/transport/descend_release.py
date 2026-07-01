@@ -1,8 +1,14 @@
-"""Descend to drop position, release the object, and retract home.
+"""Descend to the drop position, release the object, and retract home.
 
-Three-step sequence: go_to_pose down to the drop position, open the gripper
-with settle delays, then go_home to retract. This combines descend + release +
-retract into a single atomic node.
+Three-step sequence: a straight-line Cartesian descend to the drop
+position, open the gripper with settle delays, then go_home to retract.
+This combines descend + release + retract into a single atomic node.
+
+The descend uses ``robot.go_to_pose_cartesian`` (a TCP-aware straight
+Cartesian line, backed by cuRobo's linear planner with a single-pose
+fallback) rather than the free-space ``robot.go_to_pose``: a straight
+vertical descend lowers the held object cleanly instead of the planner's
+shortest-path arc that can swing or toss it just before release.
 
 The gripper open uses ``settle_steps`` to keep the arm holding its target
 while the sim steps, so contact-rich events (finger opening, object
@@ -10,8 +16,8 @@ falling) get physics resolution rather than the motion-to-motion yank that
 caused visible "tossing" of the released object. ``time.sleep()`` does NOT
 advance the sim (it only steps when a motion or hold command is in
 flight); use ``settle_steps`` instead. The arm motions themselves
-(``robot.go_to_pose`` / ``robot.go_home``) block until the controller has
-converged, which provides the descend/retract settling.
+(``robot.go_to_pose_cartesian`` / ``robot.go_home``) block until the
+controller has converged, which provides the descend/retract settling.
 """
 
 from typing import TypedDict
@@ -43,10 +49,11 @@ def run(
         else {"w": 0.0, "x": 1.0, "y": 0.0, "z": 0.0}
     )
 
-    # Descend; the motion blocks until the arm is stable, so the gripper
-    # opens from a quiescent pose.
+    # Descend to the drop position along a straight Cartesian line so the
+    # held object moves vertically down; the motion blocks until the arm is
+    # stable, so the gripper opens from a quiescent pose.
     pose: Se3Pose = {"position": drop_position, "rotation": rotation}
-    ctx.tool("robot.go_to_pose", pose=pose)
+    ctx.tool("robot.go_to_pose_cartesian", pose=pose)
     # Open + hold so the just-released object lands and settles in the
     # container BEFORE the arm starts retracting.
     ctx.tool("robot.open_gripper", settle_steps=60)

@@ -23,8 +23,8 @@ def register(subparsers: argparse._SubParsersAction) -> None:
              "--config skills: also works",
     )
     sp.add_argument(
-        "--provider", default=None, choices=["anthropic", "openai", "vertex"],
-        help="LLM provider override (default: anthropic)",
+        "--provider", default=None, choices=["openrouter", "vertex"],
+        help="LLM provider override (default: openrouter)",
     )
     sp.add_argument(
         "--model", default=None,
@@ -83,21 +83,24 @@ def _handle(args: argparse.Namespace) -> int:
         )
     except Exception as exc:
         print(f"FAIL: {exc}")
-        if "Could not resolve authentication method" in str(exc):
+        low = str(exc).lower()
+        if any(s in low for s in (
+            "could not resolve authentication", "401", "unauthorized",
+            "api key", "api_key", "credential",
+        )):
             provider = args.provider or (config.llm.provider if config else None)
             if provider is None:
                 import os as _os
 
-                provider = _os.environ.get("GAP_LLM_PROVIDER", "anthropic")
+                provider = _os.environ.get("GAP_LLM_PROVIDER", "openrouter")
             print(
                 f"\nhint: no LLM credentials for provider {provider!r} "
-                f"(anthropic is the default).\n"
-                "  anthropic:  export ANTHROPIC_API_KEY=...\n"
-                "  vertex:     gcloud auth application-default login\n"
-                "              export GOOGLE_CLOUD_PROJECT=<project> \\\n"
-                "                     GAP_LLM_PROVIDER=vertex GAP_LLM_MODEL=<gemini-model>\n"
-                "              (install the SDK per run: uv run --extra vertex gap generate ...)\n"
-                "  openai:     export OPENAI_API_KEY=...\n"
+                f"(openrouter is the default).\n"
+                "  openrouter:  export OPENROUTER_API_KEY=...\n"
+                "  vertex:      gcloud auth application-default login\n"
+                "               export GOOGLE_CLOUD_PROJECT=<project> \\\n"
+                "                      GAP_LLM_PROVIDER=vertex GAP_LLM_MODEL=<gemini-model>\n"
+                "               (install the SDK per run: uv run --extra vertex gap generate ...)\n"
                 "`gap check` shows which providers are configured."
             )
         return 1

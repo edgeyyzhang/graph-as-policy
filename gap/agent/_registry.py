@@ -13,7 +13,7 @@ description: >
   Decompose a robotic task into a topology of subgraphs ...
 tools: [read_skill_reference, read_skill_example, ...]
 includes: [_workflow_spec.md]
-model: claude-opus-4-8          # optional
+model: gemini-3.1-flash-lite-preview   # optional
 ---
 ```
 

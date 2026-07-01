@@ -10,6 +10,8 @@ build/
 .mypy_cache/
 .ruff_cache/
 MUJOCO_LOG.TXT
+dag_trace.json
+
 
 # Frontend build: keep gap.viz's built bundle (shipped as package data)
 # despite the generic dist/ ignore above; never track node_modules.

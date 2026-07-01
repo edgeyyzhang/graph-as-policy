@@ -16,7 +16,7 @@ From the GaP checkout (open-robot-skills cloned next to it):
 ```bash
 uv sync --extra quickstart            # engine + LIBERO sim + perception models
 uv run gap skills check --download    # verify bundles + prefetch weights (~3.5 GB)
-export ANTHROPIC_API_KEY=...          # VLM provider — alternatives below
+export OPENROUTER_API_KEY=...          # VLM provider — alternatives below
 
 MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
   --sim libero_object_all_variance/0
@@ -86,11 +86,11 @@ quickstart default.
 ## VLM provider
 
 The perception pipeline disambiguates DINO detections with a hosted VLM
-(`vlm.query`). The default provider is Anthropic:
+(`vlm.query`). The default provider is OpenRouter:
 
 ```bash
-export ANTHROPIC_API_KEY=...           # default provider; model override:
-export GAP_VLM_MODEL=claude-opus-4-8   # optional
+export OPENROUTER_API_KEY=...                        # default provider; model override:
+export GAP_VLM_MODEL=gemini-3.1-flash-lite-preview   # optional (this is the default)
 ```
 
 Alternative — Vertex AI with application-default credentials (what the
@@ -104,8 +104,9 @@ export GAP_VLM_REGION=global
 export GAP_VLM_MODEL=gemini-3.1-flash-lite-preview
 ```
 
-Any OpenAI-compatible endpoint also works (`GAP_VLM_PROVIDER=openai` +
-`GAP_VLM_BASE_URL` + `GAP_VLM_MODEL`).
+Any OpenAI-compatible endpoint (e.g. a local vLLM) also works — point
+`GAP_VLM_BASE_URL` at it (with `GAP_VLM_MODEL`); the default `openrouter`
+provider already speaks the OpenAI-compatible protocol.
 
 ## The planner variant
 

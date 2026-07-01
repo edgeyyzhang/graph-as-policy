@@ -53,7 +53,7 @@ by path — clone the two repos side by side and every command finds them.
 ## Quickstart
 
 **Requirements:** **1× NVIDIA RTX 4090 (≥24 GB VRAM, Linux + EGL)**, an
-LLM API key (Anthropic / OpenAI-compatible / Vertex), and
+LLM API key (OpenRouter / Vertex), and
 [uv](https://docs.astral.sh/uv/). First run downloads ~3.5 GB of model
 weights; `HF_TOKEN` (a free [HuggingFace token](https://huggingface.co/settings/tokens))
 is needed only for the gated SAM3 weights.
@@ -69,9 +69,9 @@ uv run gap skills install --all          # per-bundle venvs (sam3, cuRobo, vlm, 
 export HF_TOKEN=...                      # for the gated SAM3 weights
 uv run gap skills check --download       # weight prefetch (SAM3 + GDINO) + capability gate
 
-# Pick one LLM provider for codegen + the in-graph VLM. anthropic is the
+# Pick one LLM provider for codegen + the in-graph VLM. openrouter is the
 # default; for vertex, see `docs/source/authoring/llm-providers.md`.
-export ANTHROPIC_API_KEY=...
+export OPENROUTER_API_KEY=...
 MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
   --sim libero_object_all_variance/0
 uv run gap viz                           # browse the trial at localhost:9432
@@ -106,7 +106,7 @@ Full docs site: **<https://graph-robots.github.io/graph-as-policy/>**
 - [Quickstart (15-min tour)](https://graph-robots.github.io/graph-as-policy/getting-started/quickstart.html) — clone → run → generate → trace
 - [Runtime & schema](https://graph-robots.github.io/graph-as-policy/reference/workflow-schema.html) — workflow JSON, executor semantics, checkpoints
 - [Skill authoring](https://graph-robots.github.io/graph-as-policy/skills/authoring-bundles.html) — Agent Skills format, `gap.requires:` frontmatter
-- [LLM providers](https://graph-robots.github.io/graph-as-policy/authoring/llm-providers.html) — anthropic / openai / vertex
+- [LLM providers](https://graph-robots.github.io/graph-as-policy/authoring/llm-providers.html) — openrouter / vertex
 - [Skill registries](https://graph-robots.github.io/graph-as-policy/skills/registries.html) — `--skills`, `$GAP_SKILLS_PATH`, `gap registry …`
 - [CLI reference](https://graph-robots.github.io/graph-as-policy/reference/cli.html) — every `gap` verb
 - [Safety](https://graph-robots.github.io/graph-as-policy/real-robots/safety.html) — required reading before any real-robot example

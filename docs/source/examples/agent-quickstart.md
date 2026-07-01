@@ -48,7 +48,7 @@ Pick an LLM provider for generation and for the VLM perception bundle
 (`gap check` tells you what is configured):
 
 ```bash
-export ANTHROPIC_API_KEY=...          # simplest: one key drives both
+export OPENROUTER_API_KEY=...         # simplest: one key drives both
 # or vertex: gcloud auth application-default login, then
 #   export GAP_VLM_PROVIDER=vertex GAP_VLM_PROJECT_ID=<proj> \
 #          GAP_VLM_REGION=global GAP_VLM_MODEL=<gemini-model>

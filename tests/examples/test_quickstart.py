@@ -11,7 +11,7 @@ Run it explicitly::
     pytest tests/examples/test_quickstart.py -m "sim" --no-header
 
 with ``MUJOCO_GL=egl``, a CUDA device, and a configured VLM provider
-(``ANTHROPIC_API_KEY``, or ``GAP_VLM_PROVIDER=vertex`` + project env).
+(``OPENROUTER_API_KEY``, or ``GAP_VLM_PROVIDER=vertex`` + project env).
 """
 
 from __future__ import annotations

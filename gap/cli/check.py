@@ -45,9 +45,8 @@ def register(subparsers: argparse._SubParsersAction) -> None:
         help="Issue a 1-token API ping to each configured LLM and VLM "
              "provider (default is a static env-var/ADC presence check). "
              "Use this to catch stale creds and wrong model names without "
-             "running a full job — the dev-era milk-vs-soup misconfig "
-             "(VLM bundle silently fell through to the anthropic default "
-             "with no API key) would surface here.",
+             "running a full job — a VLM bundle silently falling through "
+             "to the openrouter default with no API key would surface here.",
     )
     p.set_defaults(func=_handle_check)
 
@@ -126,7 +125,7 @@ def _print_pretty(report) -> None:
     print(f"  llm: {providers}")
     # VLM dispatches to ONE resolved provider per run (see resolve_vlm_env);
     # show that single line with the resolution detail so a vlm bundle
-    # silently falling through to the anthropic default in a vertex shell
+    # silently falling through to the openrouter default in a vertex shell
     # is loud here, not at "perceive selected box 0" runtime.
     for name, probe in env.vlm_provider.items():
         line = f"  vlm: {name} {_STATUS_LABEL[probe.status]}"

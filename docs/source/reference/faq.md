@@ -124,13 +124,14 @@ deterministic scene variations you can replay exactly. See
 
 ## Generation and LLM
 
-**`gap generate` with an OpenAI or Vertex provider raises `ValueError`
-about the model.**
-The default model is an Anthropic model, so non-Anthropic providers
-require an explicit model — pass `--model` or set `llm.model` in your
-config YAML. Vertex additionally needs the `[vertex]` extra and ADC
-credentials. The `GAP_VLM_*` environment variables only configure the
-runtime VLM perception path, not codegen. See
+**`gap generate` returns a 404 / unknown-model error on OpenRouter.**
+OpenRouter model slugs are usually namespaced (e.g.
+`google/gemini-3.1-flash-lite-preview`, `anthropic/claude-sonnet-4.5`). If
+the bare default 404s for your account, pass `--model` or set `llm.model`
+in your config YAML with the namespaced slug. Vertex serves Gemini models
+only and additionally needs the `[vertex]` extra and ADC credentials. The
+`GAP_VLM_*` environment variables only configure the runtime VLM
+perception path, not codegen. See
 [LLM providers](../authoring/llm-providers.md).
 
 **I regenerate with temperature > 0 but get the identical graph every time.**

@@ -21,7 +21,7 @@ checkpoints (`target_obb_is_plausible`, `target_held`,
 :::
 
 :::{note} Requirements
-An LLM API key (`ANTHROPIC_API_KEY` for the default provider — see
+An LLM API key (`OPENROUTER_API_KEY` for the default provider — see
 [LLM providers](llm-providers.md)) and at least one skill registry (an
 open-robot-skills checkout). Generation is pure LLM calls plus static
 validation — no simulator is needed.
@@ -30,7 +30,7 @@ validation — no simulator is needed.
 ## CLI
 
 ```bash
-export ANTHROPIC_API_KEY=...
+export OPENROUTER_API_KEY=...
 
 gap generate "pick up the alphabet soup can and place it in the basket" --out my_graph
 ```
@@ -38,8 +38,8 @@ gap generate "pick up the alphabet soup can and place it in the basket" --out my
 | Flag | Meaning |
 |---|---|
 | `--skills PATH` | Skill registry root(s); repeatable, precedence-ordered. Default: the resolved registry set (see [Registries](../skills/registries.md)). |
-| `--provider {anthropic,openai,vertex}` | LLM provider override (default: `anthropic`). |
-| `--model M` | LLM model override (default: the provider default — `claude-opus-4-8` on `anthropic`; the other providers have none and require it). |
+| `--provider {openrouter,vertex}` | LLM provider override (default: `openrouter`). |
+| `--model M` | LLM model override (default: the provider default — `gemini-3.1-flash-lite-preview` on `openrouter`, whose OpenRouter slug may need a `google/` prefix; `vertex` requires an explicit gemini model). |
 | `--out DIR` | Output directory (default: `outputs/generated_<timestamp>`). |
 | `--config YAML` | Pipeline config YAML — `llm:` / `composition:` / `skills:` knobs (see [LLM providers](llm-providers.md)). |
 | `-v, --verbose` | Debug logging. |

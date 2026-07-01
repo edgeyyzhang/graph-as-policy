@@ -79,8 +79,8 @@ discovers bundle directories on disk and loads them.
   coordinator agent decides the subgraph topology, per-subgraph agents write
   the state machines and inline scripts, a checkpoint agent authors
   postcondition predicates, and a script-fix loop (≤2 attempts) repairs
-  validation errors. `llm.py` is the provider layer (`anthropic` default,
-  `openai`, `vertex`) for generation — the runtime `vlm` tool bundle
+  validation errors. `llm.py` is the provider layer (`openrouter` default,
+  `vertex`) for generation — the runtime `vlm` tool bundle
   carries its own equivalent provider config (`GAP_VLM_*`); `launcher.py` and
   `parallel.py` run generate/execute trials (including the benchmark's
   multiprocess worker pool). See [Generating graphs](../authoring/generation.md)
@@ -243,9 +243,10 @@ regression bar for every release:
 
 - **Distribution `graph-as-policy`, import `gap`**, console script `gap`,
   Python ≥ 3.10, MIT license.
-- **Core dependencies are lean** — numpy/scipy, FastAPI/uvicorn, the
-  Anthropic SDK, pyroki + JAX (CPU) for in-process IK, msgpack, imaging
-  libraries. No grpcio, no protobuf, no torch in core.
+- **Core dependencies are lean** — numpy/scipy, FastAPI/uvicorn, httpx (the
+  OpenRouter / OpenAI-compatible LLM client), pyroki + JAX (CPU) for
+  in-process IK, msgpack, imaging libraries. No grpcio, no protobuf, no torch
+  in core.
 - **Extras** gate the heavy stacks: `[libero]` (MuJoCo/robosuite/the posvar
   LIBERO fork — `mujoco==3.6.0` is pinned exactly because the acceptance
   numbers were measured on it), `[ray]`, `[real]`, `[vertex]`, `[policy]`,

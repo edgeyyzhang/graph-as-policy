@@ -133,7 +133,7 @@ site's [CLI reference](../reference/cli.md) and guides.
 | --- | --- |
 | *"What can this robot do right now?"* | `gap registry list` + `gap skills list`, then `gap check --format json`; answers by separating what *exists* from what is READY / BLOCKED, citing fix hints. |
 | *"Run the quickstart graph in sim."* | `MUJOCO_GL=egl gap run examples/libero_quickstart/graph --sim libero_object/0 --checkpoints warn`, then reads the trace and reports checkpoint evidence — never bare "it worked". |
-| *"Generate a graph that packs the groceries."* | `gap generate "..." --provider anthropic --out outputs/...` (needs an LLM key — `gap check` shows which providers are configured), then `--validate-only`, then a sim run. |
+| *"Generate a graph that packs the groceries."* | `gap generate "..." --provider openrouter --out outputs/...` (needs an LLM key — `gap check` shows which providers are configured), then `--validate-only`, then a sim run. |
 | *"Add a tested skill bundle that waves the gripper."* | `gap skills new waving-gripper --kind skill`, fills in the SKILL.md contract, script, and scaffolded unit test, then `gap skills check`, `gap skills test waving-gripper`, `gap check`. |
 | *"Why did this trial fail?"* | Reads `dag_trace.json` in the trace dir for per-node inputs/outputs and checkpoint results; opens `gap viz`; runs `gap trace-diff` against a passing run. |
 

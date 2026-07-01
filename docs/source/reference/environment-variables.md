@@ -54,16 +54,14 @@ Read by `gap generate` and the agent pipeline
 |---|---|---|
 | `GAP_LLM_CACHE_DIR` | path; default: unset (caching disabled) | Disk cache for LLM completions during generation. Keyed by provider + model + generation knobs + prompt; only correct for deterministic (temperature-0) calls. |
 | `GAP_LLM_NO_CACHE` | `1`/`true`/`yes`/`on`; default: unset | Bypass the prompt cache even when a cache dir is configured. |
-| `ANTHROPIC_API_KEY` | string | API key for the default `anthropic` provider, read by the Anthropic SDK. Probed by `gap check`. |
-| `OPENAI_API_KEY` | string | API key for the `openai` provider. Custom OpenAI-compatible `endpoint:` configs may not need it. Probed by `gap check`. |
+| `OPENROUTER_API_KEY` | string | API key for the default `openrouter` provider (OpenRouter's OpenAI-compatible chat-completions API). Custom OpenAI-compatible `endpoint:` configs (e.g. local vLLM) may not need it. Probed by `gap check`. |
 | `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_REGION` | strings | Vertex AI project and region. The benchmark launcher exports them into spawned workers from the config's `llm.project_id` / `llm.region` so worker-side SDK clients can authenticate. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | path | Explicit Application Default Credentials file for the `vertex` provider; checked first by the `gap check` credential probe. |
 | `CLOUDSDK_CONFIG` | path; default: `~/.config/gcloud` | Where `gap check` looks for the gcloud ADC file (`<dir>/application_default_credentials.json`) when `GOOGLE_APPLICATION_CREDENTIALS` is unset. |
 
-The launcher also forwards a config-file `llm.api_key` into the matching
-provider variable (`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`) for spawned
-benchmark workers, since config-derived values would not otherwise
-survive the process spawn.
+The launcher also forwards a config-file `llm.api_key` into the
+`OPENROUTER_API_KEY` variable for spawned benchmark workers, since
+config-derived values would not otherwise survive the process spawn.
 
 ## Simulation and environments
 
@@ -129,10 +127,10 @@ declares its requirements, surfaced by `gap check`. See the
 
 | Variable | Type / default | Effect |
 |---|---|---|
-| `GAP_VLM_PROVIDER` | `anthropic` \| `openai` \| `vertex`; default `anthropic` | Which backend `vlm.query` / `vlm.query_yes_no` use. |
-| `GAP_VLM_MODEL` | string; default: `claude-opus-4-8` (anthropic only) | Model name. **Required** for the `openai` and `vertex` providers. |
-| `GAP_VLM_BASE_URL` | URL | **Required** for the `openai` provider: an OpenAI-compatible chat-completions endpoint, e.g. `http://localhost:8000/v1`. |
-| `GAP_VLM_API_KEY` | string; default: unset | Bearer token sent to the `openai`-provider endpoint (omitted when unset — local servers usually don't need it). |
+| `GAP_VLM_PROVIDER` | `openrouter` \| `vertex`; default `openrouter` | Which backend `vlm.query` / `vlm.query_yes_no` use. |
+| `GAP_VLM_MODEL` | string; default: `gemini-3.1-flash-lite-preview` | Model name. On OpenRouter the slug may need a `google/` prefix. |
+| `GAP_VLM_BASE_URL` | URL; default: `https://openrouter.ai/api/v1` | OpenAI-compatible chat-completions endpoint for the `openrouter` provider; point it at any other such server, e.g. a local vLLM at `http://localhost:8000/v1`. |
+| `GAP_VLM_API_KEY` | string; default: unset | API key for the `openrouter` provider (the VLM bundle also accepts `OPENROUTER_API_KEY`); omitted when unset — local servers usually don't need it. |
 | `GAP_VLM_PROJECT_ID` | string | Vertex project for the `vertex` provider. |
 | `GAP_VLM_REGION` | string; default `global` | Vertex region for the `vertex` provider. |
 

@@ -28,7 +28,7 @@ Zero to a verified rollout, with the trace open. You will:
 Linux + an NVIDIA GPU (≥ ~10 GB VRAM) with EGL, the
 [two repos installed](installation.md) with
 `uv sync && uv run gap skills install --all`, and an LLM API key
-(`export ANTHROPIC_API_KEY=...`, or
+(`export OPENROUTER_API_KEY=...`, or
 [another provider](../authoring/llm-providers.md)). The first run
 downloads ~3.5 GB of model weights; set `HF_TOKEN` for the gated SAM3
 weights — see [Model weights](installation.md#model-weights).
@@ -40,7 +40,7 @@ LIBERO sim + Grounding DINO + SAM3 + a hosted VLM + in-process IK,
 executing a perceive → grasp → transport graph:
 
 ```bash
-export ANTHROPIC_API_KEY=...          # or another provider
+export OPENROUTER_API_KEY=...          # or another provider
 
 MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
   --sim libero_object_all_variance/0

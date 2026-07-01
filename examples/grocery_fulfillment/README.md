@@ -23,7 +23,7 @@ MUJOCO_GL=egl uv run gap benchmark examples/benchmark/grocery_acceptance.yaml --
 ```
 
 You also need an LLM credential for graph generation — the reference runs
-used Vertex (`gemini-3.1-flash-lite-preview`, as the original); `anthropic`
+used Vertex (`gemini-3.1-flash-lite-preview`, as the original); `openrouter`
 works by switching the config's `llm:` block.
 
 Measured: **10/10** on the 10-task × 1-seed development gate (2026-06-11);

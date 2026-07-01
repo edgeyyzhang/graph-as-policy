@@ -12,7 +12,7 @@ config's `output_dir`.
 
 ```bash
 CUDA_HOME=/usr/local/cuda uv sync --extra grocery   # the benchmark families plan with CuRobo
-export ANTHROPIC_API_KEY=...                        # codegen + VLM (or vertex/openai)
+export OPENROUTER_API_KEY=...                       # codegen + VLM (or vertex)
 MUJOCO_GL=egl uv run gap benchmark examples/benchmark/smoke.yaml
 ```
 

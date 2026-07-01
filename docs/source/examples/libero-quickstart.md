@@ -2,7 +2,7 @@
 
 :::{note}
 **Requirements:** a GPU, the `quickstart` extra, and an API key for a hosted
-VLM (Anthropic by default — [alternatives below](#vlm-provider)). Each trial
+VLM (OpenRouter by default — [alternatives below](#vlm-provider)). Each trial
 takes ~25–55 s on an A100.
 :::
 
@@ -33,7 +33,7 @@ it (see [Installation](../getting-started/installation.md)):
 ```bash
 uv sync --extra quickstart            # engine + LIBERO sim + perception deps
 uv run gap skills check --download    # validate every bundle (PASS/WARN/FAIL)
-export ANTHROPIC_API_KEY=...          # VLM provider — alternatives below
+export OPENROUTER_API_KEY=...         # VLM provider — alternatives below
 
 MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
   --sim libero_object_all_variance/0
@@ -144,18 +144,18 @@ MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph_planner \
 ## VLM provider
 
 The perception pipeline disambiguates DINO detections with a hosted VLM (the
-`vlm.query` tool). The default provider is Anthropic:
+`vlm.query` tool). The default provider is OpenRouter:
 
 ```bash
-export ANTHROPIC_API_KEY=...           # default provider; model override:
-export GAP_VLM_MODEL=claude-opus-4-8   # optional
+export OPENROUTER_API_KEY=...                       # default provider; model override:
+export GAP_VLM_MODEL=gemini-3.1-flash-lite-preview  # optional (this is the default)
 ```
 
 Alternative — Vertex AI with application-default credentials (what the
 measured results below used):
 
 ```bash
-uv sync --inexact --extra vertex       # the vertex SDK (anthropic[vertex] + google-genai)
+uv sync --inexact --extra vertex       # the vertex SDK (google-genai)
 gcloud auth application-default login
 export GAP_VLM_PROVIDER=vertex
 export GAP_VLM_PROJECT_ID=<your-project>
@@ -163,11 +163,11 @@ export GAP_VLM_REGION=global
 export GAP_VLM_MODEL=gemini-3.1-flash-lite-preview
 ```
 
-Any OpenAI-compatible endpoint also works:
+The default `openrouter` provider is OpenAI-compatible, so pointing at any
+other such endpoint (e.g. a local vLLM server) just needs a base-URL override:
 
 ```bash
-export GAP_VLM_PROVIDER=openai
-export GAP_VLM_BASE_URL=...            # your endpoint
+export GAP_VLM_BASE_URL=...            # your endpoint (e.g. local vLLM)
 export GAP_VLM_MODEL=...               # model served at that endpoint
 export GAP_VLM_API_KEY=...             # only if the endpoint requires one
 ```

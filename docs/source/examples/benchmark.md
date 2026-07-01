@@ -3,7 +3,7 @@
 :::{note} Requirements
 A CUDA GPU with `MUJOCO_GL=egl` for headless rendering, the `grocery` extra
 (the benchmark families plan with CuRobo), and an LLM credential for code
-generation (`ANTHROPIC_API_KEY`, or Vertex/OpenAI via the config's `llm:`
+generation (`OPENROUTER_API_KEY`, or Vertex via the config's `llm:`
 block). The policy modes additionally need a running policy server.
 :::
 
@@ -23,7 +23,7 @@ key-by-key reference.
 
 ```bash
 CUDA_HOME=/usr/local/cuda uv sync --extra grocery
-export ANTHROPIC_API_KEY=...     # codegen + VLM (or vertex/openai)
+export OPENROUTER_API_KEY=...    # codegen + VLM (or vertex)
 MUJOCO_GL=egl uv run gap benchmark examples/benchmark/smoke.yaml
 ```
 
@@ -44,7 +44,7 @@ task: "auto"           # per-task prompts resolved from LIBERO metadata
 skills: ../../../open-robot-skills   # optional; omit to auto-discover
 
 llm:
-  provider: anthropic
+  provider: openrouter
 
 benchmark:
   families: [grocery_packing]

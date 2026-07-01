@@ -482,7 +482,7 @@ class SubgraphRunner:
             return await complete(config, system=system_prompt, messages=messages)
 
         tool_descriptors = [
-            _to_anthropic_tool_schema(d) for d in bound_codegen_tools
+            _to_tool_schema(d) for d in bound_codegen_tools
         ]
 
         def handler(name: str, kwargs: dict) -> Any:
@@ -853,8 +853,9 @@ def _split_block_by_subgraph(
     return {name: "\n".join(lines) for name, lines in by_sg.items() if lines}
 
 
-def _to_anthropic_tool_schema(descriptor: Any) -> dict:
-    """Translate a ToolDescriptor into the Anthropic ``tools=`` shape."""
+def _to_tool_schema(descriptor: Any) -> dict:
+    """Translate a ToolDescriptor into the canonical ``{name, description,
+    input_schema}`` tool shape (translated per-provider in gap.agent.llm)."""
     schema = descriptor.schema
     properties: dict[str, dict] = {}
     required: list[str] = []

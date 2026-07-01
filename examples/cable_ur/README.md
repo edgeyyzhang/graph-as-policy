@@ -83,7 +83,7 @@ plane in viser.
 ## Perception requirements
 
 The perception script calls Grounding-DINO + SAM3 + a hosted VLM through
-the open-robot-skills tool bundles (GPU weights + `ANTHROPIC_API_KEY` or a
+the open-robot-skills tool bundles (GPU weights + `OPENROUTER_API_KEY` or a
 vertex setup) — see the open-robot-skills README. The prompts in
 `graph/workflow.json` (`object_name`, `dino_prompt`, `text_prompts`)
 were tuned for a green circular sticker; edit them for your marker.

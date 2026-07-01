@@ -11,7 +11,7 @@ ZED camera, driven through the vendored
 A Franka Panda with a Robotiq gripper, a ZED camera, the
 `third_party/robots_realtime` submodule (own process and environment — GaP
 never imports it), a GPU with weights for the `grounding-dino` and `sam3` tool
-bundles, and a VLM provider credential (`ANTHROPIC_API_KEY` or a Vertex
+bundles, and a VLM provider credential (`OPENROUTER_API_KEY` or a Vertex
 setup). The graph validates with no hardware at all.
 :::
 

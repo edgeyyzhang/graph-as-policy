@@ -10,8 +10,8 @@ Tools have two scopes:
 
 - ``runtime`` (default): the tool is invocable from a workflow ``type: tool``
   state. The harness shows it to the coordinator so the LLM can pick it.
-- ``codegen``: the tool is bound to the codegen LLM via the SDK ``tools=``
-  parameter (Anthropic tool-use loop). It is NOT in the workflow catalog
+- ``codegen``: the tool is bound to the codegen LLM via the ``tools=``
+  parameter (native tool-use loop). It is NOT in the workflow catalog
   and cannot appear in ``workflow.json``.
 
 Public API:
