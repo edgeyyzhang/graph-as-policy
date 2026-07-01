@@ -98,14 +98,15 @@ Two variables in this area are **set by GaP itself**, not by you:
 
 Execution-speed optimizations for the LIBERO connector/env, all resolved in one
 place (`gap/env_config.py`) and each validated to preserve task success on the
-grocery pick-and-place. **`GAP_FAST=1`** flips all of them to their fast values
-in a single switch; any individual flag explicitly set in the environment still
-**wins** over the unified default — so you can enable fast mode and selectively
-turn one thing back off, e.g. `GAP_FAST=1 GAP_CUROBO_CUDA_GRAPH=0 gap run ...`.
+grocery pick-and-place. Fast mode is **on by default** — set **`GAP_FAST=0`** to
+restore the conservative (legacy) path. Any individual flag explicitly set in
+the environment still **wins** over the unified default — so you can keep fast
+mode on and selectively turn one thing back off, e.g.
+`GAP_CUROBO_CUDA_GRAPH=0 gap run ...`.
 
 | Variable | Type / default | `GAP_FAST` | Effect |
 |---|---|---|---|
-| `GAP_FAST` | `1`/`true`/`yes`/`on`; default off | — | Unified switch: turns on streaming + no-motion-render + cuRobo CUDA graph at once. (The OSC servo is intentionally **excluded** — it's safe only for free-space legs, so opt in separately.) The individual flags below override it. |
+| `GAP_FAST` | bool; **default on** | — | Unified switch, **on by default**: streaming + no-motion-render + cuRobo CUDA graph. Set `GAP_FAST=0` to restore the legacy path. (The OSC servo is intentionally **excluded** — safe only for free-space legs, so opt in separately.) The individual flags below override it. |
 | `GAP_LIBERO_STREAM` | bool; default **on** | on | Follow a planned joint trajectory with a continuous path-following servo (no per-waypoint convergence + settle). `0` restores the legacy per-waypoint tracking. |
 | `GAP_LIBERO_STREAM_MAX_STEP_FRAC` | float `[0.05, 1.0]`; default `1.0` | `1.0` | Per-tick joint-step clamp as a fraction of the joint controller's `output_max`. Lower it to be gentler on a carried payload, at some speed cost. |
 | `GAP_LIBERO_SERVO` | bool; default **off** | off (opt-in) | OSC Cartesian servo on `go_to_pose_cartesian` legs — the policy's own actuator (no IK/planning). **Not enabled by `GAP_FAST`**: safe for free-space transport legs (grocery_fulfillment) but degrades cluttered grasp legs (grocery_packing, where it stalls near the object). On stall it restores the pre-servo joint config and falls back to the cuRobo linear plan. |

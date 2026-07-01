@@ -622,6 +622,7 @@ class Connector:
             setf is None
             or getattr(env, "_motion_render", True)
             or self._cam_suspend_depth > 0
+            or self._step_callbacks  # a DataCollector needs per-step frames
         ):
             self._cam_suspend_depth += 1
             try:

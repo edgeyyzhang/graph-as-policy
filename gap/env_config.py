@@ -9,15 +9,15 @@ a connector/env observe the value.
 
 ## Fast mode
 
-``GAP_FAST=1`` flips the execution-speed flags to their fast values in one
-switch (continuous streaming, no camera rendering during motion, cuRobo
-CUDA-graph capture). The OSC servo is deliberately NOT in this set — it's
-opt-in via ``GAP_LIBERO_SERVO=1`` because it's only safe for free-space legs.
-Any individual ``GAP_*``
-flag explicitly set in the environment still wins over the unified default — so
-you can enable fast mode and selectively turn one thing back off, e.g.::
+Fast mode is **on by default** — the execution-speed flags take their fast
+values (continuous streaming, no camera rendering during motion, cuRobo
+CUDA-graph capture). Set ``GAP_FAST=0`` to restore the conservative (legacy)
+path. The OSC servo is deliberately NOT in this set — it's opt-in via
+``GAP_LIBERO_SERVO=1`` because it's only safe for free-space legs. Any
+individual ``GAP_*`` flag explicitly set still wins over the unified default —
+so you can keep fast mode on and turn one thing back off, e.g.::
 
-    GAP_FAST=1 GAP_CUROBO_CUDA_GRAPH=0 gap run ...
+    GAP_CUROBO_CUDA_GRAPH=0 gap run ...   # fast, but cuda-graph off
 
 All of these preserve task success on the grocery pick-and-place; see
 ``docs/source/reference/environment-variables.md``.
@@ -39,8 +39,9 @@ _FALSE = ("0", "false", "no", "off")
 # ---------------------------------------------------------------------------
 
 def fast_enabled() -> bool:
-    """Whether unified fast mode (``GAP_FAST``) is on."""
-    return os.environ.get("GAP_FAST", "0").strip().lower() in _TRUE
+    """Whether unified fast mode is on. **On by default** — set ``GAP_FAST=0``
+    to restore the conservative (legacy) execution path."""
+    return os.environ.get("GAP_FAST", "1").strip().lower() in _TRUE
 
 
 def fast_bool(name: str, *, fast: bool, base: bool) -> bool:
