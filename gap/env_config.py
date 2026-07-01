@@ -10,8 +10,10 @@ a connector/env observe the value.
 ## Fast mode
 
 ``GAP_FAST=1`` flips the execution-speed flags to their fast values in one
-switch (continuous streaming, OSC servo on safe Cartesian legs, no camera
-rendering during motion, cuRobo CUDA-graph capture). Any individual ``GAP_*``
+switch (continuous streaming, no camera rendering during motion, cuRobo
+CUDA-graph capture). The OSC servo is deliberately NOT in this set — it's
+opt-in via ``GAP_LIBERO_SERVO=1`` because it's only safe for free-space legs.
+Any individual ``GAP_*``
 flag explicitly set in the environment still wins over the unified default — so
 you can enable fast mode and selectively turn one thing back off, e.g.::
 
@@ -71,9 +73,11 @@ def libero_stream() -> bool:
 
 
 def libero_servo() -> bool:
-    """Policy-like OSC Cartesian servo on safe straight legs (``go_to_pose_cartesian``).
-    ``GAP_LIBERO_SERVO`` (default off; fast on)."""
-    return fast_bool("GAP_LIBERO_SERVO", fast=True, base=False)
+    """Policy-like OSC Cartesian servo on ``go_to_pose_cartesian`` legs. Opt-in
+    ONLY (``GAP_LIBERO_SERVO=1``) — NOT part of ``GAP_FAST``: it's safe for
+    free-space transport legs (grocery_fulfillment) but degrades cluttered
+    grasp legs (grocery_packing), where the servo stalls near the object."""
+    return fast_bool("GAP_LIBERO_SERVO", fast=False, base=False)
 
 
 def libero_motion_render() -> bool:

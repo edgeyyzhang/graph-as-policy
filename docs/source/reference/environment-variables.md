@@ -105,10 +105,10 @@ turn one thing back off, e.g. `GAP_FAST=1 GAP_CUROBO_CUDA_GRAPH=0 gap run ...`.
 
 | Variable | Type / default | `GAP_FAST` | Effect |
 |---|---|---|---|
-| `GAP_FAST` | `1`/`true`/`yes`/`on`; default off | — | Unified switch: turns on streaming + OSC servo + no-motion-render + cuRobo CUDA graph at once. The individual flags below override it. |
+| `GAP_FAST` | `1`/`true`/`yes`/`on`; default off | — | Unified switch: turns on streaming + no-motion-render + cuRobo CUDA graph at once. (The OSC servo is intentionally **excluded** — it's safe only for free-space legs, so opt in separately.) The individual flags below override it. |
 | `GAP_LIBERO_STREAM` | bool; default **on** | on | Follow a planned joint trajectory with a continuous path-following servo (no per-waypoint convergence + settle). `0` restores the legacy per-waypoint tracking. |
 | `GAP_LIBERO_STREAM_MAX_STEP_FRAC` | float `[0.05, 1.0]`; default `1.0` | `1.0` | Per-tick joint-step clamp as a fraction of the joint controller's `output_max`. Lower it to be gentler on a carried payload, at some speed cost. |
-| `GAP_LIBERO_SERVO` | bool; default **off** | on | OSC Cartesian servo on `go_to_pose_cartesian` straight legs — the policy's own actuator (no IK/planning). Collision-**unaware**, so safe-segment only; stalls fall back to the cuRobo linear plan. |
+| `GAP_LIBERO_SERVO` | bool; default **off** | off (opt-in) | OSC Cartesian servo on `go_to_pose_cartesian` legs — the policy's own actuator (no IK/planning). **Not enabled by `GAP_FAST`**: safe for free-space transport legs (grocery_fulfillment) but degrades cluttered grasp legs (grocery_packing, where it stalls near the object). On stall it restores the pre-servo joint config and falls back to the cuRobo linear plan. |
 | `GAP_LIBERO_MOTION_RENDER` | bool; default **on** | off | Whether to render the cameras during motion segments. `0` skips the per-step offscreen render (faster); cameras are restored + refreshed before the next perception read. |
 | `GAP_CUROBO_CUDA_GRAPH` | bool; default **off** | on | Capture cuRobo's v0.8 pose planner into a CUDA graph — ~8× faster warm plans after a one-time capture. Biggest win at batch scale; only valid when the collision world is fixed across plans (e.g. the free-space `world=off` IK path). |
 

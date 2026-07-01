@@ -988,15 +988,31 @@ class Connector:
         # clamped OSC deltas with NO IK/planning for this straight-line move.
         # Falls back to the collision-aware cuRobo linear plan on stall.
         if self._servo_enabled and hasattr(self.env, "apply_policy_action"):
+            start_joints = self._current_joints(arm_id)  # pre-servo config
             try:
                 with self._quiet_motion():
                     self._servo_to_pose(pose, arm_id=arm_id)
                 return
             except ToolError as exc:
                 logger.warning(
-                    "[servo] cartesian servo failed (%s); falling back to "
-                    "cuRobo linear plan", exc,
+                    "[servo] cartesian servo failed (%s); restoring pre-servo "
+                    "config and falling back to cuRobo linear plan", exc,
                 )
+                # A stalled servo may have left the arm partway — and possibly
+                # in collision, which makes the cuRobo fallback fail with a
+                # "start state in collision" (e.g. a cluttered grasp leg in
+                # grocery_packing). Return to the pre-servo config so the
+                # planner solves from the same state it would have without the
+                # servo attempt.
+                if start_joints is not None:
+                    try:
+                        with self._quiet_motion():
+                            self.move_to_joints(
+                                start_joints, tolerance=0.02, max_steps=200,
+                                arm_id=arm_id,
+                            )
+                    except Exception:
+                        logger.debug("[servo] restore-to-start failed", exc_info=True)
         if self.ik is None:
             raise ToolError("robot.go_to_pose_cartesian", "IK backend not configured")
 
