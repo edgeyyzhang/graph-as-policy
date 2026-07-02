@@ -114,6 +114,13 @@ class CompositionConfig:
     max_validation_retries: int = 2
     """How many times to retry fixing graph validation errors via LLM."""
 
+    max_codegen_regenerations: int = 2
+    """If a whole graph is still structurally invalid after the per-attempt
+    script-fix loop (e.g. a coordinator-level W8: a subgraph declares an input
+    with no upstream producer — not repairable by the script-body fixer),
+    regenerate the graph from scratch up to this many extra times. 0 disables
+    (single attempt, matching the legacy behavior)."""
+
     checkpoint_agent: bool = True
     """Run the whole-workflow checkpoint_agent pass after the per-subgraph
     structure generation (default ON). When off, no postcondition sidecars
@@ -239,6 +246,7 @@ class PipelineConfig:
             max_subgraph_retries=comp_raw.get("max_subgraph_retries", 2),
             max_coordinator_retries=comp_raw.get("max_coordinator_retries", 2),
             max_validation_retries=comp_raw.get("max_validation_retries", 2),
+            max_codegen_regenerations=comp_raw.get("max_codegen_regenerations", 2),
             checkpoint_agent=bool(comp_raw.get("checkpoint_agent", True)),
         )
 

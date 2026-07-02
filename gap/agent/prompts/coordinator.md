@@ -121,12 +121,12 @@ staging).
    cutting board, pot, kettle, racket), the object-side perception
    subgraph MUST use **`perceiving-object-parts`** (with the parent =
    the whole object and the subpart = the named graspable part), NOT
-   `perceiving-objects` / `perceiving-objects-multiview`. Reason: the
+   `perceiving-objects`. Reason: the
    downstream grasp closes a parallel jaw that opens only ~8 cm; a
    whole-object OBB of a pan/tray spans ~20 cm across its short axis
    and is **ungraspable by construction**, so the grasp target OBB must
    be the *subpart* (handle ≈ 3 cm), not the whole object.
-   `perceiving-objects`/`-multiview` are for compact objects the
+   `perceiving-objects` is for compact objects the
    gripper can close around whole (cans, boxes, mugs, bowls). When a
    prior attempt's grasp shows a planning failure and the target OBB is
    large (any half-extent ≳ 6 cm), that is the signature of this mistake
@@ -285,7 +285,7 @@ contains an object word that isn't itself a task object name.
    `inputs` / `outputs` you declare ARE the contract; the upstream-producer
    wiring constraint still applies.
 5. **Pick the right specialized variant.** When multiple variants of a
-   role appear in Available Skills (e.g. `perceiving-objects-multiview`
+   role appear in Available Skills (e.g. `perceiving-objects-oneshot`
    vs `perceiving-objects`, `grasping-with-planner` vs
    `grasping-direct-ik`), read each skill's *When to use* guidance and
    pick the best fit — default to the more robust / collision-aware

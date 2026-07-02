@@ -25,13 +25,12 @@ the planner-based grasp skills need the `curobo` bundle (CUDA). Run
 
 ## Choosing a perception skill
 
-Four perception tiers trade latency, robustness, and loop semantics:
+Three perception tiers trade latency, robustness, and loop semantics:
 
 | Skill | Cost | Method | "Not found" behavior | Choose when |
 |---|---|---|---|---|
 | [perceiving-objects](#perceiving-objects) | ~2–4 s | DINO + pairwise VLM crop tournament + SAM3 | raises → `not_found` | Default single-target perception |
 | [perceiving-objects-oneshot](#perceiving-objects-oneshot) | One VLM call | DINO + one set-of-marks letter pick + SAM3 | Clean `found: False` (no exception) | Clean-all-items loops needing a terminator |
-| [perceiving-objects-multiview](#perceiving-objects-multiview) | ~5–8 s | Three detectors + VLM disambiguation merge | raises → `not_found` | Cluttered scenes, maximum robustness |
 | [perceiving-object-parts](#perceiving-object-parts) | Two detection passes | DINO parent crop → DINO + SAM3 subpart | raises → `not_found` | The affordance is a subpart (handle, rim) |
 
 ## Choosing a grasp strategy
@@ -104,33 +103,6 @@ Choose it for generic target descriptions ("the next remaining grocery
 item") and multi-item loops. Avoid it for small targets (< 40 px wide) —
 the pairwise tournament in `perceiving-objects` is far more reliable in
 that regime.
-
-### perceiving-objects-multiview
-
-Robust three-method perception: a Molmo point + DINO box pipeline, a
-Molmo point + SAM3 point pipeline, and a DINO + VLM box-selection
-pipeline all run on the same observation. A `merge` script drops
-geometrically implausible masks, disambiguates survivors with a VLM
-side-by-side panel, and emits an already-filtered OBB.
-
-| | |
-|---|---|
-| Bundle | [skills/perceiving-objects-multiview](gh-skills:skills/perceiving-objects-multiview) |
-| States | `observe → perceive_dino → perceive_point → perceive_dino_vlm → merge` |
-| Exits | `found` / `not_found` (via `on_error`) |
-| Inputs | none |
-| Outputs | `<name>_obb`, `<name>_mask` (the declared set; `merge` also returns a `cloud` you can bind when a downstream skill needs it) |
-| Tool bundles | molmo (optional), grounding-dino, vlm, sam3, geometry |
-| Install | `quickstart` meta-extra + a VLM API key; optional Molmo endpoint |
-
-The Molmo paths need a self-hosted vLLM endpoint via
-`GAP_MOLMO_BASE_URL`; without one the scripts catch the error and fall
-back, so the skill keeps working with two detectors. On API-only
-platforms, `gemini-er.detect` is the hosted, zero-GPU detection swap-in.
-Note that `merge` returns only `{cloud, mask, obb}` — there is no
-`found` field, so the subgraph uses linear edges plus `on_error`, and
-this skill has no clean loop-terminating signal (use
-`perceiving-objects-oneshot` for loops).
 
 ### perceiving-object-parts
 

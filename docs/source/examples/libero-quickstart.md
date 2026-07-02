@@ -79,11 +79,10 @@ START → target → container → grasp → transport → done
 Four subgraphs, each implementing a skill recipe from open-robot-skills:
 
 - **target_sg**
-  ([perceiving-objects-multiview](gh-skills:skills/perceiving-objects-multiview)):
-  three perception paths run on the same observation — DINO-box+SAM3,
-  point+SAM3, and DINO+VLM-pairwise selection — merged by KD-tree multiview
-  fusion with VLM arbitration, producing the target's oriented bounding box
-  and mask.
+  ([perceiving-objects](gh-skills:skills/perceiving-objects)):
+  a single DINO detect + pairwise-VLM crop tournament + SAM3 perception path
+  on one observation, back-projected to a world-frame cloud, producing the
+  target's oriented bounding box and mask.
 - **container_sg** (same bundle): DINO+VLM perception of the basket, then
   `geometry.filter_and_compute_obb` fits the container OBB.
 - **grasp_sg**

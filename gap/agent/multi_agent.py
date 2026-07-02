@@ -118,7 +118,11 @@ def _materialize_canonical_scripts(
         for node in sg.get("nodes", {}).values():
             if not isinstance(node, dict):
                 continue
-            if node.get("type") != "script":
+            # `script` and `router` nodes both carry a canonical `script`
+            # field (a router's script returns the route, e.g. a loop's
+            # decide/route_next_object). Field-based routers have no script
+            # and are skipped by the empty-string guard below.
+            if node.get("type") not in ("script", "router"):
                 continue
             script_rel = node.get("script") or ""
             if not script_rel:
@@ -306,9 +310,55 @@ async def run_codegen(
     config: PipelineConfig,
     output_dir: Path,
 ) -> PipelineResult:
-    """Generate a workflow, write the folder, validate, and run the LLM
-    script-fix loop. Returns a :class:`PipelineResult` (never raises on
-    workflow failure — the error lands in ``execution_stderr``)."""
+    """Generate a valid workflow, regenerating from scratch when a whole graph
+    is still structurally invalid after the per-attempt script-fix loop.
+
+    Fix-first, regenerate-as-fallback: each attempt (:func:`_codegen_attempt`)
+    already repairs *script* errors via the LLM fix loop; but coordinator-level
+    structural mistakes (e.g. a W8 — a subgraph declaring an input with no
+    upstream producer) are not script-repairable, so we re-roll the stochastic
+    pipeline up to ``composition.max_codegen_regenerations`` extra times and
+    return the first fully-valid graph (or the last attempt if none succeed).
+    """
+    max_regen = max(0, config.composition.max_codegen_regenerations)
+    result: PipelineResult | None = None
+    for attempt in range(max_regen + 1):
+        result = await _codegen_attempt(
+            task_id=task_id, task_prompt=task_prompt,
+            config=config, output_dir=output_dir,
+        )
+        if result.success:
+            if attempt > 0:
+                logger.info(
+                    "Task %d: regeneration attempt %d/%d produced a valid graph",
+                    task_id, attempt, max_regen,
+                )
+            result.attempts = attempt + 1
+            return result
+        if attempt < max_regen:
+            logger.warning(
+                "Task %d: graph still invalid after script-fixes (%s); "
+                "regenerating from scratch (attempt %d/%d)",
+                task_id, (result.execution_stderr or "")[:140],
+                attempt + 1, max_regen,
+            )
+    if result is not None:
+        result.attempts = max_regen + 1
+    return result if result is not None else PipelineResult(
+        success=False, execution_stderr="codegen produced no result", attempts=1,
+    )
+
+
+async def _codegen_attempt(
+    *,
+    task_id: int,
+    task_prompt: str,
+    config: PipelineConfig,
+    output_dir: Path,
+) -> PipelineResult:
+    """One generate → write → validate → script-fix pass. Returns a
+    :class:`PipelineResult` (never raises on workflow failure — the error
+    lands in ``execution_stderr``)."""
     try:
         workflow_json, scripts, checkpoint_modules = await generate_workflow(
             task_id, task_prompt, config, output_dir,
@@ -447,7 +497,7 @@ async def _fix_script_errors(
         if not isinstance(sg_def, dict):
             continue
         for node_name, node_def in sg_def.get("nodes", {}).items():
-            if isinstance(node_def, dict) and node_def.get("type") == "script":
+            if isinstance(node_def, dict) and node_def.get("type") in ("script", "router"):
                 full_id = f"subgraphs.{sg_name}.nodes.{node_name}"
                 state_to_script[full_id] = node_def.get("script", "")
 

@@ -112,7 +112,11 @@ def _resolve_libero_prompts(
     :func:`gap.envs.registry.registered_envs`.
     """
     try:
-        from gap.envs.loader import _activate_libero_fork, _vab_suite_dir
+        from gap.envs.loader import (
+            _activate_libero_fork,
+            _vab_suite_dir,
+            _vab_task_files,
+        )
         from gap.envs.registry import registered_envs
     except ImportError:
         logger.debug("gap.envs unavailable — cannot auto-resolve prompts")
@@ -129,7 +133,11 @@ def _resolve_libero_prompts(
         except Exception:
             logger.debug("vab fork unavailable", exc_info=True)
             return {}
-        task_files = sorted(vab_dir.glob("*.yaml"))
+        # Classic LIBERO task numbering — MUST match the sim's ordering
+        # (``_vab_task_files``). A bare ``sorted(glob)`` renumbers 8 of the 10
+        # libero_object tasks alphabetically, so the generated graph targets a
+        # different object than the env scores (see _vab_task_files docstring).
+        task_files = _vab_task_files(vab_dir)
         for tid in task_ids:
             if not 0 <= tid < len(task_files):
                 continue

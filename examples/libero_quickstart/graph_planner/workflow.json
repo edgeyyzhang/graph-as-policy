@@ -1,485 +1,445 @@
 {
-  "version": 3,
-  "meta": {
-    "name": "pick_and_place_planner",
-    "description": "Pick the blue and yellow alphabet soup can and place it in the basket (CuRobo-planned grasp descent). Faithful port of the dev tree's libero_pro/graph_cartesian_obb."
+ "version": 3,
+ "meta": {
+  "name": "pick_and_place_planner",
+  "description": "Pick the blue and yellow alphabet soup can and place it in the basket (CuRobo-planned grasp descent). Faithful port of the dev tree's libero_pro/graph_cartesian_obb."
+ },
+ "nodes": {
+  "target": {
+   "type": "subgraph",
+   "ref": "target_sg"
   },
-  "nodes": {
-    "target": {
-      "type": "subgraph",
-      "ref": "target_sg"
-    },
-    "container": {
-      "type": "subgraph",
-      "ref": "container_sg"
-    },
-    "grasp": {
-      "type": "subgraph",
-      "ref": "grasp_sg"
-    },
-    "transport": {
-      "type": "subgraph",
-      "ref": "transport_sg"
-    },
-    "done": {
-      "type": "end",
-      "status": "success"
-    },
-    "abort": {
-      "type": "end",
-      "status": "failure",
-      "recovery": [
-        {
-          "tool": "robot.open_gripper",
-          "inputs": {}
-        },
-        {
-          "tool": "robot.go_home",
-          "inputs": {}
-        }
-      ]
-    }
+  "container": {
+   "type": "subgraph",
+   "ref": "container_sg"
   },
-  "edges": [
-    [
-      "START",
-      "target"
-    ]
-  ],
-  "conditional_edges": {
-    "target": {
-      "router_field": "exit",
-      "mapping": {
-        "found": "container",
-        "not_found": "abort"
-      }
-    },
-    "container": {
-      "router_field": "exit",
-      "mapping": {
-        "found": "grasp",
-        "not_found": "abort"
-      }
-    },
-    "grasp": {
-      "router_field": "exit",
-      "mapping": {
-        "grasped": "transport",
-        "failed": "abort"
-      }
-    },
-    "transport": {
-      "router_field": "exit",
-      "mapping": {
-        "placed": "done",
-        "blocked": "abort"
-      }
-    }
+  "grasp": {
+   "type": "subgraph",
+   "ref": "grasp_sg"
   },
-  "subgraphs": {
-    "target_sg": {
-      "skill": "perceiving-objects-multiview",
-      "inputs": {},
-      "outputs": {
-        "target_obb": {
-          "$ref": "merge.obb"
-        },
-        "target_mask": {
-          "$ref": "merge.mask"
-        }
-      },
-      "nodes": {
-        "observe": {
-          "type": "tool",
-          "inputs": {},
-          "tool": "robot.get_observation"
-        },
-        "perceive_dino": {
-          "type": "script",
-          "script": "scripts/target/perceive_dino.py",
-          "inputs": {
-            "cameras": {
-              "$ref": "observe.cameras"
-            },
-            "object_name": "blue and yellow alphabet soup can"
-          }
-        },
-        "perceive_point": {
-          "type": "script",
-          "script": "scripts/target/perceive_point.py",
-          "inputs": {
-            "cameras": {
-              "$ref": "observe.cameras"
-            },
-            "object_name": "blue and yellow alphabet soup can"
-          }
-        },
-        "perceive_vlm": {
-          "type": "script",
-          "script": "scripts/target/perceive_dino_vlm.py",
-          "inputs": {
-            "cameras": {
-              "$ref": "observe.cameras"
-            },
-            "object_name": "blue and yellow alphabet soup can"
-          }
-        },
-        "merge": {
-          "type": "script",
-          "script": "scripts/target/merge.py",
-          "inputs": {
-            "cameras": {
-              "$ref": "observe.cameras"
-            },
-            "object_name": "blue and yellow alphabet soup can",
-            "dino_result": {
-              "$ref": "perceive_dino"
-            },
-            "point_result": {
-              "$ref": "perceive_point"
-            },
-            "vlm_result": {
-              "$ref": "perceive_vlm"
-            }
-          }
-        },
-        "found": {
-          "type": "noop"
-        }
-      },
-      "edges": [
-        [
-          "START",
-          "observe"
-        ],
-        [
-          "observe",
-          "perceive_dino"
-        ],
-        [
-          "perceive_dino",
-          "perceive_point"
-        ],
-        [
-          "perceive_point",
-          "perceive_vlm"
-        ],
-        [
-          "perceive_vlm",
-          "merge"
-        ],
-        [
-          "merge",
-          "found"
-        ],
-        [
-          "found",
-          "END"
-        ]
-      ],
-      "conditional_edges": {},
-      "exit": {
-        "router_field": null,
-        "success_values": [
-          "found"
-        ]
-      },
-      "on_error": "not_found"
+  "transport": {
+   "type": "subgraph",
+   "ref": "transport_sg"
+  },
+  "done": {
+   "type": "end",
+   "status": "success"
+  },
+  "abort": {
+   "type": "end",
+   "status": "failure",
+   "recovery": [
+    {
+     "tool": "robot.open_gripper",
+     "inputs": {}
     },
-    "container_sg": {
-      "skill": "perceiving-objects-multiview",
-      "inputs": {},
-      "outputs": {
-        "container_obb": {
-          "$ref": "filter_obb.obb"
-        }
-      },
-      "nodes": {
-        "observe": {
-          "type": "tool",
-          "inputs": {},
-          "tool": "robot.get_observation"
-        },
-        "perceive": {
-          "type": "script",
-          "script": "scripts/container/perceive_dino_vlm.py",
-          "inputs": {
-            "cameras": {
-              "$ref": "observe.cameras"
-            },
-            "object_name": "basket"
-          }
-        },
-        "filter_obb": {
-          "type": "tool",
-          "inputs": {
-            "points": {
-              "$ref": "perceive.cloud"
-            }
-          },
-          "tool": "geometry.filter_and_compute_obb"
-        },
-        "found": {
-          "type": "noop"
-        }
-      },
-      "edges": [
-        [
-          "START",
-          "observe"
-        ],
-        [
-          "observe",
-          "perceive"
-        ],
-        [
-          "perceive",
-          "filter_obb"
-        ],
-        [
-          "filter_obb",
-          "found"
-        ],
-        [
-          "found",
-          "END"
-        ]
-      ],
-      "conditional_edges": {},
-      "exit": {
-        "router_field": null,
-        "success_values": [
-          "found"
-        ]
-      },
-      "on_error": "not_found"
-    },
-    "grasp_sg": {
-      "skill": "grasping-with-planner",
-      "inputs": {
-        "target_obb": "OrientedBoundingBox",
-        "target_mask": "Mask"
-      },
-      "outputs": {
-        "ee_pose_at_grasp": {
-          "$ref": "observe.arms.0.ee_pose"
-        }
-      },
-      "nodes": {
-        "open": {
-          "type": "tool",
-          "inputs": {
-            "settle_steps": 40
-          },
-          "tool": "robot.open_gripper"
-        },
-        "compute_grasp": {
-          "type": "tool",
-          "inputs": {
-            "obb": {
-              "$ref": "in.target_obb"
-            }
-          },
-          "tool": "geometry.top_down_grasp_candidates"
-        },
-        "approach": {
-          "type": "script",
-          "script": "scripts/grasp/approach_above.py",
-          "inputs": {
-            "target_position": {
-              "$ref": "compute_grasp.candidates.poses.0.position"
-            },
-            "rotation": {
-              "$ref": "compute_grasp.candidates.poses.0.rotation"
-            },
-            "target_obb": {
-              "$ref": "in.target_obb"
-            }
-          }
-        },
-        "observe": {
-          "type": "tool",
-          "inputs": {},
-          "tool": "robot.get_observation"
-        },
-        "build_world": {
-          "type": "script",
-          "script": "scripts/grasp/build_world.py",
-          "inputs": {
-            "observation": {
-              "$ref": "observe"
-            },
-            "target_mask": {
-              "$ref": "in.target_mask"
-            },
-            "target_obb": {
-              "$ref": "in.target_obb"
-            },
-            "target_name": "target"
-          }
-        },
-        "plan": {
-          "type": "script",
-          "script": "scripts/grasp/plan_grasp.py",
-          "inputs": {
-            "world_config": {
-              "$ref": "build_world.config"
-            },
-            "observation": {
-              "$ref": "observe"
-            },
-            "grasp_poses": {
-              "$ref": "compute_grasp.candidates.poses"
-            },
-            "target_name": "target"
-          }
-        },
-        "execute": {
-          "type": "tool",
-          "inputs": {
-            "trajectory": {
-              "$ref": "plan.trajectory"
-            }
-          },
-          "tool": "robot.execute_trajectory"
-        },
-        "close": {
-          "type": "tool",
-          "inputs": {
-            "settle_steps": 120
-          },
-          "tool": "robot.close_gripper"
-        },
-        "grasped": {
-          "type": "noop"
-        }
-      },
-      "edges": [
-        [
-          "START",
-          "open"
-        ],
-        [
-          "open",
-          "compute_grasp"
-        ],
-        [
-          "compute_grasp",
-          "approach"
-        ],
-        [
-          "approach",
-          "observe"
-        ],
-        [
-          "observe",
-          "build_world"
-        ],
-        [
-          "build_world",
-          "plan"
-        ],
-        [
-          "plan",
-          "execute"
-        ],
-        [
-          "execute",
-          "close"
-        ],
-        [
-          "close",
-          "grasped"
-        ],
-        [
-          "grasped",
-          "END"
-        ]
-      ],
-      "conditional_edges": {},
-      "exit": {
-        "router_field": null,
-        "success_values": [
-          "grasped"
-        ]
-      },
-      "on_error": "failed"
-    },
-    "transport_sg": {
-      "skill": "transporting-objects",
-      "inputs": {
-        "container_obb": "OrientedBoundingBox"
-      },
-      "outputs": {
-        "placed": {
-          "$ref": "release.drop_position"
-        }
-      },
-      "nodes": {
-        "compute_drop": {
-          "type": "script",
-          "script": "scripts/transport/compute_drop_pose.py",
-          "inputs": {
-            "container_obb": {
-              "$ref": "in.container_obb"
-            }
-          }
-        },
-        "move_above": {
-          "type": "script",
-          "script": "scripts/transport/waypoint_move.py",
-          "inputs": {
-            "drop_x": {
-              "$ref": "compute_drop.drop_position.x"
-            },
-            "drop_y": {
-              "$ref": "compute_drop.drop_position.y"
-            }
-          }
-        },
-        "release": {
-          "type": "script",
-          "script": "scripts/transport/descend_release.py",
-          "inputs": {
-            "drop_position": {
-              "$ref": "compute_drop.drop_position"
-            }
-          }
-        },
-        "placed": {
-          "type": "noop"
-        }
-      },
-      "edges": [
-        [
-          "START",
-          "compute_drop"
-        ],
-        [
-          "compute_drop",
-          "move_above"
-        ],
-        [
-          "move_above",
-          "release"
-        ],
-        [
-          "release",
-          "placed"
-        ],
-        [
-          "placed",
-          "END"
-        ]
-      ],
-      "conditional_edges": {},
-      "exit": {
-        "router_field": null,
-        "success_values": [
-          "placed"
-        ]
-      },
-      "on_error": "blocked"
+    {
+     "tool": "robot.go_home",
+     "inputs": {}
     }
+   ]
   }
+ },
+ "edges": [
+  [
+   "START",
+   "target"
+  ]
+ ],
+ "conditional_edges": {
+  "target": {
+   "router_field": "exit",
+   "mapping": {
+    "found": "container",
+    "not_found": "abort"
+   }
+  },
+  "container": {
+   "router_field": "exit",
+   "mapping": {
+    "found": "grasp",
+    "not_found": "abort"
+   }
+  },
+  "grasp": {
+   "router_field": "exit",
+   "mapping": {
+    "grasped": "transport",
+    "failed": "abort"
+   }
+  },
+  "transport": {
+   "router_field": "exit",
+   "mapping": {
+    "placed": "done",
+    "blocked": "abort"
+   }
+  }
+ },
+ "subgraphs": {
+  "target_sg": {
+   "skill": "perceiving-objects",
+   "inputs": {},
+   "outputs": {
+    "target_obb": {
+     "$ref": "filter_obb.obb"
+    },
+    "target_mask": {
+     "$ref": "perceive.mask"
+    }
+   },
+   "nodes": {
+    "observe": {
+     "type": "tool",
+     "tool": "robot.get_observation"
+    },
+    "perceive": {
+     "type": "script",
+     "script": "scripts/target/perceive_dino_vlm.py",
+     "inputs": {
+      "cameras": {
+       "$ref": "observe.cameras"
+      },
+      "object_name": "blue and yellow alphabet soup can"
+     }
+    },
+    "filter_obb": {
+     "type": "tool",
+     "tool": "geometry.filter_and_compute_obb",
+     "inputs": {
+      "points": {
+       "$ref": "perceive.cloud"
+      }
+     }
+    },
+    "found": {
+     "type": "noop"
+    }
+   },
+   "edges": [
+    [
+     "START",
+     "observe"
+    ],
+    [
+     "observe",
+     "perceive"
+    ],
+    [
+     "perceive",
+     "filter_obb"
+    ],
+    [
+     "filter_obb",
+     "found"
+    ],
+    [
+     "found",
+     "END"
+    ]
+   ],
+   "conditional_edges": {},
+   "exit": {
+    "router_field": null,
+    "success_values": [
+     "found"
+    ]
+   },
+   "on_error": "not_found"
+  },
+  "container_sg": {
+   "skill": "perceiving-objects",
+   "inputs": {},
+   "outputs": {
+    "container_obb": {
+     "$ref": "filter_obb.obb"
+    }
+   },
+   "nodes": {
+    "observe": {
+     "type": "tool",
+     "tool": "robot.get_observation"
+    },
+    "perceive": {
+     "type": "script",
+     "script": "scripts/container/perceive_dino_vlm.py",
+     "inputs": {
+      "cameras": {
+       "$ref": "observe.cameras"
+      },
+      "object_name": "basket"
+     }
+    },
+    "filter_obb": {
+     "type": "tool",
+     "tool": "geometry.filter_and_compute_obb",
+     "inputs": {
+      "points": {
+       "$ref": "perceive.cloud"
+      }
+     }
+    },
+    "found": {
+     "type": "noop"
+    }
+   },
+   "edges": [
+    [
+     "START",
+     "observe"
+    ],
+    [
+     "observe",
+     "perceive"
+    ],
+    [
+     "perceive",
+     "filter_obb"
+    ],
+    [
+     "filter_obb",
+     "found"
+    ],
+    [
+     "found",
+     "END"
+    ]
+   ],
+   "conditional_edges": {},
+   "exit": {
+    "router_field": null,
+    "success_values": [
+     "found"
+    ]
+   },
+   "on_error": "not_found"
+  },
+  "grasp_sg": {
+   "skill": "grasping-with-planner",
+   "inputs": {
+    "target_obb": "OrientedBoundingBox",
+    "target_mask": "Mask"
+   },
+   "outputs": {
+    "ee_pose_at_grasp": {
+     "$ref": "observe.arms.0.ee_pose"
+    }
+   },
+   "nodes": {
+    "open": {
+     "type": "tool",
+     "inputs": {
+      "settle_steps": 40
+     },
+     "tool": "robot.open_gripper"
+    },
+    "compute_grasp": {
+     "type": "tool",
+     "inputs": {
+      "obb": {
+       "$ref": "in.target_obb"
+      }
+     },
+     "tool": "geometry.top_down_grasp_candidates"
+    },
+    "approach": {
+     "type": "script",
+     "script": "scripts/grasp/approach_above.py",
+     "inputs": {
+      "target_position": {
+       "$ref": "compute_grasp.candidates.poses.0.position"
+      },
+      "rotation": {
+       "$ref": "compute_grasp.candidates.poses.0.rotation"
+      },
+      "target_obb": {
+       "$ref": "in.target_obb"
+      }
+     }
+    },
+    "observe": {
+     "type": "tool",
+     "inputs": {},
+     "tool": "robot.get_observation"
+    },
+    "build_world": {
+     "type": "script",
+     "script": "scripts/grasp/build_world.py",
+     "inputs": {
+      "observation": {
+       "$ref": "observe"
+      },
+      "target_mask": {
+       "$ref": "in.target_mask"
+      },
+      "target_obb": {
+       "$ref": "in.target_obb"
+      },
+      "target_name": "target"
+     }
+    },
+    "plan": {
+     "type": "script",
+     "script": "scripts/grasp/plan_grasp.py",
+     "inputs": {
+      "world_config": {
+       "$ref": "build_world.config"
+      },
+      "observation": {
+       "$ref": "observe"
+      },
+      "grasp_poses": {
+       "$ref": "compute_grasp.candidates.poses"
+      },
+      "target_name": "target"
+     }
+    },
+    "execute": {
+     "type": "tool",
+     "inputs": {
+      "trajectory": {
+       "$ref": "plan.trajectory"
+      }
+     },
+     "tool": "robot.execute_trajectory"
+    },
+    "close": {
+     "type": "tool",
+     "inputs": {
+      "settle_steps": 120
+     },
+     "tool": "robot.close_gripper"
+    },
+    "grasped": {
+     "type": "noop"
+    }
+   },
+   "edges": [
+    [
+     "START",
+     "open"
+    ],
+    [
+     "open",
+     "compute_grasp"
+    ],
+    [
+     "compute_grasp",
+     "approach"
+    ],
+    [
+     "approach",
+     "observe"
+    ],
+    [
+     "observe",
+     "build_world"
+    ],
+    [
+     "build_world",
+     "plan"
+    ],
+    [
+     "plan",
+     "execute"
+    ],
+    [
+     "execute",
+     "close"
+    ],
+    [
+     "close",
+     "grasped"
+    ],
+    [
+     "grasped",
+     "END"
+    ]
+   ],
+   "conditional_edges": {},
+   "exit": {
+    "router_field": null,
+    "success_values": [
+     "grasped"
+    ]
+   },
+   "on_error": "failed"
+  },
+  "transport_sg": {
+   "skill": "transporting-objects",
+   "inputs": {
+    "container_obb": "OrientedBoundingBox"
+   },
+   "outputs": {
+    "placed": {
+     "$ref": "release.drop_position"
+    }
+   },
+   "nodes": {
+    "compute_drop": {
+     "type": "script",
+     "script": "scripts/transport/compute_drop_pose.py",
+     "inputs": {
+      "container_obb": {
+       "$ref": "in.container_obb"
+      }
+     }
+    },
+    "move_above": {
+     "type": "script",
+     "script": "scripts/transport/waypoint_move.py",
+     "inputs": {
+      "drop_x": {
+       "$ref": "compute_drop.drop_position.x"
+      },
+      "drop_y": {
+       "$ref": "compute_drop.drop_position.y"
+      }
+     }
+    },
+    "release": {
+     "type": "script",
+     "script": "scripts/transport/descend_release.py",
+     "inputs": {
+      "drop_position": {
+       "$ref": "compute_drop.drop_position"
+      }
+     }
+    },
+    "placed": {
+     "type": "noop"
+    }
+   },
+   "edges": [
+    [
+     "START",
+     "compute_drop"
+    ],
+    [
+     "compute_drop",
+     "move_above"
+    ],
+    [
+     "move_above",
+     "release"
+    ],
+    [
+     "release",
+     "placed"
+    ],
+    [
+     "placed",
+     "END"
+    ]
+   ],
+   "conditional_edges": {},
+   "exit": {
+    "router_field": null,
+    "success_values": [
+     "placed"
+    ]
+   },
+   "on_error": "blocked"
+  }
+ }
 }

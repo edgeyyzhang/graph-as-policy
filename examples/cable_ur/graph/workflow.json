@@ -1,154 +1,108 @@
 {
-  "version": 3,
-  "meta": {
-    "name": "locate_white_tape",
-    "description": "Locate a green circular adhesive sticker on a cable and report its 3D position in robot base frame."
+ "version": 3,
+ "meta": {
+  "name": "locate_white_tape",
+  "description": "Locate a green circular adhesive sticker on a cable and report its 3D position in robot base frame."
+ },
+ "nodes": {
+  "locate_white_tape": {
+   "type": "subgraph",
+   "ref": "locate_white_tape_sg"
   },
-  "nodes": {
-    "locate_white_tape": {
-      "type": "subgraph",
-      "ref": "locate_white_tape_sg"
-    },
-    "done": {
-      "type": "end",
-      "status": "success"
-    },
-    "abort": {
-      "type": "end",
-      "status": "failure"
-    }
+  "done": {
+   "type": "end",
+   "status": "success"
   },
-  "edges": [
-    [
-      "START",
-      "locate_white_tape"
-    ]
-  ],
-  "conditional_edges": {
-    "locate_white_tape": {
-      "router_field": "exit",
-      "mapping": {
-        "found": "done",
-        "not_found": "abort"
-      }
-    }
-  },
-  "subgraphs": {
-    "locate_white_tape_sg": {
-      "skill": "perceiving-objects-multiview",
-      "inputs": {},
-      "outputs": {
-        "obb": {
-          "$ref": "compute_obb.obb"
-        },
-        "cloud": {
-          "$ref": "perceive_vlm.cloud"
-        }
-      },
-      "nodes": {
-        "observe": {
-          "type": "tool",
-          "inputs": {},
-          "tool": "robot.get_observation"
-        },
-        "perceive_vlm": {
-          "type": "script",
-          "script": "scripts/locate_white_tape/perceive_dino_vlm.py",
-          "inputs": {
-            "cameras": {
-              "$ref": "observe.cameras"
-            },
-            "object_name": "green circular sticker",
-            "object_description": "a green circular adhesive sticker attached to the cable",
-            "dino_prompt": "green sticker.",
-            "text_prompts": [
-              "green circular sticker",
-              "green round adhesive sticker on a black cable"
-            ],
-            "min_points": 5,
-            "min_score": 0.3,
-            "box_threshold": 0.3,
-            "text_threshold": 0.25,
-            "use_multiview": false
-          }
-        },
-        "filter_cloud": {
-          "type": "tool",
-          "inputs": {
-            "points": {
-              "$ref": "perceive_vlm.cloud"
-            },
-            "eps": 0.003,
-            "min_samples": 10
-          },
-          "tool": "geometry.filter_noise"
-        },
-        "compute_obb": {
-          "type": "tool",
-          "inputs": {
-            "points": {
-              "$ref": "filter_cloud.points"
-            }
-          },
-          "tool": "geometry.compute_obb"
-        },
-        "report": {
-          "type": "script",
-          "script": "scripts/report_location.py",
-          "inputs": {
-            "obb": {
-              "$ref": "compute_obb.obb"
-            },
-            "cloud": {
-              "$ref": "filter_cloud.points"
-            },
-            "camera": {
-              "$ref": "observe.cameras.0"
-            }
-          }
-        },
-        "found": {
-          "type": "noop"
-        }
-      },
-      "edges": [
-        [
-          "START",
-          "observe"
-        ],
-        [
-          "observe",
-          "perceive_vlm"
-        ],
-        [
-          "perceive_vlm",
-          "filter_cloud"
-        ],
-        [
-          "filter_cloud",
-          "compute_obb"
-        ],
-        [
-          "compute_obb",
-          "report"
-        ],
-        [
-          "report",
-          "found"
-        ],
-        [
-          "found",
-          "END"
-        ]
-      ],
-      "conditional_edges": {},
-      "exit": {
-        "router_field": null,
-        "success_values": [
-          "found"
-        ]
-      },
-      "on_error": "not_found"
-    }
+  "abort": {
+   "type": "end",
+   "status": "failure"
   }
+ },
+ "edges": [
+  [
+   "START",
+   "locate_white_tape"
+  ]
+ ],
+ "conditional_edges": {
+  "locate_white_tape": {
+   "router_field": "exit",
+   "mapping": {
+    "found": "done",
+    "not_found": "abort"
+   }
+  }
+ },
+ "subgraphs": {
+  "locate_white_tape_sg": {
+   "skill": "perceiving-objects",
+   "inputs": {},
+   "outputs": {
+    "obb": {
+     "$ref": "filter_obb.obb"
+    },
+    "cloud": {
+     "$ref": "perceive.cloud"
+    }
+   },
+   "nodes": {
+    "observe": {
+     "type": "tool",
+     "tool": "robot.get_observation"
+    },
+    "perceive": {
+     "type": "script",
+     "script": "scripts/locate_white_tape/perceive_dino_vlm.py",
+     "inputs": {
+      "cameras": {
+       "$ref": "observe.cameras"
+      },
+      "object_name": "green circular sticker"
+     }
+    },
+    "filter_obb": {
+     "type": "tool",
+     "tool": "geometry.filter_and_compute_obb",
+     "inputs": {
+      "points": {
+       "$ref": "perceive.cloud"
+      }
+     }
+    },
+    "found": {
+     "type": "noop"
+    }
+   },
+   "edges": [
+    [
+     "START",
+     "observe"
+    ],
+    [
+     "observe",
+     "perceive"
+    ],
+    [
+     "perceive",
+     "filter_obb"
+    ],
+    [
+     "filter_obb",
+     "found"
+    ],
+    [
+     "found",
+     "END"
+    ]
+   ],
+   "conditional_edges": {},
+   "exit": {
+    "router_field": null,
+    "success_values": [
+     "found"
+    ]
+   },
+   "on_error": "not_found"
+  }
+ }
 }

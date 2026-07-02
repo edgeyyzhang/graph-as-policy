@@ -756,7 +756,6 @@ _POLICY_SHAPES: list[dict[str, str]] = [
 _CANONICAL_CHECKPOINTS_BY_SKILL: dict[str, list[dict[str, str]]] = {
     "perceiving-objects": _PERCEPTION_SHAPES,
     "perceiving-objects-oneshot": _PERCEPTION_SHAPES,
-    "perceiving-objects-multiview": _PERCEPTION_SHAPES,
     # A SUBPART (handle, rim, spout) has NO ground-truth body of its own —
     # only the parent object does. Comparing the subpart OBB to
     # `w.body('<parent>').position` is therefore GUARANTEED to fail: the

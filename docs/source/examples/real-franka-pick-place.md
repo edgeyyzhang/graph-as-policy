@@ -113,7 +113,7 @@ START → perceive_container ─ found ──→ perceive_target ─ found ─�
 ```
 
 - `perceive_container` and `perceive_target` use the
-  `perceiving-objects-multiview` skill: `robot.get_observation` →
+  `perceiving-objects` skill: `robot.get_observation` →
   a DINO+VLM perception script → `geometry.filter_and_compute_obb`.
 - `grasp` (`grasping-direct-ik`, no motion planner): open gripper →
   `geometry.top_down_grasp_candidates` (`z_offset: -0.04`) → approach above

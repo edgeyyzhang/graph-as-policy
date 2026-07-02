@@ -8,7 +8,7 @@ from two sources:
 2. The ``allowed_tools`` list of every skill subgraph the workflow uses.
    Script nodes call tools via ``ctx.tool_call(...)``, not as workflow
    nodes — so a workflow's `target_sg` subgraph referencing a
-   ``perceiving-objects-multiview`` skill must pre-boot every bundle that
+   ``perceiving-objects`` skill must pre-boot every bundle that
    skill's ``allowed_tools`` declares (sam3, grounding-dino, vlm, …).
 
 A bundle whose SKILL.md declares ``gap.serving.protocol == "stdio-msgpack"``

@@ -96,7 +96,7 @@ writes `/tmp/white_tape_location.json`.
 ## How the graph works
 
 The top-level graph routes one subgraph, `locate_white_tape` (skill
-`perceiving-objects-multiview`), to a `done` or `abort` end node on its
+`perceiving-objects`), to a `done` or `abort` end node on its
 `found` / `not_found` exit. Inside the subgraph:
 
 1. `observe` — `robot.get_observation` captures the ZED RGB-D frame plus the

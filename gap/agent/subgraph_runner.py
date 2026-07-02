@@ -1215,7 +1215,7 @@ def _namespace_scripts(
         rename[path] = new_path
     if rename:
         for node in sg_dict.get("nodes", {}).values():
-            if isinstance(node, dict) and node.get("type") == "script":
+            if isinstance(node, dict) and node.get("type") in ("script", "router"):
                 old = node.get("script")
                 if isinstance(old, str) and old in rename:
                     node["script"] = rename[old]

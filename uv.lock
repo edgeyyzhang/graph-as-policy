@@ -3943,7 +3943,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "graph-as-policy", editable = "." }]
-provides-extras = ["perceiving-objects", "perceiving-objects-oneshot", "perceiving-objects-multiview", "perceiving-object-parts", "grasping-with-planner", "grasping-direct-ik", "grasping-short-axis", "transporting-objects", "tracking-objects", "quickstart", "grocery", "all"]
+provides-extras = ["perceiving-objects", "perceiving-objects-oneshot", "perceiving-object-parts", "perceiving-next-item", "grasping-with-planner", "grasping-direct-ik", "grasping-short-axis", "transporting-objects", "tracking-objects", "quickstart", "grocery", "all"]
 
 [package.metadata.requires-dev]
 dev = [

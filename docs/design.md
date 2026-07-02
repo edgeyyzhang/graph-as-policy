@@ -172,7 +172,6 @@ open-robot-skills/
     │                                   #   DINO + one-shot VLM set-of-marks + SAM3; clean
     │                                   #   not_found for clean-all-items loops — the grocery
     │                                   #   workhorse and the steered-policy perceiver
-    ├── perceiving-objects-multiview/   # documents molmo/gemini-er dependency
     ├── perceiving-object-parts/
     ├── grasping-with-planner/          # needs the curobo tool bundle
     ├── grasping-direct-ik/
@@ -209,7 +208,7 @@ gap:
   produces_outputs: {"<name>_obb": OrientedBoundingBox, "<name>_mask": Mask}
   canonical_scripts: [{perceive_dino_vlm: scripts/perceive_dino_vlm.py}]
   prompts: {vlm_select_box: prompts/vlm_select_box.md}
-  references: [{title: ..., path: references/single_vs_multi.md}]
+  references: [{title: ..., path: references/perception_pipeline_invariants.md}]
   hard_rules: [...]
   streaming: false
 ---

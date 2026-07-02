@@ -222,6 +222,13 @@ class WorkerState:
     skill_registry: Any = None
     connector: Any = None
     tool_registry: Any = None
+    tool_bundle_manager: Any = None
+    """RPC tool-bundle manager (sam3/dino/vlm/geometry/curobo servers) booted
+    ONCE per connector in ``_ensure_connector`` and reused across that
+    ``(suite, task)``'s seeds. Booting + tearing it down per trial — while the
+    registry persists across same-task seeds — orphaned the just-killed sam3
+    subprocess into the reused registry, so every seed after the first on a
+    worker failed perception with 'sam3 cannot write — stdin closed'."""
     last_init: tuple[str, int] | None = None
     """``(suite_name, task_id)`` of the live connector. When the next
     WorkItem matches we skip construction and just ``reset(seed)``."""
@@ -415,6 +422,17 @@ def worker_setup(
     )
 
 
+def _shutdown_bundles(state: WorkerState) -> None:
+    """Tear down the worker's live RPC tool-bundle servers (sam3/dino/vlm/…)."""
+    mgr = state.tool_bundle_manager
+    if mgr is not None:
+        try:
+            mgr.shutdown_all()
+        except Exception:
+            logger.debug("tool_bundle_manager.shutdown_all failed", exc_info=True)
+        state.tool_bundle_manager = None
+
+
 def worker_cleanup(state: WorkerState | None) -> None:
     """Close the worker's connector. Best-effort, never raises.
 
@@ -425,6 +443,7 @@ def worker_cleanup(state: WorkerState | None) -> None:
     if state is None:
         return
     logger.info("Worker %d: cleaning up", state.worker_id)
+    _shutdown_bundles(state)
 
     def _close() -> None:
         try:
@@ -448,16 +467,23 @@ def worker_cleanup(state: WorkerState | None) -> None:
     state.last_init = None
 
 
-def _ensure_connector(state: WorkerState, suite_name: str, task_id: int) -> Any:
+def _ensure_connector(state: WorkerState, suite_name: str, task_id: int,
+                      workflow_dir: str | Path | None = None) -> Any:
     """Return a connector for ``(suite, task)``, reusing the live one.
 
     Task-reuse optimization: when the previous trial on this worker
     already built the same ``(suite, task)`` env we keep it and let the
-    caller ``reset(seed)`` — skipping the scene re-load.
+    caller ``reset(seed)`` — skipping the scene re-load. The connector's RPC
+    tool bundles (sam3/dino/vlm/…) are booted ONCE here and reused across that
+    task's seeds; a task switch tears them down together with the connector.
     """
     init_key = (suite_name, task_id)
     if state.connector is not None and state.last_init == init_key:
         return state.connector
+    # Task switch (or first build): tear down the previous connector AND its
+    # tool bundles together — the bundles registered into that connector's
+    # registry, which is discarded below.
+    _shutdown_bundles(state)
     if state.connector is not None:
         try:
             state.connector.close()
@@ -485,6 +511,20 @@ def _ensure_connector(state: WorkerState, suite_name: str, task_id: int) -> Any:
         except TypeError:  # registry without catalog support
             reg.discover_pending()
     state.tool_registry = reg
+    # Boot the workflow's RPC tool bundles ONCE into this fresh registry; every
+    # seed of this task reuses the same live sam3/dino/vlm servers. (Booting +
+    # shutting them down per trial orphaned dead subprocesses into the reused
+    # registry — see the WorkerState.tool_bundle_manager note.)
+    if workflow_dir is not None and state.skill_registry is not None:
+        try:
+            from gap.runtime.tool_bundle_boot import boot_tool_bundles
+
+            state.tool_bundle_manager = boot_tool_bundles(
+                workflow_dir, state.skill_registry, state.tool_registry,
+            )
+        except Exception as exc:
+            logger.error("tool bundle boot failed (task %s env): %s", task_id, exc)
+            state.tool_bundle_manager = None
     return conn
 
 
@@ -544,7 +584,7 @@ def _execute_trial(
         sim_step=limits.get("sim_step"),
     )
 
-    conn = _ensure_connector(state, suite_name, item.task_id)
+    conn = _ensure_connector(state, suite_name, item.task_id, item.workflow_dir)
     conn.reset(seed=item.trial_id)
 
     # Boot every policy the workflow references before execution. Graph is
@@ -552,7 +592,6 @@ def _execute_trial(
     # from PRESETS unless overridden in `policies:`); a missing/unstartable
     # server fails the trial here with a clear error.
     from gap.runtime.policy_boot import boot_policies
-    from gap.runtime.tool_bundle_boot import boot_tool_bundles
 
     policy_manager, policy_executor = boot_policies(
         item.workflow_dir,
@@ -566,25 +605,12 @@ def _execute_trial(
         ),
     )
 
-    # Boot RPC tool bundles (sam3, molmo, grounding-dino, vlm, geometry, ...)
-    # the workflow references. Without this the trial registry only sees
-    # connector-owned robot.* / sim.* tools, and every perception node fails
-    # with "Tool 'sam3.segment_text' not found". gap.execute() does the same
-    # boot on the single-run path (gap/runtime/execute.py:169); the
-    # benchmark trial path was missing it.
-    tool_bundle_manager = None
-    if state.skill_registry is not None:
-        try:
-            tool_bundle_manager = boot_tool_bundles(
-                item.workflow_dir,
-                state.skill_registry,
-                state.tool_registry,
-            )
-        except Exception as exc:
-            logger.error(
-                "Trial %d (task %d): tool bundle boot failed: %s",
-                item.trial_id, item.task_id, exc,
-            )
+    # RPC tool bundles (sam3, grounding-dino, vlm, geometry, curobo, …) are
+    # booted ONCE per connector in ``_ensure_connector`` and reused across this
+    # task's seeds — their tools are already live in ``state.tool_registry``.
+    # (Booting + tearing them down per trial orphaned the just-killed sam3
+    # subprocess into the reused registry: "sam3 cannot write — stdin closed",
+    # silently failing every seed after the first on a worker.)
 
     executor = None
     try:
@@ -614,11 +640,9 @@ def _execute_trial(
                 executor.close()
             except Exception:
                 pass
-        if tool_bundle_manager is not None:
-            try:
-                tool_bundle_manager.shutdown_all()
-            except Exception:
-                pass
+        # NOTE: tool bundles are NOT shut down here — they live on the
+        # WorkerState (per connector) and are torn down on task switch /
+        # worker cleanup, so this task's remaining seeds reuse them.
         if policy_executor is not None:
             policy_executor.close()
         if policy_manager is not None:
