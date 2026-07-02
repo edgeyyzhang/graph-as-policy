@@ -15,7 +15,7 @@ other v3 graph.
 
 ```
 packing_graph/
-├── workflow.json            # the v3 graph: 4 subgraphs + done/abort ends
+├── workflow.json            # the v3 graph: 3 subgraphs + done/abort ends
 └── scripts/
     ├── perceive_dino_vlm.py # DINO + VLM tournament + SAM3 → world-frame cloud
     ├── exterior_view.py     # keep only the agentview cam (drop the wrist)
@@ -28,31 +28,34 @@ packing_graph/
 ## The loop
 
 ```
-START → container ──found──→ perceive_next ──found──→ grasp ──grasped──→ transport ┐
-                  │             │  │ none                 │ failed          │ placed │
-        not_found │             │  ↓                      ↓                 │ blocked│
-                  ↓             │ done  ←──────────────── abort ←───────────┘        │
-                abort           │ (clean success exit)                              │
-                                └────────────────── perceive_next ←─────────────────┘
-                                          THE BACKWARD EDGE (transport → perceive_next)
+START ──→ perceive_next ──found──→ grasp ──grasped──→ transport ──┐
+            │  │ none                 │ failed           │ blocked │ placed
+  not_found │  ↓                      ↓                  │         │
+            ↓  done (clean           abort ←─────────────┘         │
+          abort  success exit)                                     │
+            └──────────────── perceive_next ←──────────────────────┘
+                    THE BACKWARD EDGE (transport → perceive_next)
 ```
 
 `transport --placed--> perceive_next` is a genuine cycle. The executor treats a
 conditional edge that resolves to an already-completed node as a loop: it resets
 the loop body (`perceive_next`, `grasp`, `transport`) and re-runs it. The
 cross-subgraph store keeps the most-recent producer, so each iteration grasps
-the freshly-perceived `target_obb` while the once-perceived `container_obb`
-stays fixed. `GAP_ITERATION_CAP` bounds runaway loops. See `docs/runtime.md`
-§7.2 for the back-edge semantics.
+the freshly-perceived `target_obb` and places into the freshly-perceived
+`container_obb` — the loop head re-localizes **both** the next item and the
+basket every pass. `GAP_ITERATION_CAP` bounds runaway loops. See
+`docs/runtime.md` §7.2 for the back-edge semantics.
 
 ## The subgraphs
 
-- **container_sg** (`perceiving-objects`) runs **once** and localizes the basket
-  (`container_obb`): `get_observation → exterior_view → perceive("basket") →
-  filter_and_compute_obb`.
-
-- **perceive_next_sg** is the **loop head**: `get_observation → exterior_view →
-  perceive("grocery item") → decide`. Two things keep it honest:
+- **perceive_next_sg** (`perceiving-objects`) is the **loop head**, and it
+  localizes *both* ends of the pick on **every iteration**:
+  `get_observation → exterior_view → perceive("basket") →
+  filter_and_compute_obb → perceive("grocery item") → decide`. There is no
+  separate run-once container subgraph — the basket (`container_obb`) is
+  re-perceived each pass alongside the next item, so the place pose always
+  reflects the current scene (at the cost of one extra perceive per
+  iteration). Two things keep the item pick honest:
   - The perceive node passes an `object_description` — *"a packaged grocery
     product such as a can, box, carton, jar, or bottle; never the wicker basket
     or storage container"* — so the VLM pairwise tournament prefers a real item
@@ -105,9 +108,10 @@ Needs the `perceiving-objects` weights, CuRobo (`uv sync --extra grocery`), a
 VLM credential, and the executor's back-edge support (in this checkout):
 
 ```bash
-# Runs against the VAB pack-all suite; records an mp4.
+# Runs against the VAB pack-all suite; a run video is recorded by default
+# to <trace-dir>/run_video.mp4 (pass --no-video to skip it).
 MUJOCO_GL=egl uv run gap run examples/grocery_packing/packing_graph \
-    --sim libero_object_packing/0 --video packing.mp4
+    --sim libero_object_packing/0
 uv run gap viz     # browse the recorded trace — perceive_next is visited once per object
 ```
 
@@ -118,7 +122,9 @@ provider's credentials).
 
 On the default `seed=3` arrangement this delivers all six items
 (`completion_rate = 1.0`) and exits cleanly the iteration after the last
-delivery.
+delivery. As with the other CuRobo examples, the first run of a session
+pays one-time costs (cold vision-model loads + CuRobo's CUDA-kernel JIT,
+~40 s) before per-iteration timing settles.
 
 ## Where to go next
 

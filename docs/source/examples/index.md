@@ -5,7 +5,11 @@ the release gate and real robots. Install per
 [Installation](../getting-started/installation.md); the **Needs** column
 names the `uv sync --extra …` set, plus any credential or hardware.
 **Measured** lists only numbers measured on this repo at the committed
-`uv.lock` — a dash means no claim, not a failure.
+`uv.lock` — a dash means no claim, not a failure. **Time** is
+steady-state wall-clock: the first run of a session additionally pays
+one-time costs — cold vision-model loads, and for CuRobo examples a
+one-time CUDA-kernel JIT (~40 s) — so expect minutes before the quoted
+per-trial rate kicks in.
 
 All examples live under [examples/](gh-engine:examples) in the engine
 repo, each with a README and runnable code.

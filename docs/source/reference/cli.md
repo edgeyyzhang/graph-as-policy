@@ -339,7 +339,7 @@ suggestions); `2` resolution errors.
 ## gap skills
 
 ```text
-gap skills {list,check,table,new,test} ...
+gap skills {list,check,install,table,new,test} ...
 ```
 
 Inspect, verify, scaffold, and test skill bundles. All subcommands accept
@@ -390,10 +390,45 @@ gap skills check --download
 
 :::{note}
 `--download` is a hook mechanism: it invokes `prefetch()` on bundles that
-define one. No bundle in [open-robot-skills](gh-skills:README.md)
-currently defines a `prefetch()`, so model weights download lazily at
-the first model call instead.
+define one. In [open-robot-skills](gh-skills:README.md) the perception
+bundles (`sam3`, `grounding-dino`) define a `prefetch()`, so their
+weights download eagerly here; bundles without one report
+`declares no weights (no prefetch())` and their weights download lazily
+at the first model call instead.
 :::
+
+### gap skills install
+
+```text
+gap skills install [BUNDLE ...] [--all] [--workflow DIR]
+                   [--skills PATH] [--registry NAME]
+```
+
+Sync per-bundle virtual environments via `uv sync --project <bundle_dir>`.
+Bundles without a `pyproject.toml` (in-process tools, pure skills) inherit
+gap's own venv and are skipped with a note. To wipe a venv later, just
+`rm -rf <bundle>/.venv`.
+
+Selection precedence: explicit `BUNDLE` names > `--workflow` discovery >
+`--all`.
+
+| Flag | Type / default | Meaning |
+|---|---|---|
+| `BUNDLE ...` | names; default: none | Install exactly these bundles. |
+| `--all` | flag | Install every bundle with a `pyproject.toml` across active registries — the full set, including the heavyweight learned-policy bundles. |
+| `--workflow DIR` | path; default: none | Install just the bundles a workflow references — both `type: tool` nodes and `ctx.tool("<bundle>.…")` calls inside the graph's scripts. The lean option when you only run one example. |
+| `--skills PATH` | repeatable; default: resolved registries | See [Common options](#common-options-registries). |
+| `--registry NAME` | string; default: all | Restrict to one active registry. |
+
+Exit codes: `0` all selected bundles synced (or skipped as venv-less);
+`1` any `uv sync` failure; `2` resolution errors, unknown bundle names, or
+nothing selected.
+
+```bash
+gap skills install --all                                        # everything
+gap skills install --workflow examples/libero_quickstart/graph  # one example's needs
+gap skills install sam3 grounding-dino                          # named bundles
+```
 
 ### gap skills table
 

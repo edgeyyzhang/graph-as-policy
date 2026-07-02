@@ -3,7 +3,8 @@
 :::{note}
 **Requirements:** a GPU, the `quickstart` extra, and an API key for a hosted
 VLM (OpenRouter by default — [alternatives below](#vlm-provider)). Each trial
-takes ~25–55 s on an A100.
+takes ~25–55 s on an A100 once models are warm; the first trial of a session
+runs minutes longer while they load cold.
 :::
 
 This is GaP's end-to-end hero example: a static, fully-authored workflow
@@ -202,7 +203,8 @@ alphabet soup and place it in the basket"), Gemini
   basket-perception errors, which the planner variant shares (same
   perception subgraphs), so CuRobo would not have recovered them.
 - Wall-clock ~25–55 s per trial on one A100. Models stay resident across
-  trials within one process, so the first trial pays the model-load cost.
+  trials within one process, so the first trial pays the cold model loads
+  and can take a few minutes end-to-end.
 
 Per the release plan's decision rule (adopt the planner variant as the
 default if direct-IK grasp success < 80%), direct-IK at 90% stays the

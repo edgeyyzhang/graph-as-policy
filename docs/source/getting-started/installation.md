@@ -16,8 +16,9 @@ What you need to run the stack:
 | Real robots | See [Connectors](../real-robots/connectors.md) and read [Safety](../real-robots/safety.md) first. |
 
 The first simulation run downloads model weights (~3.5 GB total) from
-HuggingFace; `HF_TOKEN` is needed only for the gated SAM3 weights — see
-[Model weights](#model-weights) below.
+HuggingFace. `HF_TOKEN` is required in practice: the gated SAM3 weights
+sit in the default perception path of the quickstart and grocery
+examples — see [Model weights](#model-weights) below.
 
 ## Clone the two repos
 
@@ -65,6 +66,18 @@ pyroki) plus the dev group (pytest, ruff, mypy). `gap skills install --all`
 then installs every bundle in the side-by-side `open-robot-skills`
 checkout — SAM3, Grounding DINO, geometry, CuRobo, Gemini-ER, the
 learned-policy bundles, and friends.
+
+`--all` is the simplest path but heavier than most workflows need — the
+learned-policy bundles (molmoact, lerobot, openpi/JAX) alone add many
+gigabytes that the quickstart and grocery examples never touch. To install
+only what one graph actually uses, point at its directory instead:
+
+```bash
+uv run gap skills install --workflow examples/libero_quickstart/graph
+```
+
+This resolves the bundles the graph references (both `type: tool` nodes
+and `ctx.tool(...)` calls inside its scripts) and syncs just those venvs.
 
 :::{note}
 **CuRobo builds CUDA extensions at install time** against your
@@ -114,11 +127,12 @@ into each model — about 3.5 GB total, cached locally after that.
   [HuggingFace token](https://huggingface.co/settings/tokens) with access
   to the repo) before the first run, or the download fails with a 401.
 - `gap skills check --download` runs each bundle's optional `prefetch()`
-  hook after the checks. It is the supported mechanism for eager weight
-  downloads — but no bundled tool currently defines a `prefetch()` hook,
-  so today the command reports `declares no weights (no prefetch())` per
-  bundle and weights still download lazily on first model call. Budget the
-  download into your first run.
+  hook after the checks. The perception bundles (`sam3`, `grounding-dino`)
+  define one, so the command fetches their weights eagerly — and surfaces
+  a missing or under-privileged `HF_TOKEN` up front instead of mid-run.
+  A bundle without a `prefetch()` reports
+  `declares no weights (no prefetch())` and its weights download lazily on
+  the first model call — budget that into your first run.
 
 Nothing ever pip-installs or downloads behind your back outside these two
 paths.

@@ -31,8 +31,9 @@ Linux + an NVIDIA GPU with EGL (~10 GB VRAM covers this quickstart;
 `uv sync && uv run gap skills install --all`, and an LLM API key
 (`export OPENROUTER_API_KEY=...`, or
 [another provider](../authoring/llm-providers.md)). The first run
-downloads ~3.5 GB of model weights; set `HF_TOKEN` for the gated SAM3
-weights — see [Model weights](installation.md#model-weights).
+downloads ~3.5 GB of model weights, and the gated SAM3 weights are in
+this quickstart's perception path — so set `HF_TOKEN` first; see
+[Model weights](installation.md#model-weights).
 :::
 
 ## Minute 0–6: run the quickstart graph
@@ -50,7 +51,9 @@ MUJOCO_GL=egl uv run gap run examples/libero_quickstart/graph \
 `MUJOCO_GL=egl` selects headless GPU rendering and is required on every
 sim command; `--sim SUITE/TASK` picks the seeded LIBERO task variation.
 
-While it runs (~25–55 s per trial, measured on an A100), what you are
+While it runs (~25–55 s per trial, measured on an A100 — the **first**
+trial of a session runs minutes longer while the vision models load cold;
+steady-state kicks in from the second trial), what you are
 watching in the log: perception (Grounding DINO proposes boxes, a hosted
 VLM picks the right one, SAM3 segments it), geometry (mask + depth →
 oriented bounding box → top-down grasp candidates), then motion (align,

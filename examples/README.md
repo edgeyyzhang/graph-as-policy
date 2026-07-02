@@ -6,7 +6,10 @@ the release gate and real robots. Install per
 names the bundle install (`uv sync && uv run gap skills install --all`
 gets the full set), plus any credential or hardware. **Measured** lists
 only numbers measured on this repo at the committed `uv.lock` — a dash
-means no claim, not a failure.
+means no claim, not a failure. **Time** is steady-state wall-clock: the
+first run of a session additionally pays one-time costs — cold
+vision-model loads, and for CuRobo examples a one-time CUDA-kernel JIT
+(~40 s) — so expect minutes before the quoted per-trial rate kicks in.
 
 ## Start here
 

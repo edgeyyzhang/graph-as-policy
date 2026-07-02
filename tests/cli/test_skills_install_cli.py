@@ -127,6 +127,69 @@ def test_install_all_iterates_every_bundle_with_pyproject(monkeypatch, tmp_path)
     ])
 
 
+def test_install_workflow_resolves_tool_nodes_and_script_calls(
+    monkeypatch, tmp_path,
+):
+    """`--workflow DIR` must find bundles named by tool nodes AND bundles
+    called from script sources via ctx.tool("<bundle>.<name>", ...) — the
+    grocery graphs do all their perception/planning through scripts."""
+    import json
+
+    reg = tmp_path / "reg"
+    _bundle(reg, "tools", "alpha", pyproject=True)
+    _bundle(reg, "tools", "beta", pyproject=True)
+
+    wf_dir = tmp_path / "wf"
+    (wf_dir / "scripts").mkdir(parents=True)
+    (wf_dir / "scripts" / "move.py").write_text(
+        'def run(ctx):\n    return ctx.tool("beta.plan", x=1)\n'
+    )
+    (wf_dir / "workflow.json").write_text(json.dumps({
+        "version": 3,
+        "meta": {},
+        "nodes": {
+            "sg": {"type": "subgraph", "ref": "sg_def"},
+            "done": {"type": "end", "status": "success"},
+        },
+        "edges": [["START", "sg"]],
+        "conditional_edges": {
+            "sg": {"router_field": "exit", "mapping": {"ok": "done"}},
+        },
+        "subgraphs": {
+            "sg_def": {
+                "skill": "generic",
+                "inputs": {},
+                "outputs": {},
+                "nodes": {
+                    "step": {"type": "tool", "tool": "alpha.run", "inputs": {}},
+                    "move": {"type": "script", "script": "scripts/move.py",
+                             "inputs": {}},
+                    "ok": {"type": "noop"},
+                },
+                "edges": [
+                    ["START", "step"], ["step", "move"],
+                    ["move", "ok"], ["ok", "END"],
+                ],
+                "conditional_edges": {},
+                "exit": {"router_field": None, "success_values": ["ok"]},
+            },
+        },
+    }))
+
+    rec = _UvSyncRecorder()
+    monkeypatch.setattr(subprocess, "run", rec)
+    code = _run_cli(
+        monkeypatch,
+        ["skills", "install", "--skills", str(reg), "--workflow", str(wf_dir)],
+    )
+    assert code == 0
+    synced_dirs = sorted(argv[3] for argv in rec.calls)
+    assert synced_dirs == sorted([
+        str(reg / "tools" / "alpha"),
+        str(reg / "tools" / "beta"),
+    ])
+
+
 def test_install_nothing_to_do_errors(monkeypatch, tmp_path, capsys):
     reg = tmp_path / "reg"
     _bundle(reg, "policies", "x", pyproject=True)

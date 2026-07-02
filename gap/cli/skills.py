@@ -801,7 +801,6 @@ def _handle_install(args: argparse.Namespace) -> int:
     bundles inherit gap's venv — there's nothing to install per-bundle).
     """
     import subprocess
-    from pathlib import Path
 
     from gap.skills import load_skills
 
@@ -815,7 +814,7 @@ def _handle_install(args: argparse.Namespace) -> int:
         return 2
 
     # 1. Discover the bundle catalog once.
-    catalog: dict[str, "Path"] = {}  # bundle_name -> bundle_dir
+    catalog: dict[str, Path] = {}  # bundle_name -> bundle_dir
     for spec in registry_set:
         reg = load_skills(spec.path)
         for info in reg.list_skills():
@@ -875,8 +874,13 @@ def _required_bundles_for_workflow(workflow_dir: str, registry_set) -> list[str]
     Mirrors the launcher's discovery (gap.runtime.policy_boot.required_policies)
     but covers *all* bundle kinds so `gap skills install --workflow` installs
     every per-bundle venv the workflow touches, not just policies.
+
+    Tool nodes name their bundle statically; script and router nodes call
+    tools at runtime via ``ctx.tool("<bundle>.<name>", ...)``, so their
+    sources are scanned for that literal pattern too — otherwise a
+    script-heavy graph (every grocery example) resolves to almost nothing.
     """
-    from pathlib import Path
+    import re
 
     from gap.runtime.workflow import load_workflow
     from gap.skills import load_skills
@@ -887,18 +891,31 @@ def _required_bundles_for_workflow(workflow_dir: str, registry_set) -> list[str]
         print(f"error: failed to load workflow at {workflow_dir}: {exc}")
         return []
 
-    # Cache loaded registries; same dedup precedence as the catalog.
+    candidates: set[str] = set()
+    script_paths: set[Path] = set()
+    for sg in wf.subgraphs.values():
+        for node in sg.nodes.values():
+            if node.type == "tool" and node.tool:
+                candidates.add(node.tool.split(".", 1)[0])
+            if node.script:
+                script_paths.add(Path(workflow_dir) / node.script)
+    tool_call_re = re.compile(r"""ctx\.tool\(\s*["']([\w-]+)\.""")
+    for path in sorted(script_paths):
+        try:
+            candidates.update(tool_call_re.findall(path.read_text()))
+        except OSError:
+            continue
+
+    # Keep only names that resolve to a bundle in the active registries
+    # (drops connector tools like robot.* / sim.*); same dedup precedence
+    # as the catalog.
     bundle_names: set[str] = set()
     for spec in registry_set:
         reg = load_skills(spec.path)
-        for sg in wf.subgraphs.values():
-            for node in sg.nodes.values():
-                if node.type != "tool" or not node.tool:
-                    continue
-                bundle = node.tool.split(".", 1)[0]
-                try:
-                    reg.get(bundle)
-                except KeyError:
-                    continue
-                bundle_names.add(bundle)
+        for bundle in candidates:
+            try:
+                reg.get(bundle)
+            except KeyError:
+                continue
+            bundle_names.add(bundle)
     return sorted(bundle_names)

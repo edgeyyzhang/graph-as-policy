@@ -77,7 +77,8 @@ call. (pip equivalent: see the [main README](../../README.md#installation-detail
   basket-perception errors, which the planner variant shares (same
   perception subgraphs), so CuRobo would not have recovered them.
 - Wall-clock ~25-55 s per trial on one A100 (models stay resident across
-  trials in one process; first trial pays model load).
+  trials in one process; the **first** trial of a session pays the cold
+  model loads and can take a few minutes end-to-end).
 
 Per the release plan's decision rule (adopt the planner variant as the
 default if direct-IK grasp success < 80%), direct-IK at 90% stays the

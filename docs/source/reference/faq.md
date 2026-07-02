@@ -39,13 +39,13 @@ plain `gap run --sim …` does not. To spread workers across GPUs, set
 
 **When do model weights download? `gap skills check --download` said
 "declares no weights (no prefetch())".**
-Weights download lazily: the first call into a model-backed tool runs
-HuggingFace `from_pretrained`, which fetches ~3.5 GB on a fresh machine
-(your first sim trial will be slow). `--download` is a hook mechanism —
-it runs each bundle's optional `prefetch()` function, and no bundle in
-open-robot-skills currently defines one, so the flag prints that message
-for every bundle today. Set `HF_TOKEN` before the first run if you need
-the gated SAM3 weights. See
+`--download` runs each bundle's optional `prefetch()` function. The
+perception bundles (`sam3`, `grounding-dino`) define one, so their
+weights (~3.5 GB) fetch eagerly during the check. A bundle *without* a
+`prefetch()` prints that message, and its weights download lazily — the
+first call into the model runs HuggingFace `from_pretrained`, so the
+first trial pays the fetch. Set `HF_TOKEN` before the first download:
+the gated SAM3 weights sit in the default perception path. See
 [Installation](../getting-started/installation.md#model-weights).
 
 **CuRobo fails to build.**

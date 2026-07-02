@@ -67,6 +67,10 @@ MUJOCO_GL=egl uv run gap run examples/grocery_fulfillment/sample_generated_graph
   --sim libero_object_all_variance/0 --checkpoints warn
 ```
 
+The first run of a session pays one-time costs — cold vision-model loads
+plus CuRobo's CUDA-kernel JIT (~40 s) — so expect a few extra minutes.
+Once warm, individual planner calls take ~55 ms.
+
 **Why direct?** On the can it matches the planner (reward 1.0) and runs
 ~20 s faster (no world-build + trajectory opt). On a low-profile object —
 e.g. the cream-cheese box (task 1) — the planner can fail outright: CuRobo

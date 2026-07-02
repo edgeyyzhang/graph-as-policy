@@ -55,16 +55,22 @@ by path — clone the two repos side by side and every command finds them.
 **Requirements:** **1× NVIDIA RTX 4090 (≥24 GB VRAM, Linux + EGL)**, an
 LLM API key (OpenRouter / Vertex), and
 [uv](https://docs.astral.sh/uv/). First run downloads ~3.5 GB of model
-weights; `HF_TOKEN` (a free [HuggingFace token](https://huggingface.co/settings/tokens))
-is needed only for the gated SAM3 weights.
+weights; the gated SAM3 weights are part of the default perception path,
+so in practice you also need `HF_TOKEN` (a free
+[HuggingFace token](https://huggingface.co/settings/tokens) with SAM3
+access) before the first run.
 
 ```bash
 git clone --recurse-submodules https://github.com/graph-robots/graph-as-policy.git
+#   ^ submodules are required (vendored sim stack) — if you already cloned
+#     plain, run: git submodule update --init --recursive
 git clone https://github.com/graph-robots/open-robot-skills.git    # sibling, auto-discovered
 cd graph-as-policy
 uv sync                                  # engine + LIBERO sim (now baseline)
 # `uv sync --extra vertex` instead if you'll use --provider vertex for codegen
 uv run gap skills install --all          # per-bundle venvs (sam3, cuRobo, vlm, …)
+#   --all includes the heavyweight learned-policy bundles; for one example,
+#   `gap skills install --workflow <graph-dir>` installs just what it uses
 
 export HF_TOKEN=...                      # for the gated SAM3 weights
 uv run gap skills check --download       # weight prefetch (SAM3 + GDINO) + capability gate
