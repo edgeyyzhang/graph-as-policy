@@ -12,7 +12,9 @@ config.
 ## Run it
 
 ```bash
-CUDA_HOME=/usr/local/cuda uv sync --extra grocery   # quickstart set + CuRobo planning
+# add --extra vertex: the configs below pin the vertex provider, whose SDK
+# (google-genai) is engine-side for graph generation
+CUDA_HOME=/usr/local/cuda uv sync --extra grocery --extra vertex
 uv run gap skills check --download
 
 # the 20-trial smoke (tasks 0-1)
@@ -22,12 +24,10 @@ MUJOCO_GL=egl uv run gap benchmark examples/benchmark/grocery_acceptance_smoke.y
 MUJOCO_GL=egl uv run gap benchmark examples/benchmark/grocery_acceptance.yaml --gate --resume
 ```
 
-You also need an LLM credential for graph generation — the reference runs
-used Vertex (`gemini-3.1-flash-lite-preview`, as the original); `openrouter`
-works by switching the config's `llm:` block.
-
-Measured: **10/10** on the 10-task × 1-seed development gate (2026-06-11);
-the full 500-trial gate is the release procedure.
+You also need an LLM credential for graph generation — the configs pin
+Vertex with `gemini-3.1-pro-preview` (the original reference runs used
+`gemini-3.1-flash-lite-preview`); `openrouter` works by switching the
+config's `llm:` block.
 
 ## The recipe (ported verbatim)
 

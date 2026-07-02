@@ -153,12 +153,13 @@ Or in Python:
 
 | Provider | Setup |
 |---|---|
-| `openrouter` (default) | `export OPENROUTER_API_KEY=...`; the default model is `gemini-3.1-flash-lite-preview` (on OpenRouter the slug may need a `google/` prefix). Reach any other OpenAI-compatible server (e.g. local vLLM) via a `--config` YAML with `llm: {provider: openrouter, endpoint: ...}` |
+| `openrouter` (default) | `export OPENROUTER_API_KEY=...`; the default model is `gemini-3.1-flash-lite-preview` (OpenRouter accepts Gemini slugs with or without the `google/` prefix). Reach any other OpenAI-compatible server (e.g. local vLLM) via a `--config` YAML with `llm: {provider: openrouter, endpoint: ...}` |
 | `vertex` | `gcloud auth application-default login`, the `vertex` extra, and a `--config` YAML setting `llm: {provider: vertex, project_id: ..., region: ...}`; GEMINI models only |
 
 Both providers default to `gemini-3.1-flash-lite-preview`; override per call
-with `--model` (or `llm: {model: ...}` in the config). On `openrouter` the
-model slug may need a `google/` prefix.
+with `--model gemini-3.1-pro-preview` (or `llm: {model: ...}` in the
+config). OpenRouter accepts Gemini slugs with or without the `google/`
+prefix.
 
 Pick per call with `--provider`/`--model`, or pin everything (endpoint,
 temperature, max tokens, concurrency, per-agent models) in a config YAML

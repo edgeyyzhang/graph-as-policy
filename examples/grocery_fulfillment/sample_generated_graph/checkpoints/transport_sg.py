@@ -34,8 +34,8 @@ sg.add_edge('placed', END)
 sg.set_on_error('blocked')
 sg.set_outputs(drop_pose=Ref('compute_drop.drop_pose'))
 
-sg.add_checkpoint('drop_inside_cavity', predicate=lambda w, o: w.body('basket').cavity_lower[0] < o['drop_pose']['position']['x'] < w.body('basket').cavity_upper[0] and w.body('basket').cavity_lower[1] < o['drop_pose']['position']['y'] < w.body('basket').cavity_upper[1], rationale='planned drop xy lands inside the basket cavity AABB', validate=True)
-sg.add_checkpoint('drop_z_valid', predicate=lambda w, o: o['drop_pose']['position']['z'] > w.body('basket').cavity_lower[2] - 0.01, rationale='planned drop z is at or above the basket cavity floor', validate=True)
+sg.add_checkpoint('drop_inside_cavity', predicate=lambda w, o: w.body('basket').interior_lower[0] < o['drop_pose']['position']['x'] < w.body('basket').interior_upper[0] and w.body('basket').interior_lower[1] < o['drop_pose']['position']['y'] < w.body('basket').interior_upper[1], rationale='planned drop xy lands inside the basket interior AABB', validate=True)
+sg.add_checkpoint('drop_z_valid', predicate=lambda w, o: o['drop_pose']['position']['z'] > w.body('basket').interior_lower[2] - 0.01, rationale='planned drop z is at or above the basket interior floor', validate=True)
 sg.add_checkpoint('target_in_container', predicate=lambda w: w.body('alphabet soup').is_in(w.body('basket')), rationale='alphabet soup settled inside the basket after release', validate=True)
 # --- end original builder block ---
 

@@ -23,11 +23,11 @@ skills: ../../../open-robot-skills
 
 llm:
   provider: vertex
-  model: gemini-3.1-flash-lite-preview
+  model: gemini-3.1-pro-preview
   project_id: bc-y7-06
   # OpenRouter alternative (set OPENROUTER_API_KEY):
   # provider: openrouter
-  # model: gemini-3.1-flash-lite-preview
+  # model: gemini-3.1-pro-preview
 
 gate_threshold: 0.90
 

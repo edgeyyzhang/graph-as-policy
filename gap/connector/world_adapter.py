@@ -140,6 +140,28 @@ def _geom_local_box(model: Any, gid: int) -> tuple[np.ndarray, np.ndarray] | Non
     return np.zeros(3), half
 
 
+def _rotmat_to_quat_wxyz(R: np.ndarray) -> np.ndarray:
+    """Rotation matrix -> unit quaternion (w, x, y, z)."""
+    t = float(np.trace(R))
+    if t > 0.0:
+        s = np.sqrt(t + 1.0) * 2.0
+        return np.array([
+            0.25 * s,
+            (R[2, 1] - R[1, 2]) / s,
+            (R[0, 2] - R[2, 0]) / s,
+            (R[1, 0] - R[0, 1]) / s,
+        ])
+    i = int(np.argmax(np.diag(R)))
+    j, k = (i + 1) % 3, (i + 2) % 3
+    s = np.sqrt(max(R[i, i] - R[j, j] - R[k, k] + 1.0, 0.0)) * 2.0
+    q = np.empty(4)
+    q[0] = (R[k, j] - R[j, k]) / s
+    q[1 + i] = 0.25 * s
+    q[1 + j] = (R[j, i] + R[i, j]) / s
+    q[1 + k] = (R[k, i] + R[i, k]) / s
+    return q
+
+
 def _box_corners(center: np.ndarray, half: np.ndarray) -> np.ndarray:
     signs = np.array([
         [sx, sy, sz]
@@ -182,10 +204,22 @@ class LiberoWorldAdapter:
         self._objects = {}
         self._body_owner = {}
         self._local_aabbs = {}
+        self._base_bid: int | None = None
         self._prepared = False
         if self._sim is None:
             return
         model = self._sim.model
+
+        # Robot base body: snapshots are expressed in this body's frame so
+        # privileged truth lands in the SAME frame as perception clouds and
+        # motion targets (both robot-base-framed). Without this, generated
+        # checkpoints comparing subgraph outputs against w.body(...) fail
+        # by the base offset (~0.6 m x in LIBERO) on every run.
+        for base_name in ("robot0_base", "robot0_link0"):
+            bid = self._body_id(model, base_name)
+            if bid is not None:
+                self._base_bid = bid
+                break
 
         objects = _find_object_map(self.env) or self._free_joint_bodies(model)
         # Tabletop body, when present.
@@ -322,6 +356,16 @@ class LiberoWorldAdapter:
 
         contacts = contacts_from_pairs(self._contact_pairs(model, data))
 
+        # World -> robot-base transform (p_base = R_b^T @ (p_world - t_b)):
+        # keeps privileged truth in the frame all workflow outputs use.
+        base_t = np.zeros(3)
+        base_Rt = np.eye(3)
+        if self._base_bid is not None:
+            base_t = np.asarray(data.body_xpos)[self._base_bid].astype(np.float64)
+            base_Rt = _quat_wxyz_to_rotmat(
+                np.asarray(data.body_xquat)[self._base_bid].astype(np.float64)
+            ).T
+
         bodies: dict[str, Body] = {}
         names = dict(self._objects)
         if self._tabletop_name in self._local_aabbs:
@@ -335,6 +379,9 @@ class LiberoWorldAdapter:
                 name, (-0.05 * np.ones(3), 0.05 * np.ones(3))
             )
             R = _quat_wxyz_to_rotmat(quat)
+            pos = base_Rt @ (pos - base_t)
+            R = base_Rt @ R
+            quat = _rotmat_to_quat_wxyz(R)
             corners = (R @ _box_corners((lo + hi) / 2.0, (hi - lo) / 2.0).T).T + pos
             lin, ang = self._body_velocity(data, bid)
             bodies[name] = Body(
@@ -343,12 +390,12 @@ class LiberoWorldAdapter:
                 quaternion_wxyz=quat,
                 aabb_lower=corners.min(axis=0),
                 aabb_upper=corners.max(axis=0),
-                linear_velocity=lin,
-                angular_velocity=ang,
+                linear_velocity=base_Rt @ lin,
+                angular_velocity=base_Rt @ ang,
                 contacts=contacts.get(name, frozenset()),
             )
 
-        robot_view = self._robot_view(model, data)
+        robot_view = self._robot_view(model, data, base_t=base_t, base_Rt=base_Rt)
         time_s = 0.0
         if hasattr(self.env, "get_current_time_s"):
             try:
@@ -394,7 +441,14 @@ class LiberoWorldAdapter:
         except Exception:
             return np.zeros(3), np.zeros(3)
 
-    def _robot_view(self, model: Any, data: Any) -> Robot | None:
+    def _robot_view(
+        self,
+        model: Any,
+        data: Any,
+        *,
+        base_t: np.ndarray | None = None,
+        base_Rt: np.ndarray | None = None,
+    ) -> Robot | None:
         joint_names: list[str] = []
         joint_pos: list[float] = []
         qpos = np.asarray(data.qpos)
@@ -419,6 +473,11 @@ class LiberoWorldAdapter:
         if eef_id is not None:
             ee_pos = np.asarray(data.body_xpos)[eef_id].astype(np.float64).copy()
             ee_quat = np.asarray(data.body_xquat)[eef_id].astype(np.float64).copy()
+            if base_t is not None and base_Rt is not None:
+                ee_pos = base_Rt @ (ee_pos - base_t)
+                ee_quat = _rotmat_to_quat_wxyz(
+                    base_Rt @ _quat_wxyz_to_rotmat(ee_quat)
+                )
 
         fraction = float(getattr(self.env, "_gripper_fraction", 1.0))
         try:

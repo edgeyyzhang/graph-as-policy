@@ -14,7 +14,7 @@ skills: ../../../open-robot-skills
 
 llm:
   provider: openrouter
-  # model: gemini-3.1-flash-lite-preview   # default; uncomment to pin
+  # model: gemini-3.1-pro-preview   # uncomment to pin (unset = provider default)
 
 benchmark:
   families: [grocery_packing]

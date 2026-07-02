@@ -94,7 +94,10 @@ def _slugify_name(name: str) -> str:
 class Body:
     """Pose, AABB, velocity, contacts, cavity at one timestep for one env_id.
 
-    All fields are world-frame numpy arrays (shape annotated below).
+    All fields are numpy arrays (shape annotated below) in the connector's
+    reference frame — for sim connectors that is the **robot base frame**,
+    the same frame perception clouds, OBBs, and motion targets use, so
+    predicates can compare subgraph outputs against these fields directly.
     Constructed by the harness's world adapter; LLM code reads but
     does not construct ``Body`` instances.
     """
@@ -146,6 +149,28 @@ class Body:
     @property
     def xy(self) -> np.ndarray:
         return self.position[:2]
+
+    @property
+    def interior_lower(self) -> np.ndarray:
+        """World-frame min of the interior cavity AABB, falling back to
+        the body AABB when no cavity is registered (same fallback as
+        :meth:`is_in`). Predicates should prefer this over raw
+        ``cavity_lower``, which is ``None`` on sims whose world adapter
+        does not register cavities (e.g. LIBERO)."""
+        return (
+            self.cavity_lower
+            if self.cavity_lower is not None
+            else self.aabb_lower
+        )
+
+    @property
+    def interior_upper(self) -> np.ndarray:
+        """World-frame max counterpart of :attr:`interior_lower`."""
+        return (
+            self.cavity_upper
+            if self.cavity_upper is not None
+            else self.aabb_upper
+        )
 
     @property
     def top_z(self) -> float:

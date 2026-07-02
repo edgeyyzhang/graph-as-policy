@@ -78,7 +78,11 @@ class Ref:
     path: str
 
     def parts(self) -> list[str]:
-        return self.path.split(".")
+        """Path segments. Python-style indexing is normalized to dotted
+        segments (``arms[0].ee_pose`` == ``arms.0.ee_pose``) — generated
+        graphs emit both spellings."""
+        normalized = self.path.replace("[", ".").replace("]", "")
+        return [p for p in normalized.split(".") if p != ""]
 
 
 def is_ref_dict(value: Any) -> bool:

@@ -51,7 +51,7 @@ Pick an LLM provider for generation and for the VLM perception bundle
 export OPENROUTER_API_KEY=...         # simplest: one key drives both
 # or vertex: gcloud auth application-default login, then
 #   export GAP_VLM_PROVIDER=vertex GAP_VLM_PROJECT_ID=<proj> \
-#          GAP_VLM_REGION=global GAP_VLM_MODEL=<gemini-model>
+#          GAP_VLM_REGION=global GAP_VLM_MODEL=gemini-3.1-pro-preview
 #   and pass a config YAML with the same llm: settings to gap generate
 ```
 

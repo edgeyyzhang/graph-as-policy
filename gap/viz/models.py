@@ -186,6 +186,9 @@ class VizMeta(BaseModel):
     total_duration_ms: float = 0.0
     degraded_replay: bool = False
     trial_path: str | None = None
+    #: True when the trial recorded a scene_log/ directory (TrialLogger),
+    #: i.e. the 3D replay view can actually be served for this run.
+    has_scene_log: bool = False
 
 
 class VizTrial(BaseModel):

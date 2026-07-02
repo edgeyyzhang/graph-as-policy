@@ -175,7 +175,10 @@ class PromptAssembler:
             f"step a registered tool already covers.\n"
             f"2. For every step no tool covers, **author a "
             f"`type=\"script\"` node** and emit its Python in a "
-            f"` ```python:scripts/<sg>/<file>.py` block (or delegate via "
+            f"` ```python:scripts/<sg>/<file>.py` block, substituting "
+            f"`<sg>` with YOUR subgraph's actual name and `<file>` with the "
+            f"script name (e.g. ` ```python:scripts/perceive_sg/locate.py`) "
+            f"— never emit the literal placeholders (or delegate via "
             f"`request_inline_script`). For a generated skill these scripts "
             f"are the PRIMARY implementation surface, not a rare fallback — "
             f"there are no canonical scripts to collide with, so emit as "
@@ -785,15 +788,18 @@ _CANONICAL_CHECKPOINTS_BY_SKILL: dict[str, list[dict[str, str]]] = {
     "grasping-direct-ik": _GRASP_SHAPES,
     "transporting-objects": [
         {
-            "shape": "lambda w, o: w.body('<container>').cavity_lower[0] < "
+            "shape": "lambda w, o: w.body('<container>').interior_lower[0] < "
                      "o['drop_position']['x'] < "
-                     "w.body('<container>').cavity_upper[0] and ... (also for y)",
+                     "w.body('<container>').interior_upper[0] and ... (also for y)",
             "rationale": "planned drop xy lands inside the container's "
-                         "privileged cavity AABB (output-anchored)",
+                         "privileged interior AABB (output-anchored; "
+                         "interior_lower/upper fall back to the body AABB "
+                         "on sims with no registered cavity — never index "
+                         "raw cavity_lower/cavity_upper, they can be None)",
         },
         {
             "shape": "lambda w, o: o['drop_position']['z'] > "
-                     "w.body('<container>').cavity_lower[2] - 0.01",
+                     "w.body('<container>').interior_lower[2] - 0.01",
             "rationale": "planned drop z is at or above the container floor "
                          "(catches mis-computed drop heights before release).",
         },

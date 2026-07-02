@@ -140,6 +140,7 @@ def _call_with_optional_outputs(fn: Callable, world: World, outputs: dict) -> An
     positional only when the signature explicitly declares a second
     positional parameter.
     """
+    two_arg = False
     try:
         import inspect
         sig = inspect.signature(fn)
@@ -152,13 +153,18 @@ def _call_with_optional_outputs(fn: Callable, world: World, outputs: dict) -> An
         positional = [
             p for p in sig.parameters.values() if p.kind in positional_kinds
         ]
-        if len(positional) >= 2:
-            return fn(world, outputs)
-        return fn(world)
+        two_arg = len(positional) >= 2
     except (TypeError, ValueError):
         # Builtins or C-level callables sometimes refuse introspection.
-        # Fall back to the historical 1-arg signature.
-        return fn(world)
+        # Fall back to the historical 1-arg signature. The call itself
+        # stays OUTSIDE this try: a TypeError raised inside the predicate
+        # body must surface as that predicate's eval_error, not silently
+        # re-dispatch to the 1-arg shape (which then fails with a
+        # misleading "missing positional argument" message).
+        two_arg = False
+    if two_arg:
+        return fn(world, outputs)
+    return fn(world)
 
 
 def load_checkpoints(path: str | Any) -> list[Checkpoint]:

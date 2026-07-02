@@ -78,9 +78,22 @@ export function getSubcallAssetUrl(nodeId: string, seq: number, filename: string
 
 // --- 3D Scene Replay ---
 
+/** FastAPI errors arrive as {"detail": "..."} — surface the human-readable
+ * reason instead of the raw status + JSON blob. */
+async function errorDetail(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const parsed = JSON.parse(text) as { detail?: unknown };
+    if (typeof parsed.detail === "string") return parsed.detail;
+  } catch {
+    // not JSON — fall through to the raw body
+  }
+  return `${res.status}: ${text}`;
+}
+
 export async function startReplay3d(trialPath?: string): Promise<{ url: string }> {
   const res = await fetch(`${BASE}/trial/replay3d${trialParam(trialPath)}`, { method: "POST" });
-  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(await errorDetail(res));
   return res.json();
 }
 

@@ -170,6 +170,15 @@ def probe_llm_providers(*, probe: bool = False) -> dict[str, ProbeResult]:
         for name, res in results.items():
             if not res.ok:
                 continue
+            if name == "vertex" and not _envstr("GOOGLE_CLOUD_PROJECT"):
+                # A ping without a project can only fail — and its error
+                # ("re-check credentials") would point at the wrong culprit.
+                results[name] = ProbeResult(
+                    "missing",
+                    f"{res.detail}; no GCP project set — ping skipped",
+                    fix_hint="export GOOGLE_CLOUD_PROJECT=<project-id>",
+                )
+                continue
             ping = _ping_provider(
                 name,
                 model=_envstr("GAP_LLM_MODEL"),
@@ -230,7 +239,9 @@ def resolve_vlm_env() -> ResolvedVlmEnv:
     return ResolvedVlmEnv(provider, model, project, region, source)
 
 
-def probe_vlm_providers(*, probe: bool = False) -> dict[str, ProbeResult]:
+def probe_vlm_providers(
+    *, probe: bool = False, registry_set: RegistrySet | None = None,
+) -> dict[str, ProbeResult]:
     """Credential presence (and, when ``probe=True``, a 1-token API ping)
     for the resolved VLM provider.
 
@@ -306,12 +317,95 @@ def probe_vlm_providers(*, probe: bool = False) -> dict[str, ProbeResult]:
             env.provider, model=env.model,
             project_id=env.vertex_project, region=env.vertex_region,
         )
+        if (
+            env.provider == "vertex"
+            and ping.status == "error"
+            and _VERTEX_SDK_MISSING in ping.detail
+        ):
+            # The VLM never runs in the engine venv — the vlm bundle is an
+            # out-of-process server with its own venv (which always carries
+            # google-genai). Re-run the ping through that interpreter so a
+            # missing engine-side vertex extra doesn't masquerade as a
+            # credential failure.
+            ping = _ping_vertex_via_vlm_bundle(env, registry_set)
         res = ProbeResult(
             ping.status,
             detail=f"{res.detail}; {ping.detail}" if res.detail else ping.detail,
             fix_hint=ping.fix_hint,
         )
     return {env.provider: res}
+
+
+def _ping_vertex_via_vlm_bundle(
+    env: ResolvedVlmEnv, registry_set: RegistrySet | None,
+    *, timeout_s: float = 60.0,
+) -> ProbeResult:
+    """1-token vertex ping executed by the vlm bundle's venv interpreter —
+    the environment that actually serves VLM calls at runtime."""
+    venv_python: Path | None = None
+    for spec in registry_set or []:
+        cand = Path(spec.path) / "tools" / "vlm" / ".venv" / "bin" / "python"
+        if cand.is_file():
+            venv_python = cand
+            break
+    if venv_python is None:
+        return ProbeResult(
+            "unknown",
+            "google-genai is not in the engine venv and no installed vlm "
+            "bundle venv was found to probe instead; VLM calls run in the "
+            "bundle venv, engine-side generation needs the vertex extra",
+            fix_hint=(
+                "uv run gap skills install vlm  ·  uv sync --extra vertex"
+            ),
+        )
+    model = env.model or "gemini-2.5-flash"
+    snippet = (
+        "import os\n"
+        "from google import genai\n"
+        "from google.genai import types\n"
+        "client = genai.Client(vertexai=True,"
+        " project=os.environ['_GAP_PING_PROJECT'],"
+        " location=os.environ['_GAP_PING_REGION'])\n"
+        "client.models.generate_content(model=os.environ['_GAP_PING_MODEL'],"
+        " contents='x',"
+        " config=types.GenerateContentConfig(max_output_tokens=1))\n"
+        "print('PING_OK')\n"
+    )
+    ping_env = dict(os.environ)
+    ping_env.update({
+        "_GAP_PING_PROJECT": env.vertex_project,
+        "_GAP_PING_REGION": env.vertex_region,
+        "_GAP_PING_MODEL": model,
+    })
+    try:
+        proc = subprocess.run(
+            [str(venv_python), "-c", snippet],
+            capture_output=True, text=True, timeout=timeout_s, env=ping_env,
+        )
+    except subprocess.TimeoutExpired:
+        return ProbeResult(
+            "error", f"vlm bundle ping timed out after {timeout_s:g}s",
+        )
+    if proc.returncode == 0 and "PING_OK" in proc.stdout:
+        return ProbeResult(
+            "ok",
+            f"ping ok via vlm bundle venv (project={env.vertex_project}, "
+            f"region={env.vertex_region}, model={model})",
+        )
+    err_lines = [
+        ln for ln in (proc.stderr or proc.stdout).strip().splitlines() if ln
+    ]
+    msg = (err_lines[-1] if err_lines else f"exit {proc.returncode}")[:200]
+    return ProbeResult(
+        "error", f"ping failed (via vlm bundle venv): {msg}",
+        fix_hint="re-check credentials and model name; see provider docs",
+    )
+
+
+#: Sentinel detail for "the google-genai SDK is not importable in the venv
+#: running this probe" — distinguishes a local install gap from a real
+#: credential/model failure (the fix hints differ completely).
+_VERTEX_SDK_MISSING = "google-genai not installed in this environment"
 
 
 def _ping_provider(
@@ -343,8 +437,17 @@ def _ping_provider(
                 r.raise_for_status()
             return ProbeResult("ok", f"ping ok (model={ping_model})")
         if provider == "vertex":
-            from google import genai
-            from google.genai import types
+            try:
+                from google import genai
+                from google.genai import types
+            except ImportError:
+                return ProbeResult(
+                    "error", _VERTEX_SDK_MISSING,
+                    fix_hint=(
+                        "install the vertex extra: uv sync --extra vertex "
+                        "(or pip install 'graph-as-policy[vertex]')"
+                    ),
+                )
             client = genai.Client(
                 vertexai=True, project=project_id, location=region,
             )
@@ -393,7 +496,9 @@ class EnvironmentReport:
         }
 
 
-def probe_environment(*, probe: bool = False) -> EnvironmentReport:
+def probe_environment(
+    *, probe: bool = False, registry_set: RegistrySet | None = None,
+) -> EnvironmentReport:
     import gap
 
     return EnvironmentReport(
@@ -401,7 +506,7 @@ def probe_environment(*, probe: bool = False) -> EnvironmentReport:
         gap_version=getattr(gap, "__version__", "unknown"),
         gpu=probe_gpu(),
         llm_providers=probe_llm_providers(probe=probe),
-        vlm_provider=probe_vlm_providers(probe=probe),
+        vlm_provider=probe_vlm_providers(probe=probe, registry_set=registry_set),
     )
 
 
@@ -656,7 +761,7 @@ def build_check_report(
     configured provider; default is static (env-var / ADC presence
     only). Bundle import + weights probes are always run regardless.
     """
-    environment = probe_environment(probe=probe)
+    environment = probe_environment(probe=probe, registry_set=registry_set)
     gpu = environment.gpu
 
     bundles: list[BundleCapability] = []

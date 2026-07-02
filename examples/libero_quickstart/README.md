@@ -89,8 +89,8 @@ The perception pipeline disambiguates DINO detections with a hosted VLM
 (`vlm.query`). The default provider is OpenRouter:
 
 ```bash
-export OPENROUTER_API_KEY=...                        # default provider; model override:
-export GAP_VLM_MODEL=gemini-3.1-flash-lite-preview   # optional (this is the default)
+export OPENROUTER_API_KEY=...                  # default provider; model override:
+export GAP_VLM_MODEL=gemini-3.1-pro-preview    # optional (unset = gemini-3.1-flash-lite-preview)
 ```
 
 Alternative — Vertex AI with application-default credentials (what the
@@ -101,7 +101,7 @@ gcloud auth application-default login
 export GAP_VLM_PROVIDER=vertex
 export GAP_VLM_PROJECT_ID=<your-project>
 export GAP_VLM_REGION=global
-export GAP_VLM_MODEL=gemini-3.1-flash-lite-preview
+export GAP_VLM_MODEL=gemini-3.1-pro-preview
 ```
 
 Any OpenAI-compatible endpoint (e.g. a local vLLM) also works — point

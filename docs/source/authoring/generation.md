@@ -39,7 +39,7 @@ gap generate "pick up the alphabet soup can and place it in the basket" --out my
 |---|---|
 | `--skills PATH` | Skill registry root(s); repeatable, precedence-ordered. Default: the resolved registry set (see [Registries](../skills/registries.md)). |
 | `--provider {openrouter,vertex}` | LLM provider override (default: `openrouter`). |
-| `--model M` | LLM model override (default: the provider default — `gemini-3.1-flash-lite-preview` on `openrouter`, whose OpenRouter slug may need a `google/` prefix; `vertex` requires an explicit gemini model). |
+| `--model M` | LLM model override (default: the provider default — `gemini-3.1-flash-lite-preview` on `openrouter`, OpenRouter accepts Gemini slugs with or without the `google/` prefix; `vertex` requires an explicit gemini model). |
 | `--out DIR` | Output directory (default: `outputs/generated_<timestamp>`). |
 | `--config YAML` | Pipeline config YAML — `llm:` / `composition:` / `skills:` knobs (see [LLM providers](llm-providers.md)). |
 | `-v, --verbose` | Debug logging. |

@@ -25,8 +25,18 @@ export function SceneView({ trialPath }: { trialPath?: string }) {
 
   if (error || !url) {
     return (
-      <div className="empty-state" style={{ height: "100%", display: "grid", placeItems: "center" }}>
-        {error || "3D replay not available for this trial."}
+      <div
+        className="empty-state"
+        style={{ height: "100%", display: "grid", placeItems: "center" }}
+      >
+        <div style={{ maxWidth: 520, textAlign: "center", display: "grid", gap: 8 }}>
+          <div style={{ fontWeight: 600 }}>3D replay unavailable for this run.</div>
+          <div style={{ opacity: 0.8 }}>
+            {error
+              ? `Reason: ${error.replace(/^Error:\s*/, "")}`
+              : "No replay URL was returned by the server."}
+          </div>
+        </div>
       </div>
     );
   }

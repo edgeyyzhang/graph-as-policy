@@ -137,8 +137,8 @@ class _CheckpointDef:
     """
 
     name: str
-    predicate: Callable[[Any], bool]
-    diagnostics: Callable[[Any], dict] | None
+    predicate: Callable[..., bool]
+    diagnostics: Callable[..., dict] | None
     rationale: str
     validate: bool
     weight: float
@@ -308,9 +308,9 @@ class Subgraph(_Builder):
     def add_checkpoint(
         self,
         name: str,
-        predicate: Callable[[Any], bool],
+        predicate: Callable[..., bool],
         *,
-        diagnostics: Callable[[Any], dict] | None = None,
+        diagnostics: Callable[..., dict] | None = None,
         rationale: str = "",
         validate: bool = True,
         weight: float = 1.0,

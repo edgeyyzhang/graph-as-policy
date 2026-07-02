@@ -26,28 +26,43 @@ from .view_builder import build_viz_trial
 logger = logging.getLogger(__name__)
 
 
+#: Trial-dir *content* subtrees — a trial directory never nests inside one
+#: of these, so the discovery walk prunes them (node_data alone holds
+#: thousands of dirs per run; descending into it made every re-scan take
+#: seconds on large output trees).
+_NON_TRIAL_SUBTREES = frozenset(
+    {"node_data", "assets", "calls", "scene_log", "scripts", "checkpoints",
+     "codegen", "__pycache__"}
+)
+
+
 def discover_trials(root: Path) -> list[str]:
     """Recursively find trial or workflow directories.
 
     A directory qualifies if it contains ``dag_trace.json`` (a completed trial)
     or ``workflow.json`` (a static workflow definition with no execution yet).
-    Returns paths relative to *root*, sorted lexicographically.
+    Returns paths relative to *root*, sorted lexicographically. Called per
+    ``/api/trials`` request (the frontend polls it), so the walk prunes
+    trial-content subtrees rather than visiting every file.
     """
-    trials: list[str] = []
-    seen: set[str] = set()
-    for trace_file in sorted(root.rglob("dag_trace.json")):
-        rel = str(trace_file.parent.relative_to(root))
-        if rel not in seen:
-            trials.append(rel)
-            seen.add(rel)
-    for workflow_file in sorted(root.rglob("workflow.json")):
-        # Skip codegen directories — they're source copies, not independent trials
-        if "codegen" in workflow_file.parent.parts:
-            continue
-        rel = str(workflow_file.parent.relative_to(root))
-        if rel not in seen:
-            trials.append(rel)
-            seen.add(rel)
+    import os
+
+    with_trace: set[str] = set()
+    with_workflow: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(root):
+        # Codegen dirs hold source copies of workflow.json, not trials.
+        dirnames[:] = sorted(
+            d for d in dirnames if d not in _NON_TRIAL_SUBTREES
+        )
+        rel = os.path.relpath(dirpath, root)
+        if "dag_trace.json" in filenames:
+            with_trace.add(rel)
+        if "workflow.json" in filenames:
+            with_workflow.add(rel)
+    # Preserve the historical ordering contract: completed trials first,
+    # then workflow-only dirs, each block sorted lexicographically.
+    trials = sorted(with_trace)
+    trials += sorted(with_workflow - with_trace)
     return trials
 
 
@@ -126,13 +141,15 @@ def load_viz_trial(
     trial = load_trial(trial_dir, tool_registry=tool_registry)
     trace_path = trial_dir / "dag_trace.json"
     trace_data = _load_trace_json(trial_dir) if trace_path.exists() else {"nodes": [], "events": []}
-    return build_viz_trial(
+    viz = build_viz_trial(
         workflow=trial.workflow,
         nodes=trial.nodes,
         raw_trace=trace_data,
         trial_path=trial_path,
         total_duration_ms=trial.total_duration_ms,
     )
+    viz.meta.has_scene_log = (trial_dir / "scene_log").is_dir()
+    return viz
 
 
 def _load_trace_json(trial_dir: Path) -> dict[str, Any]:

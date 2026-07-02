@@ -25,6 +25,7 @@ registry — re-registration of the same function is idempotent.
 
 from __future__ import annotations
 
+import ast
 import logging
 import threading
 from collections.abc import Sequence
@@ -35,6 +36,7 @@ from typing import Any
 from gap.skills import SkillsRegistry
 from gap_core.tools import ToolDescriptor, ToolRegistry
 from gap_core.tools import _registry as _tools_registry_module
+from gap_core.tools.schema import FieldInfo, UnitSchema
 
 from ._meta_tools import register_codegen_meta_tools
 
@@ -110,31 +112,204 @@ def build_codegen_tool_registry(
 def _register_rpc_bundle_tools(
     registry: ToolRegistry, skills_registry: SkillsRegistry,
 ) -> None:
-    """Register schema-only stubs for tools whose @tool definitions live
-    in an out-of-process bundle venv (``serving.protocol == 'stdio-msgpack'``).
+    """Register schema stubs for tools whose @tool definitions live in an
+    out-of-process bundle venv (``serving.protocol == 'stdio-msgpack'``).
 
-    The codegen LLM needs to KNOW these tools exist + their summaries.
-    Schema introspection isn't available without booting the bundle; this
-    registers a placeholder so the prompt assembler surfaces the tool
-    name and the SKILL.md summary, and the validator accepts ``tool:``
-    references to it. Dispatch happens through the runtime registry's
-    RpcAdapter once :class:`ToolBundleManager` boots the bundle at
-    workflow execution time.
+    The codegen LLM needs to KNOW these tools exist, their summaries, AND
+    their real signatures: with name+summary-only stubs the generator
+    guessed parameter names (``question`` vs ``prompt``, dropped
+    ``world_config``, mis-wired joint states) and the graphs failed at
+    runtime. Booting each bundle venv at codegen time is too heavy, so
+    the signatures are lifted **statically** from the bundle's Python
+    source via :func:`_ast_bundle_schemas` — no imports, so it works from
+    the engine venv regardless of the bundle's deps. Dispatch still
+    happens through the runtime registry's RpcAdapter once
+    :class:`ToolBundleManager` boots the bundle at workflow execution
+    time.
     """
     for info in skills_registry.list_skills():
         serving = getattr(info.meta, "serving", None)
         if serving is None or getattr(serving, "protocol", None) != "stdio-msgpack":
             continue
+        ast_schemas = _ast_bundle_schemas(info.bundle_dir)
         for tool_name, summary in (info.meta.tools or {}).items():
             if tool_name in registry:
                 continue
             try:
-                registry.register_rpc(tool_name, client=None, summary=summary)
+                registry.register_rpc(
+                    tool_name, client=None, summary=summary,
+                    schema=ast_schemas.get(tool_name),
+                )
             except ValueError:
                 # Tool already registered elsewhere (e.g. drained @tool
                 # left over in the archive); first registration wins.
                 logger.debug("rpc tool %r already registered; keeping existing",
                              tool_name)
+
+
+# ---------------------------------------------------------------------------
+# Static (AST) signature extraction for out-of-process bundles
+# ---------------------------------------------------------------------------
+
+#: Cache: bundle dir -> {tool name -> UnitSchema}. Source files are static
+#: for the life of a codegen process.
+_AST_SCHEMA_CACHE: dict[Path, dict[str, UnitSchema]] = {}
+
+
+def _ast_bundle_schemas(bundle_dir: Path) -> dict[str, UnitSchema]:
+    """Extract ``{tool name -> UnitSchema}`` from a bundle's source, without
+    importing it.
+
+    Parses every top-level ``*.py`` in *bundle_dir* (conventionally the
+    ``@tool`` functions live in ``tools.py``), finds functions decorated
+    with ``@tool(name=..., summary=...)``, and lifts parameter names /
+    annotation strings / defaults. A return annotation naming a TypedDict
+    defined in the same file is expanded into per-field outputs — the
+    same shape the bundle server reports from its own venv at runtime.
+    """
+    bundle_dir = Path(bundle_dir)
+    with _LOCK:
+        cached = _AST_SCHEMA_CACHE.get(bundle_dir)
+        if cached is not None:
+            return cached
+
+    schemas: dict[str, UnitSchema] = {}
+    for py in sorted(bundle_dir.glob("*.py")):
+        try:
+            tree = ast.parse(py.read_text(), filename=str(py))
+        except (OSError, SyntaxError):
+            logger.debug("AST parse failed for %s", py, exc_info=True)
+            continue
+        typed_dicts = _module_typed_dicts(tree)
+        for node in tree.body:
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            decorated = _tool_decorator_kwargs(node)
+            if decorated is None:
+                continue
+            name = decorated.get("name")
+            if not isinstance(name, str):
+                continue
+            summary = decorated.get("summary")
+            schemas[name] = _function_schema(
+                node, name,
+                summary if isinstance(summary, str) else "",
+                typed_dicts,
+            )
+
+    with _LOCK:
+        _AST_SCHEMA_CACHE[bundle_dir] = schemas
+    return schemas
+
+
+def _tool_decorator_kwargs(
+    fn: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> dict[str, Any] | None:
+    """The keyword literals of an ``@tool(...)`` decorator, or None."""
+    for dec in fn.decorator_list:
+        if not isinstance(dec, ast.Call):
+            continue
+        target = dec.func
+        dotted = (
+            target.attr if isinstance(target, ast.Attribute)
+            else target.id if isinstance(target, ast.Name)
+            else ""
+        )
+        if dotted != "tool":
+            continue
+        kwargs: dict[str, Any] = {}
+        for kw in dec.keywords:
+            if kw.arg is not None and isinstance(kw.value, ast.Constant):
+                kwargs[kw.arg] = kw.value.value
+        return kwargs
+    return None
+
+
+def _module_typed_dicts(tree: ast.Module) -> dict[str, dict[str, str]]:
+    """``{class name -> {field -> type_str}}`` for module-level TypedDicts."""
+    out: dict[str, dict[str, str]] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        base_names = {
+            b.attr if isinstance(b, ast.Attribute)
+            else b.id if isinstance(b, ast.Name) else ""
+            for b in node.bases
+        }
+        if "TypedDict" not in base_names and not (base_names & set(out)):
+            continue
+        fields: dict[str, str] = {}
+        for base in node.bases:
+            bname = base.attr if isinstance(base, ast.Attribute) else (
+                base.id if isinstance(base, ast.Name) else "")
+            fields.update(out.get(bname, {}))
+        for stmt in node.body:
+            if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                fields[stmt.target.id] = ast.unparse(stmt.annotation)
+        out[node.name] = fields
+    return out
+
+
+def _function_schema(
+    fn: ast.FunctionDef | ast.AsyncFunctionDef,
+    tool_name: str,
+    summary: str,
+    typed_dicts: dict[str, dict[str, str]],
+) -> UnitSchema:
+    """Build a UnitSchema from one decorated function's AST."""
+    inputs: dict[str, FieldInfo] = {}
+
+    def _add(arg: ast.arg, default: ast.expr | None) -> None:
+        if arg.arg in ("self", "ctx"):
+            return
+        type_str = ast.unparse(arg.annotation) if arg.annotation else "Any"
+        has_default = default is not None
+        default_value: Any = None
+        if has_default and isinstance(default, ast.Constant):
+            default_value = default.value
+        elif has_default:
+            default_value = ast.unparse(default)
+        inputs[arg.arg] = FieldInfo(
+            name=arg.arg, python_type=None, type_str=type_str,
+            required=not has_default, default=default_value,
+        )
+
+    args = fn.args
+    pos = args.posonlyargs + args.args
+    pos_defaults: list[ast.expr | None] = [None] * (
+        len(pos) - len(args.defaults)
+    ) + list(args.defaults)
+    for arg, default in zip(pos, pos_defaults):
+        _add(arg, default)
+    for arg, default in zip(args.kwonlyargs, args.kw_defaults):
+        _add(arg, default)
+
+    outputs: dict[str, FieldInfo] = {}
+    ret = fn.returns
+    ret_name = (
+        ret.id if isinstance(ret, ast.Name)
+        else ret.attr if isinstance(ret, ast.Attribute)
+        else None
+    )
+    if ret_name and ret_name in typed_dicts:
+        for fname, ftype in typed_dicts[ret_name].items():
+            outputs[fname] = FieldInfo(
+                name=fname, python_type=None, type_str=ftype, required=True,
+            )
+    elif ret is not None and not (
+        isinstance(ret, ast.Constant) and ret.value is None
+    ):
+        outputs["result"] = FieldInfo(
+            name="result", python_type=None,
+            type_str=ast.unparse(ret), required=True,
+        )
+
+    doc = ast.get_docstring(fn) or ""
+    description = summary or (doc.splitlines()[0] if doc else "")
+    return UnitSchema(
+        name=tool_name, description=description,
+        inputs=inputs, outputs=outputs,
+    )
 
 
 def load_codegen_registries(

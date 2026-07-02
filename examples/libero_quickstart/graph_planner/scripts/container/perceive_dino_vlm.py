@@ -145,7 +145,7 @@ def _resolved_vlm_model() -> str:
     return (
         os.environ.get("GAP_VLM_MODEL", "").strip()
         or os.environ.get("GAP_LLM_MODEL", "").strip()
-        or "gemini-3.1-flash-lite-preview"
+        or "gemini-3.1-pro-preview"
     )
 
 

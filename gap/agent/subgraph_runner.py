@@ -1039,6 +1039,20 @@ def _parse_subgraph_response(
         if py_dict is not None:
             sg_dict = py_dict
             builder_error = None
+    # LLMs occasionally emit the prompt's path TEMPLATE literally —
+    # ``scripts/<sg>/file.py`` — in both the fence path and the node's
+    # ``script:`` field. Substitute the real subgraph name on both sides
+    # (they reference each other, so the rewrite must be consistent).
+    sg_name = (sg_dict or {}).get("name")
+    if sg_dict is not None and isinstance(sg_name, str) and sg_name:
+        scripts = {
+            key.replace("<sg>", sg_name): body
+            for key, body in scripts.items()
+        }
+        for node in (sg_dict.get("nodes") or {}).values():
+            script = node.get("script") if isinstance(node, dict) else None
+            if isinstance(script, str) and "<sg>" in script:
+                node["script"] = script.replace("<sg>", sg_name)
     return sg_dict, scripts, checkpoint_module, checkpoint_meta, builder_block, builder_error
 
 

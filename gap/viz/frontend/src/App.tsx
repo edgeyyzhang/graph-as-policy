@@ -54,6 +54,24 @@ export default function App() {
     };
   }, []);
 
+  // Keep the trial rail fresh: new runs land on disk while the server is
+  // up, so poll the (re-scanning) /api/trials endpoint.
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const next = await getTrials();
+        setTrials((prev) =>
+          prev.length === next.length && prev.every((p, i) => p === next[i])
+            ? prev
+            : next,
+        );
+      } catch {
+        // transient — keep the current list
+      }
+    }, 10_000);
+    return () => clearInterval(interval);
+  }, []);
+
   async function handleSelectTrial(path: string) {
     setActiveTrial(path);
     setLoading(true);
@@ -111,16 +129,25 @@ export default function App() {
       <main className="workspace-shell">
         <div className="workspace-toolbar">
           <div className="view-tabs">
-            {(["state-machine", "execution", "3d-scene"] as ViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={`view-tabs__tab ${view === mode ? "is-active" : ""}`}
-                onClick={() => setView(mode)}
-              >
-                {labelForView(mode)}
-              </button>
-            ))}
+            {(["state-machine", "execution", "3d-scene"] as ViewMode[]).map((mode) => {
+              const disabled = mode === "3d-scene" && !viz.meta.has_scene_log;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`view-tabs__tab ${view === mode ? "is-active" : ""}`}
+                  disabled={disabled}
+                  title={
+                    disabled
+                      ? "3D replay unavailable for this run: no scene_log/ was recorded (scene logging is opt-in via gap.viz.TrialLogger)"
+                      : undefined
+                  }
+                  onClick={() => setView(mode)}
+                >
+                  {labelForView(mode)}
+                </button>
+              );
+            })}
           </div>
         </div>
 

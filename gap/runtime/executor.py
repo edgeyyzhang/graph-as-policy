@@ -345,6 +345,10 @@ class WorkflowExecutor:
         self.exit_status = node.status
         self._run_recovery(terminal, node)
         self.trace.flush()
+        logger.info(
+            "DAG trace written to %s",
+            getattr(self.trace, "_output_dir", "<trace dir>"),
+        )
         if node.status == "success":
             logger.info("Workflow terminated at end node %r (success)", terminal)
             return
@@ -641,6 +645,15 @@ class WorkflowExecutor:
             return result
         finally:
             self.trace.end_node(full_id, success)
+            # Incremental flush: a crash mid-run (segfault, OOM kill, disk
+            # full during video render) previously lost the WHOLE trace —
+            # node_data/ was on disk but dag_trace.json never existed, so
+            # the run was invisible to the visualizer. Never let the flush
+            # itself break execution.
+            try:
+                self.trace.flush()
+            except Exception:
+                logger.debug("incremental trace flush failed", exc_info=True)
 
     def _lookup_bundle_for_scope(self, scope_name: str) -> str:
         """Map a scope name back to the owning subgraph's `skill` field."""

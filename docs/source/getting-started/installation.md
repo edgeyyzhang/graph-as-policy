@@ -12,7 +12,7 @@ What you need to run the stack:
 
 | Setup | Requirements |
 |---|---|
-| Run the quickstart, sim, perception, motion planning | Linux + **1× NVIDIA RTX 4090 (≥24 GB VRAM)** + EGL, an LLM API key, [uv](https://docs.astral.sh/uv/). |
+| Run the quickstart, sim, perception, motion planning | Linux + an NVIDIA GPU + EGL, an LLM API key, [uv](https://docs.astral.sh/uv/). **≥24 GB VRAM (RTX 4090-class) fits the full stack**; the LIBERO quickstart alone runs in ~10 GB. |
 | Real robots | See [Connectors](../real-robots/connectors.md) and read [Safety](../real-robots/safety.md) first. |
 
 The first simulation run downloads model weights (~3.5 GB total) from
@@ -70,7 +70,10 @@ learned-policy bundles, and friends.
 **CuRobo builds CUDA extensions at install time** against your
 environment's torch. The engine repo already declares it as a
 no-build-isolation package for uv; you only need `CUDA_HOME` to point at a
-CUDA toolkit matching torch's CUDA version.
+CUDA toolkit matching torch's CUDA version. A version **mismatch** shows
+up as a CuRobo build failure (or a version-mismatch warning at import) —
+compare `"$CUDA_HOME"/bin/nvcc --version` against torch's
+`python -c "import torch; print(torch.version.cuda)"` before syncing.
 :::
 
 `uv run gap …` needs no venv activation; run
@@ -167,6 +170,12 @@ You cloned without `--recurse-submodules`. Run
 `git submodule update --init` inside `graph-as-policy/` — the lockfile
 references the vendored submodules even for engine-only installs. The
 side-by-side `open-robot-skills` checkout is required for the same reason.
+
+**`uv sync` fails with `Distribution not found at: file:///…/open-robot-skills`.**
+The side-by-side `open-robot-skills` checkout is missing or renamed —
+`[tool.uv.sources]` resolves it at `../open-robot-skills` relative to the
+engine repo. Clone it next to `graph-as-policy/` (see
+[Clone the two repos](#clone-the-two-repos)) and re-run `uv sync`.
 
 **pip downgraded numpy to 1.26.**
 That is SAM3's over-strict metadata pin. Reinstall numpy 2.x

@@ -101,10 +101,15 @@ gap generate "..." --config vertex.yaml
 # vertex.yaml
 llm:
   provider: vertex
-  model: gemini-3.1-flash-lite-preview
+  model: gemini-3.1-pro-preview
   project_id: my-gcp-project
   region: global          # the default when omitted
 ```
+
+Keep `region: global` for the preview Gemini models
+(`gemini-3.1-pro-preview`, `gemini-3.1-flash-lite-preview`): they are
+served from the global endpoint only — pinning a regional endpoint such
+as `us-central1` returns a 404 ("publisher model not found").
 
 Vertex serves **Gemini models only** (Claude-on-Vertex was removed):
 requests go through `google-genai` with a native function-calling tool
@@ -210,7 +215,7 @@ gcloud auth application-default login
 export GAP_VLM_PROVIDER=vertex
 export GAP_VLM_PROJECT_ID=my-gcp-project
 export GAP_VLM_REGION=global
-export GAP_VLM_MODEL=gemini-3.1-flash-lite-preview
+export GAP_VLM_MODEL=gemini-3.1-pro-preview
 
 gap run my_graph/task_00 --sim libero_object_all_variance/0
 ```

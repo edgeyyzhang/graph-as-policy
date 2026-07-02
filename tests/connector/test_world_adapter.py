@@ -1,4 +1,9 @@
-"""LiberoWorldAdapter on a hand-built mujoco-like FakeEnv state."""
+"""LiberoWorldAdapter on a hand-built mujoco-like FakeEnv state.
+
+Snapshots are expressed in the ROBOT BASE frame (robot0_base sits at
+world (-0.4, 0, 0) here, so world x maps to base x + 0.4) — the same
+frame perception clouds and motion targets use.
+"""
 
 from __future__ import annotations
 
@@ -106,7 +111,8 @@ def test_bodies_present(world):
 
 def test_object_pose_from_sim_state(world):
     cube = world.body("cube")
-    np.testing.assert_allclose(cube.position, [0.1, 0.0, 0.42])
+    # world (0.1, 0, 0.42) - base (-0.4, 0, 0) -> base frame (0.5, 0, 0.42)
+    np.testing.assert_allclose(cube.position, [0.5, 0.0, 0.42])
     np.testing.assert_allclose(cube.quaternion_wxyz, [1.0, 0.0, 0.0, 0.0])
 
 
@@ -116,7 +122,7 @@ def test_aabbs_from_model_geoms(world):
     assert cube.top_z == pytest.approx(0.44)
     table = world.body("table")
     assert table.top_z == pytest.approx(0.40)
-    assert table.left_x == pytest.approx(-0.4)
+    assert table.left_x == pytest.approx(0.0)  # world -0.4 + base offset 0.4
 
 
 def test_predicates_evaluate(world):
@@ -150,7 +156,7 @@ def test_robot_view(world):
     assert robot.joint_names[0] == "robot0_joint1"
     # finger qpos 0.02 / 0.04 stroke → half open
     assert robot.gripper_open_fraction == pytest.approx(0.5)
-    np.testing.assert_allclose(robot.ee_position, [0.1, 0.0, 0.5])
+    np.testing.assert_allclose(robot.ee_position, [0.5, 0.0, 0.5])
 
 
 def test_refresh_after_reset_rebuilds(world):

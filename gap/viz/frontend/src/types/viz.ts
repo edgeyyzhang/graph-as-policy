@@ -88,6 +88,8 @@ export interface VizMeta {
   total_duration_ms: number;
   degraded_replay: boolean;
   trial_path: string | null;
+  /** True when the trial recorded a scene_log/ dir — 3D replay is servable. */
+  has_scene_log: boolean;
 }
 
 export interface VizTrial {

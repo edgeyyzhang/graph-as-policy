@@ -70,7 +70,15 @@ def _resolve_trial_dir(trial: str | None) -> Path:
 
 @router.get("/trials")
 def get_trials() -> list[str]:
-    """Return list of discovered trial paths (relative to root)."""
+    """Return list of discovered trial paths (relative to root).
+
+    Re-scans the root directory on every call so trials created after
+    server startup appear without a restart (the frontend polls this).
+    """
+    global _trial_paths
+    if _root_dir is not None:
+        from .trial_loader import discover_trials
+        _trial_paths = discover_trials(_root_dir)
     return _trial_paths
 
 
@@ -305,6 +313,15 @@ def start_replay3d(trial: str | None = Query(None)):
     """Start a viser 3D replay server for a trial's scene_log data."""
     trial_dir = _resolve_trial_dir(trial)
 
+    if not (trial_dir / "scene_log").is_dir():
+        raise HTTPException(
+            404,
+            "3D replay unavailable for this run: no scene_log/ directory was "
+            "recorded. Scene logging is opt-in — attach a "
+            "gap.viz.TrialLogger to the run to record robot joints, cameras, "
+            "and object poses for replay.",
+        )
+
     try:
         from .replay3d import start_replay_server
         url = start_replay_server(trial_dir, port=8890)
@@ -312,7 +329,9 @@ def start_replay3d(trial: str | None = Query(None)):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise HTTPException(400, str(e)) from e
+        raise HTTPException(
+            400, f"3D replay failed to start for this run: {e}"
+        ) from e
 
 
 @router.post("/node/{node_id}/replay")

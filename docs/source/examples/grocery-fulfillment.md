@@ -3,8 +3,9 @@
 :::{note} Requirements
 A CUDA GPU (MuJoCo EGL rendering + CuRobo planning + perception weights), the
 `grocery` dependency extra, and an LLM credential for graph generation. The
-reference runs used Vertex (`gemini-3.1-flash-lite-preview`); the default
-`openrouter` provider works by switching the config's `llm:` block.
+configs pin Vertex with `gemini-3.1-pro-preview` (the original reference
+runs used `gemini-3.1-flash-lite-preview`); the default `openrouter`
+provider works by switching the config's `llm:` block.
 :::
 
 This is GaP's flagship acceptance family — and its release gate. The task:
@@ -52,7 +53,7 @@ task: "auto"            # per-task prompts resolved from LIBERO metadata
 
 llm:
   provider: vertex
-  model: gemini-3.1-flash-lite-preview
+  model: gemini-3.1-pro-preview
   project_id: bc-y7-06
 
 gate_threshold: 0.90

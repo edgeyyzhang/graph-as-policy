@@ -25,7 +25,8 @@ Zero to a verified rollout, with the trace open. You will:
 ::::
 
 :::{note} Requirements
-Linux + an NVIDIA GPU (≥ ~10 GB VRAM) with EGL, the
+Linux + an NVIDIA GPU with EGL (~10 GB VRAM covers this quickstart;
+[Installation](installation.md) recommends ≥24 GB for the full stack), the
 [two repos installed](installation.md) with
 `uv sync && uv run gap skills install --all`, and an LLM API key
 (`export OPENROUTER_API_KEY=...`, or

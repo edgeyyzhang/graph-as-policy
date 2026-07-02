@@ -9,7 +9,7 @@ task: auto
 skills: ../../../open-robot-skills
 llm:
   provider: vertex
-  model: gemini-3.1-flash-lite-preview
+  model: gemini-3.1-pro-preview
   project_id: bc-y7-06
 gate_threshold: 0.9
 suites:

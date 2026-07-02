@@ -178,7 +178,7 @@ configured. Six env vars:
 | Env var | Meaning | Default |
 |---|---|---|
 | `GAP_VLM_PROVIDER` | `openrouter` \| `vertex` | `openrouter` |
-| `GAP_VLM_MODEL` | Model name (on OpenRouter the slug may need a `google/` prefix) | `gemini-3.1-flash-lite-preview` |
+| `GAP_VLM_MODEL` | Model name (OpenRouter accepts Gemini slugs with or without the `google/` prefix) | `gemini-3.1-flash-lite-preview` |
 | `GAP_VLM_BASE_URL` | OpenAI-compatible endpoint (openrouter provider) | `https://openrouter.ai/api/v1` |
 | `GAP_VLM_API_KEY` | API key for the openrouter provider (or `OPENROUTER_API_KEY`) | — |
 | `GAP_VLM_PROJECT_ID` | GCP project (vertex provider) | — |

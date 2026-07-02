@@ -759,4 +759,7 @@ class DagTrace:
         trace_path = self._output_dir / "dag_trace.json"
         with open(trace_path, "w") as f:
             json.dump(data, f, indent=2)
-        logger.info("DAG trace written to %s", trace_path)
+        # DEBUG: flush() now also runs incrementally after every node (crash
+        # resilience); the end-of-run INFO line lives at the executor's
+        # final flush call.
+        logger.debug("DAG trace written to %s", trace_path)

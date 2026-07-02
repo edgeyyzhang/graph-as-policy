@@ -128,7 +128,7 @@ declares its requirements, surfaced by `gap check`. See the
 | Variable | Type / default | Effect |
 |---|---|---|
 | `GAP_VLM_PROVIDER` | `openrouter` \| `vertex`; default `openrouter` | Which backend `vlm.query` / `vlm.query_yes_no` use. |
-| `GAP_VLM_MODEL` | string; default: `gemini-3.1-flash-lite-preview` | Model name. On OpenRouter the slug may need a `google/` prefix. |
+| `GAP_VLM_MODEL` | string; default: `gemini-3.1-flash-lite-preview` | Model name. OpenRouter accepts Gemini slugs with or without the `google/` prefix. |
 | `GAP_VLM_BASE_URL` | URL; default: `https://openrouter.ai/api/v1` | OpenAI-compatible chat-completions endpoint for the `openrouter` provider; point it at any other such server, e.g. a local vLLM at `http://localhost:8000/v1`. |
 | `GAP_VLM_API_KEY` | string; default: unset | API key for the `openrouter` provider (the VLM bundle also accepts `OPENROUTER_API_KEY`); omitted when unset — local servers usually don't need it. |
 | `GAP_VLM_PROJECT_ID` | string | Vertex project for the `vertex` provider. |
