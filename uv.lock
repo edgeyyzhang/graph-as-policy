@@ -2568,7 +2568,7 @@ wheels = [
 [[package]]
 name = "libero"
 version = "0.2.0"
-source = { editable = "../graph-as-policy/third_party/Variational-Automation-Benchmark" }
+source = { editable = "third_party/Variational-Automation-Benchmark" }
 
 [[package]]
 name = "librt"
@@ -4074,8 +4074,8 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "graph-as-policy", editable = "../graph-as-policy" }]
-provides-extras = ["perceiving-objects", "perceiving-objects-oneshot", "perceiving-objects-multiview", "perceiving-object-parts", "grasping-with-planner", "grasping-direct-ik", "grasping-short-axis", "transporting-objects", "tracking-objects", "quickstart", "grocery", "all"]
+requires-dist = [{ name = "graph-as-policy", editable = "." }]
+provides-extras = ["perceiving-objects", "perceiving-objects-oneshot", "perceiving-objects-multiview", "perceiving-object-parts", "grasping-with-planner", "grasping-direct-ik", "grasping-short-axis", "transporting-objects", "tracking-objects", "push-concave-v1", "quickstart", "grocery", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -5095,7 +5095,7 @@ wheels = [
 [[package]]
 name = "robosuite"
 version = "1.4.0"
-source = { editable = "../graph-as-policy/third_party/robosuite" }
+source = { editable = "third_party/robosuite" }
 dependencies = [
     { name = "mujoco" },
     { name = "numba" },

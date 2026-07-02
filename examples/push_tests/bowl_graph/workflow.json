@@ -1,0 +1,149 @@
+{
+  "version": 3,
+  "meta": {
+    "name": "push_bowl_demo",
+    "description": "Perceive a black bowl and push it to create space for manipulation (libero_spatial test)"
+  },
+  "nodes": {
+    "perceive_bowl": {
+      "type": "subgraph",
+      "ref": "perceive_sg"
+    },
+    "push_bowl": {
+      "type": "subgraph",
+      "ref": "push_sg"
+    },
+    "done": {
+      "type": "end",
+      "status": "success"
+    },
+    "abort": {
+      "type": "end",
+      "status": "failure",
+      "recovery": [
+        {
+          "tool": "robot.open_gripper",
+          "inputs": {}
+        },
+        {
+          "tool": "robot.go_home",
+          "inputs": {}
+        }
+      ]
+    }
+  },
+  "edges": [
+    ["START", "perceive_bowl"]
+  ],
+  "conditional_edges": {
+    "perceive_bowl": {
+      "router_field": "exit",
+      "mapping": {
+        "found": "push_bowl",
+        "not_found": "abort"
+      }
+    },
+    "push_bowl": {
+      "router_field": "exit",
+      "mapping": {
+        "pushed": "done",
+        "failed": "abort"
+      }
+    }
+  },
+  "subgraphs": {
+    "perceive_sg": {
+      "skill": "perceiving-objects",
+      "inputs": {},
+      "outputs": {
+        "object_obb": {"$ref": "filter_obb.obb"}
+      },
+      "nodes": {
+        "observe": {
+          "type": "tool",
+          "tool": "robot.get_observation"
+        },
+        "perceive": {
+          "type": "script",
+          "script": "scripts/perceive_dino_vlm.py",
+          "inputs": {
+            "cameras": {"$ref": "observe.cameras"},
+            "object_name": "black bowl"
+          }
+        },
+        "filter_obb": {
+          "type": "tool",
+          "tool": "geometry.filter_and_compute_obb",
+          "inputs": {
+            "points": {"$ref": "perceive.cloud"}
+          }
+        },
+        "found": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        ["START", "observe"],
+        ["observe", "perceive"],
+        ["perceive", "filter_obb"],
+        ["filter_obb", "found"],
+        ["found", "END"]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": ["found"]
+      },
+      "on_error": "not_found"
+    },
+    "push_sg": {
+      "skill": "push-concave-v1",
+      "inputs": {
+        "object_obb": "OrientedBoundingBox"
+      },
+      "outputs": {},
+      "nodes": {
+        "approach": {
+          "type": "script",
+          "script": "scripts/approach_above.py",
+          "inputs": {
+            "target_obb": {"$ref": "in.object_obb"},
+            "approach_height": 0.35
+          }
+        },
+        "push_motion": {
+          "type": "script",
+          "script": "scripts/waypoint_move.py",
+          "inputs": {
+            "final_pos": {
+              "x": 0.55,
+              "y": 0.2,
+              "z": 0.02
+            }
+          }
+        },
+        "go_home": {
+          "type": "tool",
+          "tool": "robot.go_home",
+          "inputs": {}
+        },
+        "pushed": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        ["START", "approach"],
+        ["approach", "push_motion"],
+        ["push_motion", "go_home"],
+        ["go_home", "pushed"],
+        ["pushed", "END"]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": ["pushed"]
+      },
+      "on_error": "failed"
+    }
+  }
+}
