@@ -87,7 +87,7 @@ validation found error-severity issues, the workflow failed to load,
 `--sim` and `--real` were combined, or an `--inputs` entry was malformed.
 
 ```console
-$ gap run outputs/generated_20260612_101500 --sim libero_object/0
+$ gap run outputs/generated_20260612_101500/task_00 --sim libero_object/0
 video: outputs/run_20260612_102014/run_video.mp4 (412 frames)
 SUCCESS (exit=success, 41.3s)
 trace: outputs/run_20260612_102014
@@ -131,9 +131,9 @@ config-provided registries were given.
 
 ```console
 $ gap generate "pick up the alphabet soup and put it in the basket"
-OK: wrote outputs/generated_20260612_103000 (2 subgraph(s), 3 generated file(s))
+OK: wrote outputs/generated_20260612_103000/task_00 (2 subgraph(s), 3 generated file(s))
 ...
-run it with: gap run outputs/generated_20260612_103000
+run it with: gap run outputs/generated_20260612_103000/task_00
 ```
 
 :::{note}

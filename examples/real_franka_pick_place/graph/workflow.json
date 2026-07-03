@@ -209,7 +209,7 @@
      "found"
     ]
    },
-   "on_error": "not_found"
+   "on_error": "table_clean"
   },
   "grasp_sg": {
    "skill": "grasping-direct-ik",

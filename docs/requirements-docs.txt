@@ -1,6 +1,7 @@
 # Documentation build dependencies.
 #   pip install -r docs/requirements-docs.txt
-# or: uv venv .venv-docs && uv pip install -r docs/requirements-docs.txt
+# or: uv venv --python 3.12 .venv-docs && uv pip install -p .venv-docs -r docs/requirements-docs.txt
+# (sphinx 9.x needs Python >= 3.12; the engine venv pins 3.11 — see docs/README.md)
 sphinx==9.1.0
 pydata-sphinx-theme==0.16.1
 myst-parser==5.1.0

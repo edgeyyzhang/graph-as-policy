@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from gap_core.skills.meta import SkillMeta
+
 from .registries import RegistrySet, RegistrySpec
 from .validate import load_checkout_extras, validate_checkout
 
@@ -161,9 +162,16 @@ def probe_llm_providers(*, probe: bool = False) -> dict[str, ProbeResult]:
         if importlib.util.find_spec("google") is None or (
             importlib.util.find_spec("google.genai") is None
         ):
-            results["vertex"].detail += (
-                "; google-genai not installed (gemini-* models need "
-                "`pip install 'graph-as-policy[vertex]'`)"
+            # Credentials alone are not enough: codegen on vertex imports
+            # google-genai in *this* interpreter, so a missing extra means
+            # `gap generate --provider vertex` cannot work. Downgrade the
+            # probe (the pretty printer only surfaces hints on non-ok
+            # probes, so an appended detail on an "ok" result is invisible).
+            results["vertex"] = ProbeResult(
+                "missing",
+                results["vertex"].detail + "; google-genai not installed",
+                fix_hint="uv sync --extra vertex  (or pip install "
+                         "'graph-as-policy[vertex]')",
             )
 
     if probe:

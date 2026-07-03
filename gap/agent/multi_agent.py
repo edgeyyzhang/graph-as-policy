@@ -318,10 +318,21 @@ async def run_codegen(
     structural mistakes (e.g. a W8 — a subgraph declaring an input with no
     upstream producer) are not script-repairable, so we re-roll the stochastic
     pipeline up to ``composition.max_codegen_regenerations`` extra times and
-    return the first fully-valid graph (or the last attempt if none succeed).
+    return the first fully-valid graph. When every attempt fails, return the
+    most *diagnostic* failure, not the last one: an attempt that wrote a graph
+    and reports concrete residual ``validation_errors`` must not be clobbered
+    by a later re-roll that crashed on an infrastructure error (LLM outage,
+    exhausted stub queue in tests) with nothing to show — that would violate
+    the honest-reporting contract (see ``_codegen_attempt``).
     """
     max_regen = max(0, config.composition.max_codegen_regenerations)
-    result: PipelineResult | None = None
+
+    def _diagnostic_rank(r: PipelineResult) -> tuple[int, int]:
+        # Concrete residual validation errors beat a written-but-unexplained
+        # graph, which beats a bare crash with no artifact at all.
+        return (int(bool(r.validation_errors)), int(r.workflow_dir is not None))
+
+    best_failure: PipelineResult | None = None
     for attempt in range(max_regen + 1):
         result = await _codegen_attempt(
             task_id=task_id, task_prompt=task_prompt,
@@ -335,6 +346,8 @@ async def run_codegen(
                 )
             result.attempts = attempt + 1
             return result
+        if best_failure is None or _diagnostic_rank(result) > _diagnostic_rank(best_failure):
+            best_failure = result
         if attempt < max_regen:
             logger.warning(
                 "Task %d: graph still invalid after script-fixes (%s); "
@@ -342,9 +355,9 @@ async def run_codegen(
                 task_id, (result.execution_stderr or "")[:140],
                 attempt + 1, max_regen,
             )
-    if result is not None:
-        result.attempts = max_regen + 1
-    return result if result is not None else PipelineResult(
+    if best_failure is not None:
+        best_failure.attempts = max_regen + 1
+    return best_failure if best_failure is not None else PipelineResult(
         success=False, execution_stderr="codegen produced no result", attempts=1,
     )
 

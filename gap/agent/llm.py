@@ -485,7 +485,10 @@ async def _call_vertex_async(
     model = _resolve_model(config)
     _reject_claude_on_vertex(model)
 
-    from google.genai import types
+    try:
+        from google.genai import types
+    except ImportError as e:  # pragma: no cover - import-guarded
+        raise ImportError(_VERTEX_HINT) from e
 
     client = _vertex_gemini_client(config)
     contents = [
@@ -526,7 +529,10 @@ async def _vertex_gemini_tool_loop(
     to Gemini ``FunctionDeclaration``s by mapping ``input_schema`` →
     ``parameters``.
     """
-    from google.genai import types
+    try:
+        from google.genai import types
+    except ImportError as e:  # pragma: no cover - import-guarded
+        raise ImportError(_VERTEX_HINT) from e
 
     client = _vertex_gemini_client(config)
     model = _resolve_model(config)

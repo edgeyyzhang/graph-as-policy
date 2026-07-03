@@ -127,37 +127,34 @@ def test_generate_example_imports_and_parses():
 
 
 # ---------------------------------------------------------------------------
-# grocery_packing (the looping pick-everything graph with a backward edge)
+# grocery_packing (the looping pick-everything static graph with a backward
+# edge; a checked-in v3 artifact — no build step)
 # ---------------------------------------------------------------------------
 
-
-@pytest.fixture(scope="module")
-def packing_module():
-    return _import_example("grocery_packing/build_graph.py", "_example_grocery_packing")
+PACKING_GRAPH = EXAMPLES / "grocery_packing" / "packing_graph"
 
 
-def test_packing_validates(packing_module, tmp_path):
-    """The looping builder output validates cleanly (no errors)."""
+def test_packing_validates():
+    """The checked-in looping graph validates cleanly (no errors)."""
     from gap.runtime.validate import validate_workflow
     from gap.runtime.workflow import load_workflow
     from gap.skills import load_skills
 
     skills_root = _skills_root()
-    wf = packing_module.build_workflow()
-    out = packing_module.write_graph(wf, tmp_path / "graph", skills_root)
-
-    wf_def = load_workflow(out / "workflow.json")
+    wf_def = load_workflow(PACKING_GRAPH / "workflow.json")
     issues = validate_workflow(wf_def, skill_registry=load_skills(skills_root))
     errors = [i for i in issues if i.severity == "error"]
     assert not errors, [str(i) for i in errors]
 
 
-def test_packing_has_back_edge_and_loop_exit(packing_module):
-    d = packing_module.build_workflow().to_dict()
+def test_packing_has_back_edge_and_loop_exit():
+    d = json.loads((PACKING_GRAPH / "workflow.json").read_text())
 
     assert d["meta"]["name"] == "grocery_packing"
+    # The loop head re-localizes the basket each pass — there is no separate
+    # run-once container subgraph.
     assert set(d["subgraphs"]) == {
-        "container_sg", "perceive_next_sg", "grasp_sg", "transport_sg",
+        "perceive_next_sg", "grasp_sg", "transport_sg",
     }
 
     cond = d["conditional_edges"]
@@ -170,34 +167,39 @@ def test_packing_has_back_edge_and_loop_exit(packing_module):
     assert cond["transport"]["mapping"]["placed"] == "perceive_next"
 
     # The loop head exits on a marker name (found/none); the internal router
-    # gates the OBB fit behind "found".
+    # gates the item-OBB fit behind "found".
     ex = d["subgraphs"]["perceive_next_sg"]["exit"]
     assert set(ex["success_values"]) == {"found", "none"}
     decide = d["subgraphs"]["perceive_next_sg"]["conditional_edges"]["decide"]
-    assert decide["mapping"] == {"found": "filter_obb", "none": "none"}
+    assert decide["mapping"] == {"found": "filter_obb_item", "none": "none"}
 
-    # Cross-iteration dataflow: container_obb produced once, target_obb per loop.
-    assert "container_obb" in d["subgraphs"]["container_sg"]["outputs"]
+    # Per-iteration dataflow: the loop head produces BOTH ends of the pick
+    # (container_obb re-perceived alongside the next item), grasp consumes
+    # the item OBB, transport consumes the basket OBB.
     assert "target_obb" in d["subgraphs"]["perceive_next_sg"]["outputs"]
+    assert "container_obb" in d["subgraphs"]["perceive_next_sg"]["outputs"]
+    assert "target_obb" in d["subgraphs"]["grasp_sg"]["inputs"]
     assert "container_obb" in d["subgraphs"]["transport_sg"]["inputs"]
-    assert "target_obb" in d["subgraphs"]["transport_sg"]["inputs"]
+
+    # The abort end recovers to a safe state.
+    assert d["nodes"]["abort"]["recovery"][0]["tool"] == "robot.open_gripper"
 
 
-def test_packing_artifact_layout(packing_module, tmp_path):
-    skills_root = _skills_root()
-    wf = packing_module.build_workflow()
-    out = packing_module.write_graph(wf, tmp_path / "graph", skills_root)
+def test_packing_artifact_layout():
+    """The checked-in artifact is self-contained: every script node's file
+    ships next to the workflow, including the loop router."""
+    d = json.loads((PACKING_GRAPH / "workflow.json").read_text())
 
-    assert (out / "workflow.json").is_file()
-    for rel in packing_module.SCRIPT_SOURCES:
-        assert (out / rel).is_file(), rel
-    assert (out / "scripts" / "route_found.py").is_file()
-    for name in ("container_sg.py", "grasp_sg.py", "transport_sg.py"):
-        sidecar = (out / "checkpoints" / name).read_text()
-        assert "CHECKPOINTS" in sidecar
-    assert packing_module.TARGET_BODY in (
-        out / "checkpoints" / "transport_sg.py").read_text()
+    assert (PACKING_GRAPH / "workflow.json").is_file()
+    script_rels = {
+        node["script"]
+        for sg in d["subgraphs"].values()
+        for node in sg["nodes"].values()
+        if node.get("type") in ("script", "router")
+    }
+    assert "scripts/route_next_object.py" in script_rels
+    for rel in script_rels:
+        assert (PACKING_GRAPH / rel).is_file(), rel
 
-    # The backward edge survives serialization to JSON.
-    parsed = json.loads((out / "workflow.json").read_text())
-    assert parsed["conditional_edges"]["transport"]["mapping"]["placed"] == "perceive_next"
+    # The backward edge is present in the serialized JSON.
+    assert d["conditional_edges"]["transport"]["mapping"]["placed"] == "perceive_next"

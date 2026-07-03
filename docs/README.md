@@ -7,8 +7,17 @@ level — still linked from the repo README) and the **documentation website**
 
 ## Build
 
+The pinned Sphinx (9.x) needs **Python ≥ 3.12**, while the engine venv pins
+3.11 (`.python-version`) — build from a separate ≥3.12 environment, matching
+Read the Docs:
+
 ```bash
-pip install -r docs/requirements-docs.txt   # or: uv pip install -r ...
+# one-shot, no venv to manage (uv fetches 3.12 if needed):
+uv run --no-project --python 3.12 --with-requirements docs/requirements-docs.txt bash docs/build.sh
+
+# or with a persistent ≥3.12 environment of your own:
+#   python3.12 -m venv .venv-docs && .venv-docs/bin/pip install -r docs/requirements-docs.txt
+#   PATH=$PWD/.venv-docs/bin:$PATH ./docs/build.sh
 
 ./docs/build.sh                # one-shot build → docs/build/html (warnings are errors)
 ./docs/build.sh --watch 8000   # live-reload dev server

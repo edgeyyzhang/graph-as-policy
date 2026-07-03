@@ -191,9 +191,10 @@ def test_grocery_acceptance_yaml_is_suites_mode(skills_root) -> None:
         assert suite.num_workers == 1
     assert pc.suites[0].objects["expected_label"] == "Alphabet Soup"
     assert pc.suites[9].objects["target"] == "orange juice carton"
-    # llm block: vertex + gemini flash lite preview on the right project.
+    # llm block: vertex + gemini pro preview on the right project (the
+    # acceptance config switched to the pro model in ff9758f).
     assert pc.llm.provider == "vertex"
-    assert pc.llm.model == "gemini-3.1-flash-lite-preview"
+    assert pc.llm.model == "gemini-3.1-pro-preview"
     assert pc.llm.project_id == "bc-y7-06"
 
 
