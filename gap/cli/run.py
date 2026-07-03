@@ -150,9 +150,19 @@ def _handle(args: argparse.Namespace) -> int:
     elif args.trace_dir:
         trace_dir = args.trace_dir
     else:
-        trace_dir = str(
-            Path("outputs") / f"run_{time.strftime('%Y%m%d_%H%M%S')}"
-        )
+        # Claim the directory atomically: the timestamp alone collides when
+        # two runs launch in the same second (observed — their node_data
+        # and videos interleaved silently).
+        base = Path("outputs") / f"run_{time.strftime('%Y%m%d_%H%M%S')}"
+        candidate, n = base, 1
+        while True:
+            try:
+                candidate.mkdir(parents=True, exist_ok=False)
+                break
+            except FileExistsError:
+                n += 1
+                candidate = base.with_name(f"{base.name}_{n}")
+        trace_dir = str(candidate)
 
     if args.sim and args.real:
         raise SystemExit("--sim and --real are mutually exclusive")
