@@ -313,6 +313,17 @@ must not collide with a node name (S9) and must not be a conditional-edge
 exception crashes the whole workflow. The resolved exit must land in
 `success_values ∪ {on_error}` or the run raises `PipelineError`.
 
+**Ordering of `$ref` producers (S12).** The executor is a frontier scheduler
+with no join barrier: a node is enqueued as soon as *any* in-edge source
+completes. A node that consumes `Ref("P.*")` is therefore only valid when `P`
+is an ancestor of every other node whose completion can enqueue the consumer —
+wire the producer on the same path (a chain), not on a parallel branch that
+joins at the consumer. A parallel "diamond" (e.g. `observe → perceive_item`
+racing `observe → … → filter_obb` into a shared `decide`) fails validation
+with S12; at runtime it would intermittently resolve the `$ref` before the
+producer ran. Streaming producers are exempt (consumers read their latest
+published snapshot).
+
 ## Outputs
 
 `set_outputs(**bindings)` binds named subgraph outputs to internal node
@@ -422,7 +433,7 @@ not data bindings — the dataflow is established later by name matching.
 
 - `Workflow.save(path, validate=True)` — serialize to JSON; parse with the
   strict runtime parser and run the structural validator (rules W1–W8 and
-  S1–S11) first, raising `GraphValidationError` on any error-severity issue.
+  S1–S12) first, raising `GraphValidationError` on any error-severity issue.
   Pass `validate=False` to skip checks (e.g. when serializing an
   intentionally partial graph).
 - `Workflow.load(path)` — strict-parse an existing `workflow.json` into a
@@ -430,7 +441,7 @@ not data bindings — the dataflow is established later by name matching.
   for any valid `workflow.json`, so load–edit–save is a safe way to patch
   generated graphs.
 - `Subgraph.save(path)` / `Subgraph.load(path_or_dict)` — standalone
-  subgraph JSON with a wrapping `"name"` field. Saving runs S1–S11 by
+  subgraph JSON with a wrapping `"name"` field. Saving runs S1–S12 by
   embedding the subgraph in a stub workflow. This wrapped form is
   *non-canonical*: the executor only consumes subgraphs inside a workflow's
   `subgraphs` map. Use it to hand a subgraph between processes, not as a

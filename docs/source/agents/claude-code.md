@@ -106,7 +106,7 @@ exist in the live CLI parser:
 - **Generating graphs from language** — `gap generate` and
   `gap.agent.generate_sync`, including that richer registries give better
   graphs ([Generation](../authoring/generation.md)).
-- **Hand-authoring** — the `gap.builder` API and the validator's W1–W8 / S1–S11
+- **Hand-authoring** — the `gap.builder` API and the validator's W1–W8 / S1–S12
   rule codes, iterating against `gap run <dir> --validate-only`
   ([Builder](../authoring/builder.md)).
 - **Authoring skill bundles** — the five-step recipe from

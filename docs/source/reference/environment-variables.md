@@ -147,6 +147,7 @@ declares its requirements, surfaced by `gap check`. See the
 | `GAP_MOLMO_MODEL` | string; default `allenai/Molmo2-8B` | Model name served at `GAP_MOLMO_BASE_URL`. |
 | `GAP_PERCEPTION_CACHE` | `1` (default) or `0` | Disk cache for the `perceiving-objects` skill: a hit on identical camera frames + args short-circuits the whole DINO + VLM + SAM pipeline. Set `0` to disable. |
 | `GAP_PERCEPTION_CACHE_DIR` | path; default: `<skills checkout>/.llm_cache/perceiving-objects` | Where that cache lives — per-checkout by default, easy to wipe. |
+| `GAP_DECIDE_TRUST_ENV` | `1`/`true`/`yes`; default: unset | `perceiving-next-item`'s loop router: trust the simulator's `task_completed` as an immediate loop exit. Off by default — the loop terminates on its unprivileged VLM completion check + no-progress guard; opt in on benchmarks where the env's task *is* the instruction to skip the final verification pass. |
 
 ## Miscellaneous
 

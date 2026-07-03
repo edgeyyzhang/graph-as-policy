@@ -232,7 +232,7 @@ emits both the skill declaration and its scripts as part of codegen, all in the 
 The runtime synthesises a transient `SkillInfo` (a minimal `SkillMeta` carrying the agent-declared
 contract) so the rest of the pipeline can treat the invented skill uniformly: structural
 validation still runs in full (the input/output contract, `exit_success_values` / `on_error`
-consistency, the subgraph S1-S11 rules, and `allowed_tools` against the flat tool catalog), and
+consistency, the subgraph S1-S12 rules, and `allowed_tools` against the flat tool catalog), and
 validation errors flow back to the authoring agent in the same self-repair feedback loop used for
 registered-skill subgraphs.
 

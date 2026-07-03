@@ -60,8 +60,8 @@ basket every pass. `GAP_ITERATION_CAP` bounds runaway loops. See
     product such as a can, box, carton, jar, or bottle; never the wicker basket
     or storage container"* — so the VLM pairwise tournament prefers a real item
     over the basket whenever one is on the table.
-  - `decide` (`route_next_object.py`) is the loop's stop signal, and it is
-    **driven by the benchmark, not geometry** (see below).
+  - `decide` (`route_next_object.py`) is the loop's stop signal — a per-pass
+    **VLM completion check**, not a privileged simulator verdict (see below).
 
 - **grasp_sg** — `open → top_down_grasp_candidates → grasp_move → observe →
   close`. `grasp_move.py` is the **VAB approach recipe**: rise to a hover height
@@ -75,21 +75,31 @@ basket every pass. `GAP_ITERATION_CAP` bounds runaway loops. See
   descend *into* the basket; `place_release.py` opens the gripper and retracts
   linearly.
 
-## Termination — the benchmark's own completion signal
+## Termination — unprivileged, VLM-verified
 
-The VAB packing env teleports each delivered item to a graveyard and flips
-`task_completed` once everything is packed. `route_next_object.py` reads that
-directly via the `sim.check_success` tool:
+`route_next_object.py` needs no privileged simulator signal — the same policy
+runs unchanged on a real robot. Signals are layered:
 
-1. `sim.check_success().task_completed` is True → **`none` → done (success)** —
-   authoritative, no false-rejects, so the loop never spins on the basket after
-   the table is clear and never stops early while items remain.
-2. otherwise route on perception: an item was returned → `found` (grasp it);
+1. **VLM completion check (primary).** Every pass, the exterior frame goes to
+   the VLM: *"have ALL the grocery items been placed inside the basket?"* A
+   confident YES → **`none` → done (success)**. The check only ever forces a
+   STOP — a NO (or an unavailable VLM) never forces the loop to continue, so
+   the guards below still guarantee termination.
+2. **Env verdict (secondary, sim-only backstop).** `sim.check_success` is
+   polled; `task_completed` reads the success the env cached in its own
+   `step()` — it never re-evaluates the stateful `pack_all_into` predicate
+   (which teleports delivered objects on each evaluation). Wrapped so a
+   non-sim connector falls through cleanly.
+3. **No-progress guard.** Re-perceiving the *same* target (cloud centroid
+   within 3 cm) three passes in a row means the last grasp+transport cycle
+   changed nothing (a delivery removes its item) → `none`. A 30-pass budget
+   backstops pathological alternation. Guard state is keyed per trace dir so
+   benchmark workers never leak one trial's state into the next.
+4. **Perception.** Otherwise: an item was returned → `found` (grasp it);
    nothing → `none`.
 
-The `sim.check_success` call is wrapped so a non-sim connector (real robot)
-falls back to perception cleanly. `none` is a normal exit (not `on_error`), so
-finishing never looks like a failure.
+`none` is a normal exit (not `on_error`), so finishing never looks like a
+failure.
 
 ## The packing benchmark (teleport-on-delivery)
 
@@ -125,6 +135,33 @@ On the default `seed=3` arrangement this delivers all six items
 delivery. As with the other CuRobo examples, the first run of a session
 pays one-time costs (cold vision-model loads + CuRobo's CUDA-kernel JIT,
 ~40 s) before per-iteration timing settles.
+
+## Generate it yourself
+
+The static graph above is also what `gap generate` produces from the task
+sentence — the `perceiving-next-item` / `grasping-with-planner` /
+`transporting-objects` skills carry the same tuned recipes as this example's
+scripts, so the generated loop matches this one in structure *and* score:
+
+```bash
+# LLM codegen (needs an LLM credential; Vertex shown — OpenRouter also works):
+export GAP_LLM_PROVIDER=vertex GAP_LLM_MODEL=gemini-3.1-pro-preview \
+       GOOGLE_CLOUD_PROJECT=<your-project>       # + `gcloud auth application-default login`
+uv run gap generate "Pick all the objects and place them in the basket" \
+    --provider vertex --model gemini-3.1-pro-preview
+
+# Run the generated graph on the same suite:
+MUJOCO_GL=egl uv run gap run outputs/generated_<timestamp>/task_00 \
+    --sim libero_object_packing/0
+```
+**Benchmarking note:** `gap benchmark` applies per-trial safety guards sized
+for a *single* pick (`max_perception_calls: 50` etc.). A six-item pack-all
+loop does ~6× the work — raise them in the benchmark YAML or the workers kill
+mid-loop episodes:
+
+```yaml
+safety_limits: {max_perception_calls: 400, max_planning_calls: 200, max_sim_steps: 40000}
+```
 
 ## Where to go next
 
