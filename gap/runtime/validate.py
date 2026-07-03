@@ -734,6 +734,17 @@ def _check_subgraph_level(
                     f"field-strings and must not be node names (S11)",
                 ))
 
+    # S12: unordered $ref race. The executor is a frontier scheduler with
+    # NO join barrier: a node is enqueued as soon as ANY in-edge source
+    # completes. So a node that consumes ``Ref("P.*")`` is only safe when
+    # P is guaranteed to have completed first — i.e. P must be an ancestor
+    # of EVERY other source that can enqueue the node. A "diamond" join
+    # (decide with in-edges from a slow container branch AND a parallel
+    # item branch) races: the fast branch enqueues the node before the
+    # other branch's producer ran, and ref resolution fails at runtime
+    # with "unknown node in current scope".
+    issues.extend(_check_ref_ordering(sg_name, sg))
+
     # Agent-registry exit-condition match (codegen-time only).
     # The catalog declares exit_conditions covering both success and failure;
     # we must reconcile against (success_values ∪ {on_error}).
@@ -790,6 +801,104 @@ def _check_subgraph_level(
                     f"{loc}.nodes.{node_name}.inputs.{in_name}",
                     f"$ref {value.path!r}: unknown node {head!r} (S5)",
                 ))
+
+    return issues
+
+
+def _check_ref_ordering(sg_name: str, sg: SubgraphDef) -> list[ValidationIssue]:
+    """S12: every intra-subgraph ``$ref`` producer must be sequenced before
+    the consumer under the frontier scheduler's semantics.
+
+    The executor enqueues a node as soon as ANY in-edge source completes
+    (there is no join barrier). A consumer of ``Ref("P.*")`` is therefore
+    only safe when P is an ancestor of every *other* node whose completion
+    can enqueue the consumer — otherwise the consumer can run before P and
+    ref resolution fails at runtime ("unknown node in current scope").
+    Canonical skill subgraphs sequence producers in a single chain, which
+    trivially satisfies this; the racy shape is a parallel "diamond"
+    feeding a join node.
+    """
+    issues: list[ValidationIssue] = []
+    loc = f"subgraphs.{sg_name}"
+
+    # Union sequencing graph: static edges + conditional-mapping edges (a
+    # taken conditional edge orders src before tgt exactly like a static
+    # edge). START/END are structural, not producers.
+    succ: dict[str, set[str]] = {}
+    def _add(src: str, dst: str) -> None:
+        if src != START and dst != END:
+            succ.setdefault(src, set()).add(dst)
+    for src, dst in sg.edges:
+        _add(src, dst)
+    for src, ce in sg.conditional_edges.items():
+        for tgt in ce.mapping.values():
+            _add(src, tgt)
+
+    rev: dict[str, set[str]] = {}
+    for s, ds in succ.items():
+        for d in ds:
+            rev.setdefault(d, set()).add(s)
+
+    def _ancestors(target: str) -> set[str]:
+        seen = {target}
+        stack = [target]
+        while stack:
+            for p in rev.get(stack.pop(), ()):
+                if p not in seen:
+                    seen.add(p)
+                    stack.append(p)
+        seen.discard(target)
+        return seen
+
+    ancestors_cache: dict[str, set[str]] = {}
+    def _anc(n: str) -> set[str]:
+        if n not in ancestors_cache:
+            ancestors_cache[n] = _ancestors(n)
+        return ancestors_cache[n]
+
+    for node_name, node in sg.nodes.items():
+        producers = set()
+        for value in node.inputs.values():
+            if isinstance(value, Ref):
+                parts = value.parts()
+                head = parts[0] if parts else ""
+                # Streaming producers are exempt: they are spawned eagerly
+                # at scope entry and consumers read the latest published
+                # snapshot (blocking until the first publish), so no
+                # ordering edge is required.
+                if (
+                    head in sg.nodes
+                    and head != node_name
+                    and not sg.nodes[head].streaming
+                ):
+                    producers.add(head)
+        if not producers:
+            continue
+        sources = rev.get(node_name, set())
+        if not sources:
+            # Only enqueued from START — no producer can have run yet.
+            for p in sorted(producers):
+                issues.append(_issue(
+                    "error", f"{loc}.nodes.{node_name}",
+                    f"node consumes $ref from {p!r} but is a START-entry "
+                    f"node — {p!r} cannot have run before it (S12)",
+                ))
+            continue
+        for p in sorted(producers):
+            unordered = sorted(
+                q for q in sources if q != p and p not in _anc(q) and p != q
+            )
+            if unordered:
+                issues.append(_issue(
+                    "error", f"{loc}.nodes.{node_name}",
+                    f"node consumes $ref from {p!r} but can be scheduled by "
+                    f"the completion of {unordered!r} before {p!r} has run — "
+                    f"the executor has no join barrier, so parallel branches "
+                    f"joining at a $ref consumer race. Sequence {p!r} on the "
+                    f"same path as the other predecessor(s) (chain them, as "
+                    f"the skill's canonical subgraph does) (S12)",
+                ))
+
 
     return issues
 
