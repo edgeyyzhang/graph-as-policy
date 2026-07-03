@@ -71,8 +71,8 @@ LIBERO-PosVar study versus a one-shot set-of-marks pick.
 Multi-camera rigs get a verified **wrist-fallback gate**: identification
 defaults to the exterior view, and the wrist view is consulted only when
 the exterior pick fails its own close-up verify while the wrist pick
-passes — the only zero-regression policy on the 4-suite regression study
-(+2.5% net, 94.5% → 97.0%, 0/189 frames regressed). Wrist clouds still
+passes — the only policy that improved identification without regressing
+any frame in the 4-suite regression study. Wrist clouds still
 fuse into the
 output geometry, so the OBB recovers the faces a single front view
 misses.

@@ -16,7 +16,7 @@ here, not hidden — and is planned to return after v1.
 - Verification against simulator ground truth via LLM-authored checkpoints
   ([Checkpoints](../running/checkpoints.md)).
 - A release gate that holds the line: the grocery-fulfillment acceptance
-  benchmark must clear **≥90% success** before any release
+  benchmark must clear its configured `gate_threshold` before any release
   ([Benchmarking](../benchmarks/benchmarking.md)).
 - Geometric grasping: oriented-bounding-box top-down candidates executed
   via CuRobo planning or direct IK.

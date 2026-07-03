@@ -32,7 +32,7 @@ MUJOCO_GL=egl uv run gap benchmark examples/benchmark/smoke.yaml
 | [smoke.yaml](gh-engine:examples/benchmark/smoke.yaml) | 1 family × 1 variation × 1 mode × 1 task × 1 seed sanity check |
 | [posvar.yaml](gh-engine:examples/benchmark/posvar.yaml) | the LIBERO-PosVar variation × mode ablation grid |
 | [grocery_acceptance_smoke.yaml](gh-engine:examples/benchmark/grocery_acceptance_smoke.yaml) | the gate's 20-trial smoke (tasks 0–1 × 10 trials) |
-| [grocery_acceptance.yaml](gh-engine:examples/benchmark/grocery_acceptance.yaml) | **the release gate**: 10 tasks × 50 trials, ≥90% success |
+| [grocery_acceptance.yaml](gh-engine:examples/benchmark/grocery_acceptance.yaml) | **the release gate**: the full acceptance grid, gated by the config's `gate_threshold` |
 
 ## Two config shapes
 

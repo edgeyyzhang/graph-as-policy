@@ -1,8 +1,9 @@
 # grocery_packing — pack EVERY object into the basket with a loop
 
 > **What:** a pick-and-place graph with a real **backward edge** — loop until
-> every grocery item is in the basket · **Artifact:** a static `workflow.json`
-> (v3) you run directly.
+> every grocery item is in the basket · **Needs:** `uv sync` + `gap skills
+> install --all` (CUDA) + GPU + LLM key · **Time:** ~min/item · **Artifact:**
+> a static `workflow.json` (v3) you run directly.
 
 Where [build_a_graph](../build_a_graph/) picks one described object, this
 example **loops**: perceive the next object on the table, grasp it with the
@@ -130,18 +131,18 @@ sibling checkout); pass `--skills /path/to/open-robot-skills` to override. The
 VLM provider/model come from `GAP_VLM_PROVIDER` / `GAP_VLM_MODEL` (+ the
 provider's credentials).
 
-On the default `seed=3` arrangement this delivers all six items
-(`completion_rate = 1.0`) and exits cleanly the iteration after the last
-delivery. As with the other CuRobo examples, the first run of a session
-pays one-time costs (cold vision-model loads + CuRobo's CUDA-kernel JIT,
-~40 s) before per-iteration timing settles.
+On the default arrangement the loop delivers the items one per pass and
+exits cleanly the iteration after the last delivery. As with the other
+CuRobo examples, the first run of a session pays one-time costs (cold
+vision-model loads + CuRobo's CUDA-kernel JIT, ~40 s) before per-iteration
+timing settles.
 
 ## Generate it yourself
 
 The static graph above is also what `gap generate` produces from the task
 sentence — the `perceiving-next-item` / `grasping-with-planner` /
 `transporting-objects` skills carry the same tuned recipes as this example's
-scripts, so the generated loop matches this one in structure *and* score:
+scripts, so the generated loop matches this one in structure and behavior:
 
 ```bash
 # LLM codegen (needs an LLM credential; Vertex shown — OpenRouter also works):

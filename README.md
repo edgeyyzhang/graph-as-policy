@@ -2,7 +2,7 @@
 
 # Graph-as-Policy
 <h3 align="center">
-  <strong>🟠 INTERNAL TEST VERSION</strong> | <em>Alpha</em> | June 22, 2026
+  <strong>🧪 BETA CODE RELEASE</strong> | <em>Beta</em> | July 1, 2026
 </h3>
 
 
@@ -91,6 +91,7 @@ for the full walkthrough (clone → run → generate → trace).
 | Example | What it shows |
 |---|---|
 | [libero_quickstart](examples/libero_quickstart/) | Hero: vision → OBB grasp → transport, ground-truth verified |
+| [grocery_packing](examples/grocery_packing/) | Pack every item with a loop: a graph with a real backward edge |
 | [generate_a_graph](examples/generate_a_graph/) | Instruction → validated workflow dir; all LLM providers |
 | [build_a_graph](examples/build_a_graph/) | Full Python authoring with `gap.builder`: checkpoints, recovery |
 | [agent_quickstart](examples/agent_quickstart/) | Claude Code + one skill: sentence → graph → sim success |
@@ -101,8 +102,8 @@ for the full walkthrough (clone → run → generate → trace).
 | [cable_ur](examples/cable_ur/) | Real UR + ZED perception (motion-disabled) |
 | [real_franka_pick_place](examples/real_franka_pick_place/) | Real Franka pick-place via robots_realtime |
 
-Full gallery with measured results, time estimates, and per-example
-media in **[examples/README.md](examples/README.md)**. Real-robot examples
+Full gallery with install needs and time estimates in
+**[examples/README.md](examples/README.md)**. Real-robot examples
 — read [docs/safety.md](docs/safety.md) first.
 
 ## Documentation

@@ -1,6 +1,6 @@
 # libero_quickstart — pick the soup can into the basket
 
-> **What:** The end-to-end hero: real vision → OBB grasp → transport, ground-truth verified · **Needs:** `quickstart` + GPU + LLM key · **Time:** ~25–55 s/trial · **Measured:** 9/10 grasp · 7/10 task (10 seeds)
+> **What:** The end-to-end hero: real vision → OBB grasp → transport, ground-truth verified · **Needs:** `quickstart` + GPU + LLM key · **Time:** ~25–55 s/trial
 
 The end-to-end quickstart for GaP: a static, fully-authored workflow graph
 that perceives a target object and a container with real vision models
@@ -51,38 +51,22 @@ committed `uv.lock`. Model weights (`facebook/sam3`,
 `IDEA-Research/grounding-dino-base`) download from HuggingFace on first
 call. (pip equivalent: see the [main README](../../README.md#installation-details).)
 
-## Results (measured live)
+## What can go wrong
 
-10 trials, seeds 1-10, LIBERO `libero_object_all_variance/0`
-("pick up the alphabet soup and place it in the basket"), Gemini
-`gemini-3.1-flash-lite-preview` as the VLM, A100 GPU:
+When a trial fails, the trace almost always points at perception, not the
+grasp mechanics:
 
-| Seed | Grasp (`target_held`) | Task success | Failure mode |
-|---|---|---|---|
-| 1 | pass | **yes** | — |
-| 2 | fail | no | target perception mis-ID (grasped at a wrong-object location) |
-| 3 | pass | no | container perception (degenerate basket OBB) → place miss |
-| 4 | pass | **yes** | — |
-| 5 | pass | **yes** | — |
-| 6 | pass | **yes** | — |
-| 7 | pass | **yes** | — |
-| 8 | pass | **yes** | — |
-| 9 | pass | no | container perception (oversized basket OBB) → place miss |
-| 10 | pass | **yes** | — |
+- **Target mis-identification** — the DINO + VLM disambiguation picks the
+  wrong detection, so the grasp executes cleanly at a wrong-object
+  location. Shows up as a `target_held` checkpoint failure.
+- **Container perception** — a degenerate or oversized basket OBB shifts
+  the drop pose, so a held object is placed next to (or on the rim of) the
+  basket. The planner variant shares the same perception subgraphs, so
+  CuRobo does not recover these.
 
-- **Grasp success: 9/10 (90%)** — the single grasp failure was a target
-  mis-identification upstream, not a grasp-mechanics failure; every
-  correctly-perceived target was grasped.
-- **End-to-end task success: 7/10 (70%)** — both place misses trace to
-  basket-perception errors, which the planner variant shares (same
-  perception subgraphs), so CuRobo would not have recovered them.
-- Wall-clock ~25-55 s per trial on one A100 (models stay resident across
-  trials in one process; the **first** trial of a session pays the cold
-  model loads and can take a few minutes end-to-end).
-
-Per the release plan's decision rule (adopt the planner variant as the
-default if direct-IK grasp success < 80%), direct-IK at 90% stays the
-quickstart default.
+Wall-clock is ~25–55 s per trial on one A100 (models stay resident across
+trials in one process; the **first** trial of a session pays the cold
+model loads and can take a few minutes end-to-end).
 
 ## VLM provider
 

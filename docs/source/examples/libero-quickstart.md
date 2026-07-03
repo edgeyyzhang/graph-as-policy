@@ -177,38 +177,22 @@ The full variable list is in
 setup for graph *generation* (a separate LLM call path) is covered in
 [LLM providers](../authoring/llm-providers.md).
 
-## Measured results
+## What can go wrong
 
-10 trials, seeds 1–10, LIBERO `libero_object_all_variance/0` ("pick up the
-alphabet soup and place it in the basket"), Gemini
-`gemini-3.1-flash-lite-preview` as the VLM, one A100 GPU:
+When a trial fails, the trace almost always points at perception, not the
+grasp mechanics:
 
-| Seed | Grasp (`target_held`) | Task success | Failure mode |
-|---|---|---|---|
-| 1 | pass | **yes** | — |
-| 2 | fail | no | target perception mis-ID (grasped at a wrong-object location) |
-| 3 | pass | no | container perception (degenerate basket OBB) → place miss |
-| 4 | pass | **yes** | — |
-| 5 | pass | **yes** | — |
-| 6 | pass | **yes** | — |
-| 7 | pass | **yes** | — |
-| 8 | pass | **yes** | — |
-| 9 | pass | no | container perception (oversized basket OBB) → place miss |
-| 10 | pass | **yes** | — |
+- **Target mis-identification** — the DINO + VLM disambiguation picks the
+  wrong detection, so the grasp executes cleanly at a wrong-object
+  location. Shows up as a `target_held` checkpoint failure.
+- **Container perception** — a degenerate or oversized basket OBB shifts
+  the drop pose, so a held object is placed next to (or on the rim of) the
+  basket. The planner variant shares the same perception subgraphs, so
+  CuRobo does not recover these.
 
-- **Grasp success: 9/10 (90%)** — the single grasp failure was a target
-  mis-identification upstream, not a grasp-mechanics failure; every
-  correctly-perceived target was grasped.
-- **End-to-end task success: 7/10 (70%)** — both place misses trace to
-  basket-perception errors, which the planner variant shares (same
-  perception subgraphs), so CuRobo would not have recovered them.
-- Wall-clock ~25–55 s per trial on one A100. Models stay resident across
-  trials within one process, so the first trial pays the cold model loads
-  and can take a few minutes end-to-end.
-
-Per the release plan's decision rule (adopt the planner variant as the
-default if direct-IK grasp success < 80%), direct-IK at 90% stays the
-quickstart default.
+Wall-clock is ~25–55 s per trial on one A100. Models stay resident across
+trials within one process, so the first trial pays the cold model loads
+and can take a few minutes end-to-end.
 
 ### Seed semantics
 

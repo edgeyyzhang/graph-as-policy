@@ -182,7 +182,7 @@ Generating one graph is the unit; the benchmark harness drives the same
 pipeline over task × seed grids. See
 [grocery_fulfillment](grocery-fulfillment.md) for the flagship recipe —
 `gap generate` on grocery instructions under pose / permutation /
-basket-swap variations, gated at ≥90% success over 500 trials — and
+basket-swap variations, gated by the config's `gate_threshold` — and
 [Benchmarking](../benchmarks/benchmarking.md) for the harness. A single
 green run is not a success-rate claim: gate it with
 `gap benchmark <yaml> --gate`.

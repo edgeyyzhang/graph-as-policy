@@ -1,6 +1,6 @@
 # benchmark — configs for `gap benchmark`
 
-> **What:** Grid harness configs: 1-cell smoke → posvar grid → the release gate · **Needs:** `grocery` (CUDA) + LLM key · **Time:** minutes → hours · **Measured:** release gate requires ≥90% (10 tasks × 50 trials)
+> **What:** Grid harness configs: 1-cell smoke → posvar grid → the release gate · **Needs:** `grocery` (CUDA) + LLM key · **Time:** minutes → hours
 
 Benchmark configs from a 1-cell smoke to the release acceptance gate. The
 harness expands a config into a grid of cells (`modes × families ×
@@ -21,7 +21,7 @@ MUJOCO_GL=egl uv run gap benchmark examples/benchmark/smoke.yaml
 | [smoke.yaml](smoke.yaml) | 1 task × 1 seed sanity check (~minutes) |
 | [posvar.yaml](posvar.yaml) | grid over the posvar variation families |
 | [grocery_acceptance_smoke.yaml](grocery_acceptance_smoke.yaml) | the gate's 20-trial smoke (tasks 0–1) |
-| [grocery_acceptance.yaml](grocery_acceptance.yaml) | **the release gate**: 10 tasks × 50 trials, ≥90% success |
+| [grocery_acceptance.yaml](grocery_acceptance.yaml) | **the release gate**: the full acceptance grid, gated by the config's `gate_threshold` |
 
 ## Gate semantics
 
@@ -32,7 +32,7 @@ MUJOCO_GL=egl uv run gap benchmark examples/benchmark/grocery_acceptance.yaml --
 - `--gate` exits non-zero when `success_rate` lands below the config's
   `gate_threshold` — wire it into CI or a release checklist as-is.
 - `--resume` skips cells whose results already exist in `output_dir` and
-  rebuilds the summary — a 500-trial run survives interruptions.
+  rebuilds the summary — a long acceptance run survives interruptions.
 - Cells run in parallel worker processes; spread EGL rendering across GPUs
   with `GAP_MUJOCO_EGL_DEVICES=0,1,2` and cap workers in the config.
 

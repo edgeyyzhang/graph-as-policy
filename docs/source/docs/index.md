@@ -48,8 +48,9 @@ vary in geometry and pose), not just solve once. Model-free policies struggle to
 close this **reliability gap**. GaP is a multi-agent coding harness that turns a
 natural-language task into a **directed computation graph of modular skills**
 (MORSL), self-improves it through simulation rehearsal, and ships it to an edge
-device for persistent execution — **outperforming VLA, TAMP, and single-agent
-code-as-policy baselines across 8 Variational Automation benchmarks**.
+device for persistent execution — evaluated across **8 Variational Automation
+benchmarks (4 sim + 4 real)**; results are on the
+[project page](https://graph-robots.github.io/graph-as-policy-anonymous/).
 
 **Highlights**
 
@@ -69,10 +70,10 @@ code-as-policy baselines across 8 Variational Automation benchmarks**.
   sampled task instances, uses physical contact and state feedback to localize
   failures to specific nodes, and iteratively refines graph topology and
   parameters before deployment.
-- On **8 new open VA benchmarks (4 sim + 4 real)**, GaP significantly
-  outperforms VLA (π₀.₅, MolmoAct2), TAMP (TipTop), and single-agent
-  code-as-policy (CaP-X) baselines, and approaches expert hand-engineered
-  performance.
+- GaP is evaluated on **8 new open VA benchmarks (4 sim + 4 real)** against
+  VLA, TAMP, and single-agent code-as-policy baselines — see the
+  [project page](https://graph-robots.github.io/graph-as-policy-anonymous/)
+  for the results.
 
 ## What is Variational Automation — and why GaP is different
 
@@ -104,28 +105,24 @@ on top, preserving an interpretable policy that stays reliable across a VA
 task's many instances.
 :::
 
-## How GaP compares
+## The grocery benchmark family, runnable here
 
-**Benchmarks I-a & II-a — Grocery Orders & Packing (simulation).** Success rate
-over 5,500 trials, 100 task instances per cell. LIBERO / LIBERO-Pro have
-negligible / small pose variation; the VA columns add larger variation. Best per
-column in **bold**; rows 5–6 stage the wrist camera with GaP, then hand off to a
-VLA policy.
+The two simulation benchmarks from the paper's grocery family ship in this
+repo as runnable examples — the same graphs, suites, and configs:
 
-| Method | LIBERO | LIBERO-Pro | X-Y 20×20 | basket_swap | permutation | mixed_all | Pack fixed | Pack varied |
-|---|---|---|---|---|---|---|---|---|
-| CaP-X | — | 0.22 | 0.07 | 0.05 | 0.11 | 0.10 | 0.01 | 0.01 |
-| π₀.₅ | 0.96 | 0.24 | 0.78 | 0.15 | 0.20 | 0.20 | 0.17 | 0.18 |
-| MolmoAct2 | **0.97** | 0.43 | 0.90 | 0.26 | 0.10 | 0.20 | 0.18 | 0.18 |
-| TipTop | 0.22 | 0.22 | 0.29 | 0.24 | 0.31 | 0.24 | 0.34 | 0.46 |
-| π₀.₅ w/ GaP | 0.85 | 0.60 | 0.79 | 0.32 | 0.50 | 0.39 | 0.67 | 0.66 |
-| MolmoAct2 w/ GaP | 0.70 | 0.62 | 0.84 | 0.58 | 0.39 | 0.66 | 0.59 | 0.59 |
-| **GaP** | 0.95 | **0.95** | **0.95** | **0.97** | **0.93** | **0.97** | **0.99** | **0.98** |
+- **[Grocery Fulfillment](../examples/grocery-fulfillment.md)** — pick a
+  *described* grocery item into the basket under pose / permutation /
+  basket-swap variations; every graph is LLM-generated per task, and the
+  full config is the release gate.
+- **[Grocery Packing](../examples/grocery-packing.md)** — pack *every*
+  item with a loop: a static graph with a real backward edge and
+  unprivileged VLM termination, plus the `gap generate` recipe that
+  reproduces it from one sentence.
 
-Across larger pose / geometry variation, GaP holds **0.93–0.99** where VLA and
-code-as-policy baselines drop as low as 0.01–0.20. Real-robot, cable-insertion,
-and bimanual results are on the [examples & benchmarks](../examples/index.md)
-pages.
+Quantitative comparisons against VLA, TAMP, and code-as-policy baselines
+live on the
+[project page](https://graph-robots.github.io/graph-as-policy-anonymous/);
+this documentation stays with what you can run and inspect.
 
 ## What you need to try GaP
 
@@ -184,7 +181,7 @@ Zero to a verified rollout on LIBERO, with the recorded trace open.
 :::{grid-item-card} 🧪 Examples
 :link: ../examples/index
 :link-type: doc
-Ten examples, from the end-to-end quickstart to the release gate and real robots.
+Eleven examples, from the end-to-end quickstart to the release gate and real robots.
 :::
 
 :::{grid-item-card} 🧩 Skill catalog

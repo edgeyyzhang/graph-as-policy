@@ -220,9 +220,10 @@ changes to it require a migration note — see
 v1 was defined by four acceptance gates, and the first remains the
 regression bar for every release:
 
-- **G1 — Grocery fulfillment ≥90%.** `gap benchmark` in `llm_generation`
-  mode on the grocery-fulfillment suites must clear ≥90% success, with
-  CuRobo motion planning and the grasping/transport skills in the prompt.
+- **G1 — Grocery fulfillment gate.** `gap benchmark` in `llm_generation`
+  mode on the grocery-fulfillment suites must clear the config's
+  `gate_threshold`, with CuRobo motion planning and the
+  grasping/transport skills in the prompt.
   The pinned config is
   [examples/benchmark/grocery_acceptance.yaml](gh-engine:examples/benchmark/grocery_acceptance.yaml);
   `gap benchmark --gate` exits non-zero below threshold.

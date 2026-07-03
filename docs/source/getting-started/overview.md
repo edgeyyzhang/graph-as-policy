@@ -1,6 +1,6 @@
 # Overview
 
-**The policy is the graph.** GaP compiles a natural-language task into a
+**The graph is the policy.** GaP compiles a natural-language task into a
 typed, verified execution graph of robot skills — and runs the graph, not a
 black-box policy, on simulators and real robots.
 
@@ -147,10 +147,8 @@ plain numpy arrays and TypedDicts. A deeper tour of the packages is in
   `dag_trace.json`, and per-node I/O and assets; `gap viz` browses them and
   `gap trace-diff` compares them. See [Traces](../running/traces.md).
 - **Benchmarked with a gate.** A grid harness (modes × families × seeds)
-  with `--gate`: the grocery-fulfillment acceptance config must clear
-  **≥90% success** for a release. Measured results so far (per-seed tables
-  in the repo READMEs): 9/10 grasp and 7/10 end-to-end on the 10-trial
-  quickstart, 10/10 on the grocery-fulfillment development gate. See
+  with `--gate`: the grocery-fulfillment acceptance config must clear its
+  configured `gate_threshold` for a release. See
   [Benchmarking](../benchmarks/benchmarking.md).
 
 ## Scope of v1

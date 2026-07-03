@@ -111,6 +111,8 @@ override.
 - [generate_a_graph](../generate_a_graph/) — let the LLM pipeline author
   this same artifact from a one-line instruction.
 - [libero_quickstart](../libero_quickstart/) — the hand-tuned checked-in
-  variant of this graph, with measured success rates.
+  variant of this graph, run end-to-end against sim ground truth.
+- [grocery_packing](../grocery_packing/) — the looped version: the same
+  perceive → grasp → transport, repeated until every item is packed.
 - `docs/runtime.md` — the JSON schema and executor semantics the builder
   targets.

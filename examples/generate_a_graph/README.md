@@ -117,7 +117,7 @@ Or in Python: `gap.execute(graph.path, gap.connector.sim("libero", task=...))`.
 | Provider | Setup |
 |---|---|
 | `openrouter` (default) | `export OPENROUTER_API_KEY=...`; default model `gemini-3.1-flash-lite-preview` (override with `--model gemini-3.1-pro-preview` or `GAP_LLM_MODEL`). Point at any other OpenAI-compatible server (e.g. local vLLM) via a `--config` YAML with `llm: {provider: openrouter, endpoint: ...}` |
-| `vertex` | `gcloud auth application-default login`, `export GOOGLE_CLOUD_PROJECT=...` (`GOOGLE_CLOUD_REGION` optional, default `global`); pick per call (`--provider vertex --model <m>` — no provider default) or once per shell (`export GAP_LLM_PROVIDER=vertex GAP_LLM_MODEL=<m>`), and include the SDK: `uv run --extra vertex gap generate ...`; Gemini models only |
+| `vertex` | `gcloud auth application-default login`, `export GOOGLE_CLOUD_PROJECT=...` (`GOOGLE_CLOUD_REGION` optional, default `global`); pick per call (`--provider vertex`, default model `gemini-3.1-flash-lite-preview`, override with `--model <m>`) or once per shell (`export GAP_LLM_PROVIDER=vertex GAP_LLM_MODEL=<m>`), and include the SDK: `uv run --extra vertex gap generate ...`; Gemini models only |
 
 Pick per call with `--provider/--model`, or pin everything (temperature,
 retries, per-agent models) in a config YAML passed via `--config`.
@@ -128,4 +128,4 @@ Generating one graph is the unit; the benchmark harness drives the same
 pipeline over task × seed grids. See
 [grocery_fulfillment](../grocery_fulfillment/) for the flagship recipe —
 `gap generate` on grocery instructions under pose / permutation /
-basket-swap variations, gated at ≥90% success over 500 trials.
+basket-swap variations, gated by the config's `gate_threshold`.
