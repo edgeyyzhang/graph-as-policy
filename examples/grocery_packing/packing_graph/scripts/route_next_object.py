@@ -22,8 +22,10 @@ accepted (the subgraph wires it in) but unused. Authored by build_graph.py.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
+import tempfile
 
 import numpy as np
 
@@ -34,20 +36,42 @@ logger = logging.getLogger(__name__)
 # Stop a cyclic packing episode that can no longer make progress (e.g. one
 # ungraspable item left): if completion_rate has not increased for this many
 # consecutive iterations, exit the loop cleanly rather than re-grasping the
-# same item forever. State is per-process (one episode == one gap-run PID).
+# same item forever.
 _STUCK_LIMIT = 3
 
 
-def _no_progress(cr: float | None) -> bool:
+def _progress_path(ctx: NodeContext | None) -> str:
+    """Per-episode scratch file for the no-progress counter.
+
+    Keyed by the workflow's trace dir (unique per trial/run), NOT just the
+    PID: a benchmark worker executes many trials in one process, and a
+    PID-keyed file carries the previous trial's (prev, stuck) tail into the
+    next trial's first pass, ending its loop before anything is grasped.
+    """
+    trace = getattr(ctx, "_trace", None) if ctx is not None else None
+    out_dir = getattr(trace, "_output_dir", None) if trace is not None else None
+    if out_dir is not None:
+        tag = hashlib.sha1(str(out_dir).encode()).hexdigest()[:12]
+    else:  # no-trace run: fall back to the PID (single episode per process)
+        tag = f"pid{os.getpid()}"
+    return os.path.join(tempfile.gettempdir(), f".gap_route_progress_{tag}")
+
+
+def _no_progress(cr: float | None, ctx: NodeContext | None = None) -> bool:
     if cr is None:
         return False
-    path = f"/tmp/.gap_route_progress_{os.getpid()}"
+    path = _progress_path(ctx)
     prev, stuck = -1.0, 0.0
     try:
         with open(path) as f:
             prev, stuck = (float(x) for x in f.read().split())
     except Exception:
         pass
+    # completion_rate is monotonic within an episode (delivered items are
+    # retired) — a DROP means stale state from an earlier episode reusing
+    # this key. Start fresh.
+    if cr < prev - 1e-6:
+        prev, stuck = -1.0, 0.0
     stuck = 0 if cr > prev + 1e-6 else stuck + 1
     try:
         with open(path, "w") as f:
@@ -69,7 +93,7 @@ def run(ctx: NodeContext, found: bool, cloud: dict, container_obb: dict | None =
         )
         if sc.get("task_completed"):
             return {"route": "none"}
-        if _no_progress(cr if isinstance(cr, (int, float)) else None):
+        if _no_progress(cr if isinstance(cr, (int, float)) else None, ctx):
             logger.info("[route] no completion progress for %d iters -> stopping loop",
                         _STUCK_LIMIT)
             return {"route": "none"}

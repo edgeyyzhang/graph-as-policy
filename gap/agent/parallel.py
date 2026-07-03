@@ -173,10 +173,11 @@ class TrialResult:
     task_completed: bool = False
     reward: float = 0.0
     completion_rate: float = 0.0
-    """Partial-credit metric: 1.0 when the task completed, else the
-    env's reward clamped to [0, 1] (the grocery-packing suites report
-    the delivered-item fraction there; single-goal suites report 0/1,
-    making this equal to success)."""
+    """Partial-credit metric: 1.0 when the task completed, else the env's
+    ``completion_rate()`` (delivered-item fraction for the packing suites)
+    clamped to [0, 1], falling back to the reward for envs that don't
+    expose one (single-goal suites report 0/1, making this equal to
+    success)."""
     exit_code: int = -1
     execution_stdout: str = ""
     execution_stderr: str = ""
@@ -651,8 +652,19 @@ def _execute_trial(
     completed, reward = conn.check_success()
     trial_result.task_completed = bool(completed)
     trial_result.reward = float(reward)
+    # Partial credit must come from the env's completion_rate — the VAB
+    # suites' reward is BINARY (1.0 only at full completion), so clamping
+    # the reward records a 5/6 pack as 0.0 and the aggregate can't tell
+    # "delivered nothing" from "delivered almost everything".
+    partial = float(reward)
+    cr_fn: Any = getattr(getattr(conn, "env", None), "completion_rate", None)
+    if callable(cr_fn):
+        try:
+            partial = float(cr_fn())
+        except Exception:
+            logger.debug("env completion_rate read failed", exc_info=True)
     trial_result.completion_rate = (
-        1.0 if completed else min(max(float(reward), 0.0), 1.0)
+        1.0 if completed else min(max(partial, 0.0), 1.0)
     )
 
     latency_fn = getattr(conn, "get_latency_info", None)
