@@ -36,8 +36,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from ._meta_from_skill_md import parse_skill_md
 from gap_core.skills.meta import SkillMeta
+
+from ._meta_from_skill_md import parse_skill_md
 
 __all__ = [
     "BundleIssue",

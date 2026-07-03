@@ -6,7 +6,6 @@
 from typing import TypedDict
 
 import pytest
-
 from gap_core.tools import RESERVED_TOOL_PREFIXES, ToolRegistry, tool
 from gap_core.tools._registry import _PENDING_TOOLS
 

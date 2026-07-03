@@ -32,8 +32,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-
-from gap import env_config
 from gap_core.errors import ToolError
 from gap_core.tools import ToolRegistry
 from gap_core.types import (
@@ -44,6 +42,8 @@ from gap_core.types import (
     Trajectory,
     make_pose,
 )
+
+from gap import env_config
 
 logger = logging.getLogger(__name__)
 

@@ -37,7 +37,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from gap_core.skills.meta import (
     CanonicalScript,
     ExampleDoc,

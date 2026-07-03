@@ -331,7 +331,7 @@ def _chain_lines(order: list[str], direct: set[tuple[str, str]],
     lines: list[list[Seg]] = []
     cur: list[Seg] = [(nm(order[0]), None)]
     cur_len = _seg_len(cur)
-    for prev, n in zip(order, order[1:]):
+    for prev, n in zip(order, order[1:], strict=False):
         arrow = (prev, n) in direct
         sep = " ─▶ " if arrow else " · "
         text = nm(n)
@@ -509,7 +509,7 @@ def _natural_width(wf: dict, segments: list[_Segment]) -> int:
     for seg in segments:
         if seg.intro:
             needs.append(len(seg.intro))
-        for card, ex in zip(seg.cards, seg.exits):
+        for card, ex in zip(seg.cards, seg.exits, strict=False):
             node = nodes[card]
             name, right, _ = _card_title(card, node, wf)
             needs.append(len(name) + len(right) + 9 if right else len(name) + 6)
@@ -544,7 +544,7 @@ def _render_lines(wf: dict, segments: list[_Segment], w: int) -> list[list[Seg]]
             if lines:
                 lines.append([])
             lines += [[(seg.intro, _DIM)], arrow]
-        for card, ex in zip(seg.cards, seg.exits):
+        for card, ex in zip(seg.cards, seg.exits, strict=False):
             lines += _card_lines(card, wf, w)
             lines += _edge_rows(ex, nodes, w)
             if ex.kind == "continue":

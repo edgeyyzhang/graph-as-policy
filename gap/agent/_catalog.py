@@ -33,10 +33,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from gap.skills import SkillsRegistry
 from gap_core.tools import ToolDescriptor, ToolRegistry
 from gap_core.tools import _registry as _tools_registry_module
 from gap_core.tools.schema import FieldInfo, UnitSchema
+
+from gap.skills import SkillsRegistry
 
 from ._meta_tools import register_codegen_meta_tools
 
@@ -279,9 +280,9 @@ def _function_schema(
     pos_defaults: list[ast.expr | None] = [None] * (
         len(pos) - len(args.defaults)
     ) + list(args.defaults)
-    for arg, default in zip(pos, pos_defaults):
+    for arg, default in zip(pos, pos_defaults, strict=False):
         _add(arg, default)
-    for arg, default in zip(args.kwonlyargs, args.kw_defaults):
+    for arg, default in zip(args.kwonlyargs, args.kw_defaults, strict=False):
         _add(arg, default)
 
     outputs: dict[str, FieldInfo] = {}

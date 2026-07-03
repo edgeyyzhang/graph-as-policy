@@ -6,10 +6,10 @@
 from typing import TypedDict
 
 import pytest
-
 from gap_core.errors import GuardLimitExceeded, TaskCancelled
-from gap.runtime.context import CancelToken, NodeContext
 from gap_core.tools import ToolRegistry, guards
+
+from gap.runtime.context import CancelToken, NodeContext
 
 
 class IouOutput(TypedDict):

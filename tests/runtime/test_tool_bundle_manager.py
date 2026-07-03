@@ -14,6 +14,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from gap_core.tools import ToolRegistry
+from gap_core.tools._registry import RpcAdapter
 
 from gap.runtime.tool_bundle_boot import (
     boot_tool_bundles,
@@ -23,8 +25,6 @@ from gap.runtime.tool_bundle_manager import (
     ToolBundleManager,
     ToolBundleStartupError,
 )
-from gap_core.tools import ToolRegistry
-from gap_core.tools._registry import RpcAdapter
 
 
 class _FakeCatalogEntry:
@@ -250,7 +250,7 @@ def _write_workflow(tmp_path: Path, tools: list[str]) -> Path:
                        for i, t in enumerate(tools)},
                     "ok": {"type": "noop"},
                 },
-                "edges": [["START", f"n0"]]
+                "edges": [["START", "n0"]]
                 + [[f"n{i}", f"n{i+1}"] for i in range(len(tools) - 1)]
                 + [[f"n{len(tools)-1}", "ok"], ["ok", "END"]],
                 "conditional_edges": {},

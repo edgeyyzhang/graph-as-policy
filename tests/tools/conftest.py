@@ -5,9 +5,8 @@ every new registry (the sequential-benchmark path depends on it); tests
 that assert exact registry contents need a clean slate instead.
 """
 
-import pytest
-
 import gap_core.tools._registry as _registry
+import pytest
 
 
 @pytest.fixture(autouse=True)

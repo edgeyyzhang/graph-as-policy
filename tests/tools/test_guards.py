@@ -1,7 +1,6 @@
 """Unit tests for gap.tools.guards — tag classification and call limits."""
 
 import pytest
-
 from gap_core.errors import GuardLimitExceeded
 from gap_core.tools import guards
 

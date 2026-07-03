@@ -46,10 +46,10 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Literal
 
+from gap_core.skills.meta import Skill, SkillMeta
 from gap_core.tools.schema import UnitSchema, extract_schema
 
 from ._meta_from_skill_md import parse_skill_md
-from gap_core.skills.meta import Skill, SkillMeta
 
 logger = logging.getLogger(__name__)
 

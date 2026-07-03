@@ -12,7 +12,6 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-
 from gap_core.types import ArmState, CameraFrame, Observation, Se3Pose, make_pose, pose_to_matrix
 
 # Distinct, saturated colors assigned to objects in order.

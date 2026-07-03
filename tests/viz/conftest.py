@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import TypedDict
 
 import pytest
-
 from gap_core.tools import ToolRegistry
 from gap_core.types import CameraFrame, PointCloud, Se3Pose
 

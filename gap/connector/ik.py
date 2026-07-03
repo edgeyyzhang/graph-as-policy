@@ -25,9 +25,8 @@ import logging
 from pathlib import Path
 
 import numpy as np
-from scipy.spatial.transform import Rotation, Slerp
-
 from gap_core.types import Se3Pose, Trajectory, make_pose
+from scipy.spatial.transform import Rotation, Slerp
 
 logger = logging.getLogger(__name__)
 

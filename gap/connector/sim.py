@@ -17,11 +17,11 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-
-from gap.connector.core import Capabilities, Connector
 from gap_core.errors import ToolError
 from gap_core.tools import ToolRegistry
 from gap_core.types import Observation, make_pose
+
+from gap.connector.core import Capabilities, Connector
 
 logger = logging.getLogger(__name__)
 

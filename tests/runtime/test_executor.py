@@ -16,17 +16,17 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
-import gap
 from gap_core.errors import (
     NodeExecutionError,
     PipelineError,
     VerificationFailed,
 )
+from gap_core.tools import ToolRegistry, guards
+
+import gap
 from gap.runtime.execute import ExecutionResult
 from gap.runtime.executor import SubgraphExitEvent, WorkflowExecutor
 from gap.runtime.verify import StubWorld
-from gap_core.tools import ToolRegistry, guards
 
 # ---------------------------------------------------------------------------
 # Helpers

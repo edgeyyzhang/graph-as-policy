@@ -38,8 +38,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-from gap.connector.core import Capabilities, Connector
 from gap_core.tools import ToolRegistry
+
+from gap.connector.core import Capabilities, Connector
 
 logger = logging.getLogger(__name__)
 

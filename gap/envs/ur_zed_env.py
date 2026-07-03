@@ -28,7 +28,6 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from gap import env_config
-
 from gap.envs.base_env import BaseEnv
 
 logger = logging.getLogger(__name__)

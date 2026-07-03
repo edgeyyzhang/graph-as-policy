@@ -24,13 +24,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from gap.skills import SkillInfo, SkillsRegistry
 from gap_core.skills.meta import SkillMeta
 from gap_core.tools import ToolDescriptor, ToolRegistry
 from gap_core.tools.schema import FieldInfo, UnitSchema
 
-from ._registry import AgentRegistry, AgentSpec, read_include
+from gap.skills import SkillInfo, SkillsRegistry
 
+from ._registry import AgentRegistry, AgentSpec, read_include
 
 #: One-line descriptions for ``gap.schema.TYPE_REGISTRY`` names that are NOT
 #: TypedDicts (``type_fields`` returns ``[]`` for these), so the generated type

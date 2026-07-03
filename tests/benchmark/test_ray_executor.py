@@ -7,7 +7,6 @@ No real ray (and no cluster) anywhere in this suite — the stub mimics
 from __future__ import annotations
 
 import pytest
-
 from gap_core.tools import ToolRegistry
 from gap_core.tools.ray_executor import (
     RayToolExecutor,

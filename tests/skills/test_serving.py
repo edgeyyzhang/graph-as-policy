@@ -11,9 +11,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from gap_core.skills import Serving
 
 from gap.skills import parse_skill_md
-from gap_core.skills import Serving
 
 FRONT = """\
 ---

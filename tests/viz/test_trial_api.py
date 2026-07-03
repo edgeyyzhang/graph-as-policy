@@ -15,9 +15,9 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
+from gap_core.tools import ToolRegistry
 
 import gap
-from gap_core.tools import ToolRegistry
 from gap.viz import api as viz_api
 from gap.viz.server import create_app
 from gap.viz.trial_loader import (

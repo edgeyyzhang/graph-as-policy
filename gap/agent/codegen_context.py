@@ -17,8 +17,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from gap.skills import SkillsRegistry
     from gap_core.tools import ToolRegistry
+
+    from gap.skills import SkillsRegistry
 
     from .subgraph_runner import SubgraphRunner
 

@@ -15,13 +15,13 @@ import sys
 from pathlib import Path
 
 import pytest
+from gap_core.skills import CanonicalScript, Skill
 
 from gap.skills import (
     SkillsRegistry,
     load_prompt,
     load_skills,
 )
-from gap_core.skills import CanonicalScript, Skill
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 

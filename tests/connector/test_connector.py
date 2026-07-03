@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from gap_core.errors import ToolError
 
 from gap.connector import Capabilities, SimConnector
-from gap_core.errors import ToolError
 
 from .conftest import FakeEnv, FakeEnvConfig, FakeIK
 

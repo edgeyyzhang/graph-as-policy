@@ -13,9 +13,9 @@ import asyncio
 import json
 
 import pytest
+from gap_core.errors import ValidationIssue
 
 from gap.agent.config import PipelineConfig
-from gap_core.errors import ValidationIssue
 
 from .conftest import (
     CHECKPOINT_RESPONSE_GOOD,

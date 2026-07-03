@@ -110,9 +110,10 @@ def bundle_tool_registry():
     """
     import importlib
 
-    from gap.skills import load_skills
     from gap_core.tools import ToolRegistry
     from gap_core.tools import _registry as tool_registry_mod
+
+    from gap.skills import load_skills
 
     skills = load_skills(_skills_root())
     snapshot = list(tool_registry_mod._PENDING_TOOLS)

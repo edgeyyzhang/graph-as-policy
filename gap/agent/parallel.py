@@ -571,8 +571,9 @@ def _execute_trial(
     trial_dir: Path,
 ) -> None:
     """Core trial: connector → reset(seed) → workflow → success check → video."""
-    from gap.runtime.executor import WorkflowExecutor
     from gap_core.tools import guards
+
+    from gap.runtime.executor import WorkflowExecutor
 
     config = state.config
     suite_name = item.suite_name or config.suite_name
