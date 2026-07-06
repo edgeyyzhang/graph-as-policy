@@ -1,6 +1,6 @@
 [submodule "third_party/robots_realtime"]
 	path = third_party/robots_realtime
-	url = https://github.com/KeplerC/robots_realtime.git
+	url = https://github.com/graph-robots/controllers.git
 [submodule "third_party/Variational-Automation-Benchmark"]
 	path = third_party/Variational-Automation-Benchmark
 	url = https://github.com/ehehee/Variational-Automation-Benchmark.git
