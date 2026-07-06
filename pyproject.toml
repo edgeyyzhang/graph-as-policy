@@ -4,7 +4,7 @@ version = "0.1.0.dev0"
 description = "gap — graph as policy: compile language instructions into typed, verified robot skill graphs and execute them on simulators or real robots."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 authors = [{ name = "graph-as-policy authors" }]
 keywords = ["robotics", "LLM", "agents", "manipulation", "code-generation"]
 classifiers = [
@@ -12,7 +12,7 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
-  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: Apache Software License",
   "Operating System :: POSIX :: Linux",
 ]
 

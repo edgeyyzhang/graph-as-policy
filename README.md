@@ -14,7 +14,7 @@ not just solve once. It compiles a natural-language task into a typed, verified
 computation graph of modular skills, self-improves it in simulation, and runs
 the graph — not a black-box policy — on simulators and real robots.
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![Skills: open-robot-skills](https://img.shields.io/badge/skills-open--robot--skills-orange.svg)](https://github.com/graph-robots/open-robot-skills)
 [![Docs](https://img.shields.io/badge/docs-quickstart-0f766e.svg)](https://graph-robots.github.io/graph-as-policy/getting-started/quickstart.html)
@@ -136,7 +136,7 @@ confirmation. Other agents (Cursor, Codex, …) and the no-install path:
 
 ## License & attribution
 
-graph-as-policy and open-robot-skills are MIT-licensed; they stand on third-party
+graph-as-policy and open-robot-skills are Apache-2.0-licensed; they stand on third-party
 work — LIBERO/LIBERO-PRO, Variational-Automation-Benchmark, robosuite,
 robots_realtime, pyroki, SAM3, Grounding DINO, and (optionally) NVIDIA
 cuRobo. Full attribution table: **[NOTICE.md](NOTICE.md)**.
