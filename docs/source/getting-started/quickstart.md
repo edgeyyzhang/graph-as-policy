@@ -6,7 +6,9 @@ Zero to a verified rollout, with the trace open. You will:
   models, IK, and the sim in one process;
 - read the recorded trace, the artifact everything else revolves around;
 - browse it in `gap viz`;
-- generate your own graph from one sentence.
+- generate your own graph from one sentence;
+- loop the same machinery: pack *every* item on the table, through a
+  graph with a real backward edge.
 
 ::::{grid} 1 1 2 2
 :gutter: 3
@@ -33,7 +35,9 @@ Linux + an NVIDIA GPU with EGL (~10 GB VRAM covers this quickstart;
 [another provider](../authoring/llm-providers.md)). The first run
 downloads ~3.5 GB of model weights, and the gated SAM3 weights are in
 this quickstart's perception path — so set `HF_TOKEN` first; see
-[Model weights](installation.md#model-weights).
+[Model weights](installation.md#model-weights). The closing packing
+segment (minute 12–15) additionally needs the CuRobo planning stack:
+`CUDA_HOME=/usr/local/cuda uv sync --extra grocery`.
 :::
 
 ## Minute 0–6: run the quickstart graph
@@ -112,7 +116,7 @@ outputs, timings, and assets — the same `node_data/` you just saw, with
 images inline. When two runs disagree,
 `gap trace-diff <trial_a> <trial_b>` diffs them structurally.
 
-## Minute 8–15: generate your own
+## Minute 8–12: generate your own
 
 ```bash
 uv run gap generate "pick up the alphabet soup can and place it in the basket"
@@ -139,6 +143,45 @@ directory itself — generation writes one folder per task.
 
 [Generation](../authoring/generation.md) covers the pipeline, providers,
 and config in depth.
+
+## Minute 12–15: loop it — pack every item
+
+One pick is a straight line through the graph. The packing example runs
+the same perceive → grasp → transport machinery **in a loop**: transport
+routes *back* to perception, and the graph keeps picking until a VLM
+confirms every grocery item is in the basket.
+
+<figure>
+  <video src="../_static/grocery_packing_sim.mp4" autoplay loop muted playsinline width="70%"></video>
+  <figcaption>The packing loop on the pack-all suite
+  (<code>libero_object_packing/0</code>), 2×: one perceive → grasp →
+  transport pass per item, until the VLM completion check reports the
+  table clear.</figcaption>
+</figure>
+
+```bash
+CUDA_HOME=/usr/local/cuda uv sync --extra grocery   # one-time: adds CuRobo planning
+
+MUJOCO_GL=egl uv run gap run examples/grocery_packing/packing_graph \
+  --sim libero_object_packing/0
+```
+
+Watch the first pass land and the route bend backward:
+`transport --placed--> perceive_next` resolves to an already-completed
+node, so the executor resets and re-runs the loop body — re-perceiving
+*both* the next item and the basket every iteration. Termination is
+**unprivileged**: a per-pass VLM completion check, not a simulator
+verdict, decides when the table is clear, so the same policy runs
+unchanged on a real robot. Seeing the backward edge fire once is the
+point of this segment; a full pack takes roughly a minute per item (plus
+a one-time ~40 s CuRobo kernel JIT on the first planning call), so let
+it finish in the background and open `gap viz` after — `perceive_next`
+is visited once per object.
+
+[Grocery Packing](../examples/grocery-packing.md) dissects the loop in
+depth: the subgraphs, the backward-edge (subgraph-revisit) semantics,
+the layered termination signals, and the `gap generate` recipe that
+reproduces this same graph from one sentence.
 
 ## Where next
 
