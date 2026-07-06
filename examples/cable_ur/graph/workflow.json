@@ -2,7 +2,7 @@
  "version": 3,
  "meta": {
   "name": "locate_white_tape",
-  "description": "Locate a green circular adhesive sticker on a cable and report its 3D position in robot base frame."
+  "description": "Locate the white tape marker on a cable and report its 3D position in robot base frame."
  },
  "nodes": {
   "locate_white_tape": {
@@ -57,7 +57,18 @@
       "cameras": {
        "$ref": "observe.cameras"
       },
-      "object_name": "green circular sticker"
+      "object_name": "white tape",
+      "object_description": "a piece of white tape wrapped around the cable",
+      "dino_prompt": "white tape.",
+      "text_prompts": [
+       "white tape",
+       "white tape marker on a black cable"
+      ],
+      "min_points": 5,
+      "min_score": 0.3,
+      "box_threshold": 0.3,
+      "text_threshold": 0.25,
+      "use_multiview": false
      }
     },
     "filter_obb": {
@@ -66,6 +77,23 @@
      "inputs": {
       "points": {
        "$ref": "perceive.cloud"
+      },
+      "eps": 0.003,
+      "min_samples": 10
+     }
+    },
+    "report": {
+     "type": "script",
+     "script": "scripts/report_location.py",
+     "inputs": {
+      "obb": {
+       "$ref": "filter_obb.obb"
+      },
+      "cloud": {
+       "$ref": "perceive.cloud"
+      },
+      "camera": {
+       "$ref": "observe.cameras.0"
       }
      }
     },
@@ -88,6 +116,10 @@
     ],
     [
      "filter_obb",
+     "report"
+    ],
+    [
+     "report",
      "found"
     ],
     [

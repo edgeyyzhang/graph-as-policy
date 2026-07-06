@@ -2,7 +2,7 @@
 
 > **What:** Perception-only UR + ZED connector — motion structurally impossible (read-only RTDE) · **Needs:** `real` + ZED SDK + UR arm · **Time:** seconds · **Safety:** read [../../docs/safety.md](../../docs/safety.md) first
 
-Perception-only example: detect a small adhesive sticker on a cable,
+Perception-only example: detect a white-tape marker on a cable,
 fuse the segmentation with ZED depth into a world-frame point cloud, fit
 an OBB and a local plane, and report the marker's 3D position and
 orientation in the robot base frame. Then inspect the result in 3D with
@@ -39,6 +39,27 @@ task.yaml                  task metadata (prompt, suite, cameras)
   wrist pose and the reported 3D positions will be offset by the mount.
 - UR URDF for FK: `GAP_UR_URDF=<path to ur5e.urdf>`, or leave unset to
   use `robot_descriptions`' `ur5e_description`.
+
+## Producing the hand-eye calibration
+
+The `.npy` this example needs is a 4x4 matrix mapping **camera frame →
+wrist frame**. To produce one for a wrist-mounted ZED on a UR5e, use
+[TobiasRecker/zed_hand_eye_calibration](https://github.com/TobiasRecker/zed_hand_eye_calibration):
+print its ChArUco board, capture 20–40 wrist poses with
+`capture_sample.py`, then run `compute_handeye.py`
+(`cv2.calibrateHandEye`, Tsai). Note two gotchas when bringing its
+result over:
+
+- `compute_handeye.py` **prints** the camera→tool0 transform (and its
+  ROS `static_transform_publisher` args) but does not write a file —
+  save the printed 4x4 yourself, e.g.
+  `np.save("camera_to_wrist_transform.npy", T_cam2gripper)`.
+- Its frames are ROS conventions: parent `tool0`, child the **left-lens
+  optical frame** of the ZED. The connector applies the matrix to the
+  URDF wrist link — see `gap/envs/ur_zed_env.py` for the exact
+  convention, and sanity-check with `visualize.py`: the rendered camera
+  frustum must sit on the physical mount, and the cloud must land on
+  the arm's workspace.
 
 ## Run
 
@@ -86,4 +107,29 @@ The perception script calls Grounding-DINO + SAM3 + a hosted VLM through
 the open-robot-skills tool bundles (GPU weights + `OPENROUTER_API_KEY` or a
 vertex setup) — see the open-robot-skills README. The prompts in
 `graph/workflow.json` (`object_name`, `dino_prompt`, `text_prompts`)
-were tuned for a green circular sticker; edit them for your marker.
+target a strip of white tape on a black cable; edit them for your marker.
+
+## The full cable project (companion repos)
+
+This example is the perception stage of a larger cable-manipulation
+project; the motion side lives in standalone ROS 1 stacks that are
+deliberately **not** part of this connector (its read-only design is the
+point). If you want the rest of the pipeline:
+
+- [TobiasRecker/usb_c_insertion](https://github.com/TobiasRecker/usb_c_insertion)
+  — force-guided USB-C insertion on the same UR5e + ZED rig
+  (twist control, visual servoing on the marker, plane-based
+  yaw alignment, spiral search, force-controlled insertion). Its
+  run-vision service consumes exactly the JSON this example's report
+  node writes; its launch file defaults to
+  `/tmp/green_sticker_location.json`, while this example writes
+  `/tmp/white_tape_location.json` — point the launch arg at that path
+  (or copy the file) when bridging the two.
+- [TobiasRecker/zed_hand_eye_calibration](https://github.com/TobiasRecker/zed_hand_eye_calibration)
+  — the hand-eye calibration workflow above.
+- [TobiasRecker/vertical_cable_routing](https://github.com/TobiasRecker/vertical_cable_routing)
+  and [TobiasRecker/debug_gui](https://github.com/TobiasRecker/debug_gui)
+  — the cable-routing half of the project on a dual-arm ABB YuMi
+  (learned cable tracing, clip-by-clip route planning, dual-arm
+  handover). Different robot, same cable: useful as a reference for
+  what comes after "find the marker".

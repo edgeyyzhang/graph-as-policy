@@ -54,7 +54,12 @@ task.yaml                  task metadata (prompt, suite, cameras)
   `robot_ip=` to the connector). Only the RTDE *receive* interface is used —
   the example never commands the arm.
 - A wrist-mounted ZED with a 4x4 camera-to-wrist calibration matrix saved as
-  `.npy`. Point `GAP_UR_ZED_CALIB` at it (or pass `calibration_path=`).
+  `.npy`. Point `GAP_UR_ZED_CALIB` at it (or pass `calibration_path=`). To
+  produce one, see
+  [TobiasRecker/zed_hand_eye_calibration](https://github.com/TobiasRecker/zed_hand_eye_calibration)
+  (ChArUco + `cv2.calibrateHandEye` for exactly this UR5e + ZED-Mini setup);
+  the example README covers the frame-convention gotchas when saving its
+  printed result as `.npy`.
 - A UR URDF for forward kinematics: set `GAP_UR_URDF=<path to ur5e.urdf>`, or
   leave it unset to use `robot_descriptions`' `ur5e_description`.
 
@@ -101,15 +106,15 @@ The top-level graph routes one subgraph, `locate_white_tape` (skill
 
 1. `observe` — `robot.get_observation` captures the ZED RGB-D frame plus the
    UR joint state.
-2. `perceive_vlm` — `scripts/locate_white_tape/perceive_dino_vlm.py` runs
-   Grounding-DINO with `dino_prompt: "green sticker."`, asks a VLM to pick the
+2. `perceive` — `scripts/locate_white_tape/perceive_dino_vlm.py` runs
+   Grounding-DINO with `dino_prompt: "white tape."`, asks a VLM to pick the
    right detection, falls back to `sam3.segment_text` over the `text_prompts`
    when DINO finds nothing, and lifts the mask into a world-frame point cloud
    using the ZED depth and the calibrated camera pose.
-3. `filter_cloud` — `geometry.filter_noise` (DBSCAN, `eps: 0.003`,
-   `min_samples: 10`) strips depth speckle.
-4. `compute_obb` — `geometry.compute_obb` fits the oriented bounding box.
-5. `report` — `scripts/report_location.py` fits a local plane with RANSAC,
+3. `filter_obb` — `geometry.filter_and_compute_obb` strips depth speckle
+   (DBSCAN, `eps: 0.003`, `min_samples: 10`) and fits the oriented bounding
+   box in one call.
+4. `report` — `scripts/report_location.py` fits a local plane with RANSAC,
    prints the base-frame and camera-frame positions, and writes the JSON
    result file.
 
@@ -144,11 +149,22 @@ directory. The open-robot-skills checkout is auto-discovered
 
 ## Adapting to your marker
 
-The prompts in `graph/workflow.json` (`object_name: "green circular sticker"`,
-`dino_prompt: "green sticker."`, the `text_prompts` list, `min_points: 5`)
-were tuned for a green circular sticker on a black cable. Edit them for your
-own marker — they are plain input values on the `perceive_vlm` node, so no
+The prompts in `graph/workflow.json` (`object_name: "white tape"`,
+`dino_prompt: "white tape."`, the `text_prompts` list, `min_points: 5`)
+target a strip of white tape on a black cable. Edit them for your own
+marker — they are plain input values on the `perceive` node, so no
 script changes are needed for a different object description.
+
+## The full cable project
+
+This example is the perception stage of a larger cable-manipulation project;
+the motion side lives in standalone ROS 1 stacks by the same collaborators.
+[TobiasRecker/usb_c_insertion](https://github.com/TobiasRecker/usb_c_insertion)
+consumes the report JSON for force-guided USB-C insertion on the same
+UR5e + ZED rig, and
+[TobiasRecker/vertical_cable_routing](https://github.com/TobiasRecker/vertical_cable_routing)
+routes the cable itself on a dual-arm ABB YuMi. The example README lists all
+the companion repos and the bridging details.
 
 ## Next steps
 
