@@ -43,7 +43,7 @@ HERE = Path(__file__).resolve().parent
 # must be listed too — perception + planning use its grounding-dino / sam3 /
 # curobo bundles (base first, tsh-skills layered on top).
 OPEN_ROBOT_SKILLS = HERE.parents[2] / "open-robot-skills"
-TSH_SKILLS = HERE.parents[1] / "tsh-skills"   # in-repo (moved from sibling)
+TSH_SKILLS = HERE.parents[1] / "tsh-skills"   # in-repo (moved from the sibling checkout)
 BDDL = HERE.parents[2] / "LIBERO-YAM" / "libero_yam" / "bddl_files" / \
     "libero_yam_tabletop" / "two_tape_handover.bddl"
 

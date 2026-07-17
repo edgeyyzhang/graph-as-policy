@@ -21,20 +21,26 @@ gap:
     - robot.close_gripper
     - robot.get_ee_pose
   exit_conditions:
-    grasped: Tape ring held; tape_in_giver + grasp_tcp + rim_radius bound in the outputs.
+    grasped: Tape ring held; held_offset + grasp_tcp + rim_radius bound in the outputs.
     failed: A grasp leg had no cuRobo plan (raise routes to abort).
   required_inputs:
-    tape_xyz: Vec3                 # world grasp point, from tsh-perceive
+    tape_xyz: Vec3                 # world grasp point, from tsh-perceive (its <name>_xyz output)
     hole_radius: float             # perceived inner radius (m); REQUIRED, no tuned fallback
     rim_radius: float              # perceived outer radius (m); REQUIRED, no tuned fallback
     fingertip_axial: float         # from tsh-gripper-geometry; REQUIRED, no tuned fallback
     finger_half_gap: float         # from tsh-gripper-geometry; REQUIRED, no tuned fallback
+    arm_id: int                    # picking arm (route-decided; 0=left, 1=right). Default 0.
   produces_outputs:
     grasped: bool
-    tape_in_giver: Vec3            # tape centre in the giver TCP frame (m), rigid under the grip
+    held_offset: Vec3             # tape centre in the picking arm's TCP frame (m), rigid under
+                                    # the grip; the shared transport/place skills track it by FK.
+                                    # This is the canonical name; the handover rebinds it to the
+                                    # receiver's measured offset (latest-producer cross-sg binding).
+    tape_in_giver: Vec3           # alias of held_offset (legacy graphs / exchange input)
     grasp_tcp: Se3Pose             # world TCP pose at close (return-leg replay)
     rim_radius: float              # passthrough of the perceived rim radius used for this grasp;
                                     # relayed to tsh-handover (stable across runs, unlike hole_radius)
+    pick_arm: int                 # echo of the arm that holds the tape (checkpoint anchor)
   hard_rules:
     - >
       ALWAYS begin the grasp with `robot.open_gripper` before the descent —
@@ -87,17 +93,19 @@ pickup
    `tape_xyz=Ref("in.tape_xyz")`, `hole_radius=Ref("in.hole_radius")`,
    `rim_radius=Ref("in.rim_radius")`,
    `fingertip_axial=Ref("in.fingertip_axial")`,
-   `finger_half_gap=Ref("in.finger_half_gap")`, plus `arm_id` (literal giver arm).
-   Returns `{grasped, tape_in_giver, grasp_tcp, rim_radius}`.
+   `finger_half_gap=Ref("in.finger_half_gap")`, plus
+   `arm_id=Ref("in.arm_id")` (route-decided picking arm).
+   Returns `{grasped, held_offset, tape_in_giver, grasp_tcp, rim_radius, pick_arm}`.
 
-Bind the outputs (`tape_in_giver` + `rim_radius` feed `tsh-handover`; `grasp_tcp`
-feeds a return leg):
+Bind the outputs (`held_offset` + `rim_radius` feed the shared transport / the
+handover; `grasp_tcp` feeds a return leg):
 
 ```python
 sg.set_outputs(
-    tape_in_giver=Ref("pickup.tape_in_giver"),
+    held_offset=Ref("pickup.held_offset"),
     grasp_tcp=Ref("pickup.grasp_tcp"),
     rim_radius=Ref("pickup.rim_radius"),
+    pick_arm=Ref("pickup.pick_arm"),
 )
 ```
 
@@ -112,4 +120,5 @@ sg.set_outputs(
 
 - `tsh-perceive` — supplies `tape_xyz` + ring radii.
 - `tsh-gripper-geometry` — supplies `fingertip_axial` + `finger_half_gap`.
-- `tsh-handover` — consumes `tape_in_giver` + `rim_radius`.
+- `tsh-transport-held` — consumes `held_offset` to carry the tape to the meet.
+- `tsh-handover` — consumes `held_offset` (a.k.a. `tape_in_giver`) + `rim_radius`.

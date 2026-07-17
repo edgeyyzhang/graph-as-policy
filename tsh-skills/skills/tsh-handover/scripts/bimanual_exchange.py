@@ -51,10 +51,17 @@ class Output(TypedDict):
     receiver_offset: list  # tape centre in the receiver TCP frame (m), measured at
                            # the grab instant via the giver's rigid grip + FK (no
                            # GT). Consumed by place to land the tape centre on target.
+    held_offset: list   # alias of receiver_offset — rebinds the cross-subgraph
+                        # ``held_offset`` name (the pickup bound it to the giver's
+                        # grip) to the RECEIVER's grip, so a downstream place
+                        # consumes the latest holder's offset either route.
     giver_tcp: list     # world giver TCP pose at the present, [x,y,z,qw,qx,qy,qz].
                         # A return leg replays these two proven-feasible, proven-
                         # collision-free poses with the arm roles swapped.
     receiver_tcp: list  # world receiver TCP pose at the grab, same layout.
+    giver_arm: int      # echo of the giving arm (checkpoint anchor)
+    receiver_arm: int   # echo of the receiving arm (checkpoint anchor; the
+                        # holder after this subgraph)
 
 
 # Reflection across the world Y=0 plane. The exchange geometry below is authored
@@ -120,11 +127,19 @@ def run(ctx: NodeContext, *,
         rim_radius: float,
         meet_xyz: tuple,
         giver_quat: tuple,
-        recv_quat: tuple) -> Output:
+        recv_quat: tuple,
+        skip_present: bool = False) -> Output:
     """Transfer the tape from giver to receiver at ``meet_xyz``.
 
     tape_in_giver: tape centre in the giver TCP frame, measured by the pickup —
                    the giver's tool offset for the whole exchange.
+    skip_present:  True when a preceding ``transport_held`` node (the shared
+                   held-object transport, possibly with the tape cloud attached
+                   as a collision body) already presented the tape at
+                   ``meet_xyz`` — the exchange then starts at the receiver
+                   thread. The live tape pose is re-queried from the giver's FK
+                   either way, so an imperfect present only shifts the thread
+                   target, never breaks it.
     rim_radius:    perceived outer rim radius (m), relayed from tsh-pickup (the
                    same value it used for the giver's grasp). Stable run-to-run
                    (~1mm spread), unlike hole_radius (~17mm spread) — so the
@@ -177,10 +192,11 @@ def run(ctx: NodeContext, *,
     # 1. Giver presents the tape "o" face-on at the meeting point: the TAPE is
     #    the end effector (tool_offset=tig), so cuRobo plans the tape centre to
     #    meet_xyz directly — repeatable regardless of how the ring settled on the
-    #    finger.
-    plan_tool_move(ctx, giver_arm, meet_xyz, giver_quat, tool_offset=tig,
-                   position_threshold=PLAN_POSITION_THRESHOLD,
-                   rotation_threshold=PLAN_ROTATION_THRESHOLD)
+    #    finger. Skipped when a transport_held node already presented.
+    if not skip_present:
+        plan_tool_move(ctx, giver_arm, meet_xyz, giver_quat, tool_offset=tig,
+                       position_threshold=PLAN_POSITION_THRESHOLD,
+                       rotation_threshold=PLAN_ROTATION_THRESHOLD)
 
     # 2. Receiver opens and pre-positions on its OWN Y side, level with the hole
     #    and backed off in -X, so its finger can sweep into the hole face along +X.
@@ -265,5 +281,7 @@ def run(ctx: NodeContext, *,
                    [tx + RECV_PRE_BACK, ty + recv_retract, tz], recv_quat)
 
     return {"handed_over": True, "receiver_offset": receiver_offset,
-            "giver_tcp": giver_tcp, "receiver_tcp": receiver_tcp}
+            "held_offset": receiver_offset,
+            "giver_tcp": giver_tcp, "receiver_tcp": receiver_tcp,
+            "giver_arm": int(giver_arm), "receiver_arm": int(receiver_arm)}
 

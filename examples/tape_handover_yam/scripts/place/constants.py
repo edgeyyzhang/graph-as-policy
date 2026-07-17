@@ -10,13 +10,10 @@
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Tape half-thickness (top face above the body centroid). DERIVED at runtime from
-# the perceived cloud — (robust top − robust bottom)/2 in perceive_tape — so it
-# tracks the true tape, whatever its size. The constant below is only the FALLBACK
-# used when the cloud is too degenerate to measure (mirrors the GRASP_RING_* /
-# hole-radius fallback pattern). Measured from the scaled yellow_tape mesh.
-TAPE_TOP_Z   = 0.016   # m — fallback tape half-thickness
+# the perceived cloud — (robust top − robust bottom)/2 in perceive_tape. Outside the
+# sanity band below, perceive_tape RAISES (degenerate cloud, no tuned fallback).
 TAPE_HALF_MIN = 0.005  # m — sanity band on the perceived half-thickness; outside it,
-TAPE_HALF_MAX = 0.040  # m   fall back to TAPE_TOP_Z rather than trust a bad cloud
+TAPE_HALF_MAX = 0.040  # m   perceive_tape RAISES (degenerate cloud, no tuned fallback)
 
 # ── Grasp parameters (pickup.py) ─────────────────────────────────────
 # Strategy: ring-grasp from above with DOWN_QUAT.
@@ -36,14 +33,12 @@ TAPE_HALF_MAX = 0.040  # m   fall back to TAPE_TOP_Z rather than trust a bad clo
 # ring_dx = 0.038 compensates: finger tip lands at tape centre in X.
 # ring_dx = 0.050 puts finger tip 12 mm INSIDE the hole in X (more clearance).
 DOWN_QUAT     = (0.0, 0.7071067811865476, 0.7071067811865476, 0.0)
-GRASP_RING_DX = 0.048   # m — rotated ~18° CW on ring; fingertip 10mm from centre in X
 # Fingers spread along world X (half-gap ≈ 40 mm). With ring_dx=0.038 the near
 # finger lands ≈ tape centre (inside the 47 mm hole) and the far finger ≈ 78 mm
 # out (outside the 62 mm rim) → a true wall pinch. ring_dy shifts both in Y;
 # 0.038 keeps the near finger clearly inside the hole. Re-tuned for the 1.3×
 # tape under realistic friction (1.0): combined with the kp=400 clamp (run.py)
 # the grip survives the 90° reorientation to the present pose.
-GRASP_RING_DY = 0.024   # m — rotated grip: near finger 17mm inside hole, far 2mm outside rim
 # ── Coordinated grasp clock-angle preset ───────────────────────────────────────
 # The pickup revolve (GRASP_RING_ANGLE_DEG) and the receiver revolve
 # (RECV_GRASP_ANGLE_DEG) are a COUPLED pair: rotating the pickup moves the giver's
@@ -72,7 +67,6 @@ GRASP_LIFT_CLEARANCE = 0.085  # m — lift the grasped tape this far ABOVE its p
 # ── Gripper geometry (YAM-specific, empirical FK under DOWN_QUAT) ─────────────
 # (each fingertip sits ~39 mm from the TCP along the spread axis — the half-gap
 # referenced in the grasp-offset rationale above)
-GRIPPER_FINGERTIP_BEHIND = 0.038 # m — fingertip sits this far behind TCP along the approach axis
 
 # ── Handover (bimanual_exchange.py) ────────────────────────────────────────────
 # Everything that defines WHERE and in WHAT ORIENTATION the two arms meet.
@@ -109,37 +103,37 @@ GRIPPER_FINGERTIP_BEHIND = 0.038 # m — fingertip sits this far behind TCP alon
 # grip no longer cocks the ring, and the mirror splay separates the wrists
 # (collision-free by geometry, no Z-stagger needed). The old demo RECV_QUAT
 # (0.4023,0.4028,0.6723,0.4732) tilted down ~23deg, which cocked the held ring.
-GIVER_QUAT = (0.5, 0.5, 0.5, 0.5)  # gz=[1,0,0] — tool on pure +X so the ring plane is parallel
                                    # to the Y axis (hole axis exactly along X, no tilt)
 # Receiver wrist: splayed toward -Y (gz=[0.99,-0.15,0]), i.e. the SAME splay as
 # the giver. Two reasons: (1) a -Y splay throws the receiver hand toward -Y, away
 # from the giver (a +Y splay or a pure +X pose threw it toward the giver / sat on
 # an arm-1 IK branch boundary that made the arm thrash); (2) being ~8.5° off pure
 # +X keeps arm 1 off that singularity so consecutive IK solves stay on one branch.
-RECV_QUAT  = (0.5358, 0.5358, 0.4614, 0.4614)  # gz=[0.99,-0.15,0] — splay toward -Y
 #
 # meet_xyz: world-frame TCP point where arm0 (giver) presents the tape.
 #   = demo giver TCP @ t=185. y=0.050 (NOT 0.22) keeps the giver on its own side.
-MEET_XYZ            = (0.586, 0.050, 1.032)  # demo giver TCP @ t=185
 # Receiver grasp — grab the OPEN -Y rim from the receiver's OWN -Y side.
 # The giver presents the ring vertically and pinches only its +Y rim, so the
 # whole -Y half is free. The receiver therefore targets the -Y rim (NOT the hole
-# centre, which sits in the giver's corridor): TCP at hole - RECV_GRASP_DY in Y,
+# centre, which sits in the giver's corridor): TCP at hole - recv_grasp_dy in Y,
 # so the near finger threads the hole edge and the far finger lands on the -Y
 # outer wall (wall pinch). It approaches from -Y and -X, slides +Y to the rim,
 # then inserts +X — its wrist never enters the central corridor where the giver's
 # forearm (link_5) sits. The receiver re-queries the LIVE tape pose (tape_key),
 # so these are offsets from the true hole centre and generalise across positions.
-RECV_GRASP_DY         = 0.075   # m — TCP offset in -Y from the hole centre. Sized so the
-                                # threading (near) finger lands just INSIDE the -Y edge of the
-                                # hole (≈1 cm in), NOT on the rim wall: the giver's inner finger
-                                # holds the +Y edge, so the receiver threads the opposite (-Y)
-                                # edge ~7 cm away across the 9.4 cm hole. The far finger lands
-                                # outside the -Y rim (free space). (Too large → finger hits the
-                                # -Y rim and shoves the tape; too small → finger meets the
-                                # giver's finger at the centre.) Kept a tuned constant rather than
-                                # derived from the perceived hole radius: that estimate is noisy
-                                # run-to-run (~31–48 mm) and would swing the receiver grab ~17 mm.
+#
+# recv_grasp_dy = rim_radius + RECV_GRASP_DY_MARGIN (derived in bimanual_exchange.py,
+# NOT hole_radius-based): hole_radius measured ~31-48mm across saved runs on this
+# scene (~17mm spread — too noisy to key an 8mm-wide safety margin off), while
+# rim_radius measured ~64-65mm across the same runs (<1.1mm spread) — stable enough
+# to trust. RECV_GRASP_DY_MARGIN is calibrated so recv_grasp_dy reproduces the old
+# validated 0.075m TCP offset at the observed rim_radius (~0.0645m): the near
+# (threading) finger should land just INSIDE the -Y edge of the hole (≈1cm in), NOT
+# on the rim wall — the giver's inner finger holds the +Y edge, so the receiver
+# threads the opposite (-Y) edge across the hole, landing its far finger outside the
+# -Y rim (free space). Too large → finger hits the -Y rim and shoves the tape; too
+# small → finger meets the giver's finger at the centre.
+RECV_GRASP_DY_MARGIN = 0.0105  # m — added to the perceived rim_radius; see above
 RECV_GRASP_DZ         = 0.045   # m — raise the TCP so the fingertips reach hole height: the
                                 # fingers hang ~44 mm BELOW the wrist for this +X pose, so
                                 # TCP must sit that far above the hole centre.
@@ -164,16 +158,12 @@ EXCHANGE_RETRACT_D  = 0.10   # m — retract distance after exchange
 PLACE_OFFSET         = (0.0,  0.00,  0.00)  # centred on the duct (stacking on top, no rim to dodge)
 # curobo plans the descent in joint space; hover = place + z_approach.
 PLACE_Z_APPROACH     = 0.08
-PLACE_DROP_CLEARANCE = 0.05  # release this far above the rest pose and let the tape DROP the
+PLACE_DROP_CLEARANCE = 0.02  # release this far above the rest pose and let the tape DROP the
                              # last stretch: the receiver's finger (threaded in the hole) slips
                              # out during the fall and the gripper is clear before it retracts,
                              # so the straight-up retract can't hook and lift the ring. 0.02 was
                              # too low — the finger stayed in the hole and carried the tape up.
 PLACE_RETRACT_OFFSET = (0.0, -0.05,  0.12)  # up/away from the duct after release
-# Fallback collision body for the tape-attached approach swing, used only when no
-# perceived cloud is available (a convex hull of the cloud is preferred).
-PLACE_TAPE_SPHERE_RADIUS = 0.08   # m — bounding-sphere radius
-PLACE_TAPE_SPHERE_SUBDIV = 2      # icosphere tessellation level
 
 # ── Motion-planner tolerances (bimanual_exchange.py / place.py) ─────────────────
 # Pose-match thresholds for the two tolerance-sensitive plans: the giver present

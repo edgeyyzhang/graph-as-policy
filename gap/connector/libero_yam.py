@@ -363,6 +363,22 @@ class LiberoYamCuRoboIK:
 class LiberoYamSimConnector(SimConnector):
     """SimConnector that exposes ``libero-yam.object_pose`` (ground-truth object pose)."""
 
+    def world_snapshot(self):
+        """Base ``world_snapshot`` with YAM robot-link prefixes.
+
+        The YAM MJCF names every arm/gripper body ``left_*`` / ``right_*``
+        (link_1..6, *_lf/rf finger bodies) — none match the adapter's default
+        Panda-era prefixes, so contacts with the fingers would not register
+        as robot contacts and ``Body.is_grasped()`` would always be False in
+        checkpoint predicates. Same lazy-build shape as the base method.
+        """
+        if self._world_adapter is None:
+            from gap.connector.world_adapter import LiberoWorldAdapter
+
+            self._world_adapter = LiberoWorldAdapter(
+                self.env, robot_link_prefixes=("left_", "right_"), arm_dof=6)
+        return self._world_adapter.snapshot()
+
     def get_observation(self):
         """Same as the base observation, but attach RGB-D camera frames.
 

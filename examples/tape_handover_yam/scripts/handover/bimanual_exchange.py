@@ -32,19 +32,17 @@ from gap import NodeContext
 from ._motion import curobo_linear_move, plan_tool_move
 from .constants import (
     EXCHANGE_RETRACT_D,
-    GIVER_QUAT,
     GIVER_RELEASE_FRACTION,
-    MEET_XYZ,
     PLAN_POSITION_THRESHOLD,
     PLAN_ROTATION_THRESHOLD,
     RECV_ANGLE_SWEEP_DEG,
+    RECV_CLOSE_SETTLE_STEPS,
     RECV_GRASP_ANGLE_DEG,
-    RECV_GRASP_DY,
+    RECV_GRASP_DY_MARGIN,
     RECV_GRASP_DZ,
     RECV_INSERT_OVERSHOOT,
     RECV_OPEN_SETTLE_STEPS,
     RECV_PRE_BACK,
-    RECV_QUAT,
 )
 
 ## This is used for the return
@@ -53,10 +51,17 @@ class Output(TypedDict):
     receiver_offset: list  # tape centre in the receiver TCP frame (m), measured at
                            # the grab instant via the giver's rigid grip + FK (no
                            # GT). Consumed by place to land the tape centre on target.
+    held_offset: list   # alias of receiver_offset — rebinds the cross-subgraph
+                        # ``held_offset`` name (the pickup bound it to the giver's
+                        # grip) to the RECEIVER's grip, so a downstream place
+                        # consumes the latest holder's offset either route.
     giver_tcp: list     # world giver TCP pose at the present, [x,y,z,qw,qx,qy,qz].
                         # A return leg replays these two proven-feasible, proven-
                         # collision-free poses with the arm roles swapped.
     receiver_tcp: list  # world receiver TCP pose at the grab, same layout.
+    giver_arm: int      # echo of the giving arm (checkpoint anchor)
+    receiver_arm: int   # echo of the receiving arm (checkpoint anchor; the
+                        # holder after this subgraph)
 
 
 # Reflection across the world Y=0 plane. The exchange geometry below is authored
@@ -69,14 +74,16 @@ _M = np.diag([1.0, -1.0, 1.0])
 
 
 
-def _rim_grasp(hx, hy, hz, angle_deg, mirror=False, quat=RECV_QUAT):
+def _rim_grasp(hx, hy, hz, angle_deg, mirror=False, *, quat, recv_grasp_dy):
     """Receiver grasp pose, revolved ``angle_deg`` around the ring's axis.
 
     The ring is presented face-on (axis ~ world +X), so its circumference lies in
     the world Y-Z plane. The base grasp (angle 0) is the -Y rim point: TCP offset
-    ``(0, -RECV_GRASP_DY, +RECV_GRASP_DZ)`` from the hole centre with orientation
-    ``quat`` (canonical ``RECV_QUAT`` by default; the station-geometry derivation
-    passes a base-geometry quat instead). Revolving applies a RIGID rotation of
+    ``(0, -recv_grasp_dy, +RECV_GRASP_DZ)`` from the hole centre with orientation
+    ``quat`` (the required canonical receiver quat, supplied base-geometry-derived
+    by tsh-station-geometry). ``recv_grasp_dy`` is DERIVED per-call from the
+    perceived ``rim_radius`` (stable run-to-run, unlike ``hole_radius``) plus a
+    small fixed margin — see ``run()``. Revolving applies a RIGID rotation of
     the whole grasp frame about the world-X axis through the hole centre — offset
     AND orientation together — carrying the threading finger to a new clock
     position while its threading geometry stays intact. ``mirror`` reflects the
@@ -87,8 +94,7 @@ def _rim_grasp(hx, hy, hz, angle_deg, mirror=False, quat=RECV_QUAT):
     a = np.radians(angle_deg)
     ## rotating around x sweeps gripper along circular rim
     Rx = Rotation.from_rotvec([a, 0.0, 0.0])  # about world X = the hole axis
-    ### offset from center hole to pinch the rim: this was TUNED (to avoid arm-arm collisions)
-    off = Rx.apply([0.0, -RECV_GRASP_DY, RECV_GRASP_DZ])
+    off = Rx.apply([0.0, -recv_grasp_dy, RECV_GRASP_DZ])
     qw, qx, qy, qz = quat
     ### hand orientation changes as we revolve around the circle
     R = Rx * Rotation.from_quat([qx, qy, qz, qw])
@@ -108,22 +114,46 @@ def _ee(ctx: NodeContext, arm_id: int):
     return p, Rotation.from_quat([r["x"], r["y"], r["z"], r["w"]])
 
 
+def _as_wxyz(q):
+    """Accept a Quaternion dict {w,x,y,z} (subgraph type coercion) or a wxyz
+    sequence; return a plain wxyz tuple."""
+    return (q["w"], q["x"], q["y"], q["z"]) if isinstance(q, dict) else tuple(q)
+
+
 def run(ctx: NodeContext, *,
         giver_arm: int = 0,
         receiver_arm: int = 1,
         tape_in_giver: list,
-        meet_xyz: tuple = MEET_XYZ) -> Output:
+        rim_radius: float,
+        meet_xyz: tuple,
+        giver_quat: tuple,
+        recv_quat: tuple,
+        skip_present: bool = False) -> Output:
     """Transfer the tape from giver to receiver at ``meet_xyz``.
 
     tape_in_giver: tape centre in the giver TCP frame, measured by the pickup —
                    the giver's tool offset for the whole exchange.
+    skip_present:  True when a preceding ``transport_held`` node (the shared
+                   held-object transport, possibly with the tape cloud attached
+                   as a collision body) already presented the tape at
+                   ``meet_xyz`` — the exchange then starts at the receiver
+                   thread. The live tape pose is re-queried from the giver's FK
+                   either way, so an imperfect present only shifts the thread
+                   target, never breaks it.
+    rim_radius:    perceived outer rim radius (m), relayed from tsh-pickup (the
+                   same value it used for the giver's grasp). Stable run-to-run
+                   (~1mm spread), unlike hole_radius (~17mm spread) — so the
+                   receiver's thread offset derives from this, not hole_radius.
     meet_xyz:      world-frame handover location (where the tape centre is
-                   presented). Defaults to the validated constants.MEET_XYZ;
-                   ``GAP_HANDOVER_XYZ="x,y,z"`` overrides at runtime to sweep
-                   handover positions without rebuilding the graph.
+                   presented). REQUIRED — supplied by tsh-station-geometry (no
+                   tuned fallback); ``GAP_HANDOVER_XYZ="x,y,z"`` overrides at runtime.
+    giver_quat / recv_quat: presentation orientations (wxyz). REQUIRED — supplied
+                   base-geometry-derived by tsh-station-geometry (no tuned
+                   fallback). ``recv_quat`` is canonical (as if the receiver sits
+                   on -Y); ``_rim_grasp`` mirrors it for a +Y receiver.
     """
+    recv_grasp_dy = rim_radius + RECV_GRASP_DY_MARGIN
     ### Flexible set of inputs for the agent
-    default_meet = meet_xyz is MEET_XYZ  # caller didn't name a handover point
     if isinstance(meet_xyz, dict):
         meet_xyz = (meet_xyz["x"], meet_xyz["y"], meet_xyz["z"])
     override = os.environ.get("GAP_HANDOVER_XYZ")
@@ -132,46 +162,25 @@ def run(ctx: NodeContext, *,
     tig = np.asarray(
         [tape_in_giver["x"], tape_in_giver["y"], tape_in_giver["z"]]
         if isinstance(tape_in_giver, dict) else tape_in_giver, dtype=float)
+    # Presentation quats may arrive as a Quaternion dict {w,x,y,z} (subgraph type
+    # coercion) or as a wxyz sequence; normalize to a wxyz tuple.
+    giver_quat = _as_wxyz(giver_quat)
+    recv_quat = _as_wxyz(recv_quat)
 
     # Handedness: the two arms are IDENTICAL copies (not mirror images), so both
-    # reach the SAME orientation set. The giver therefore presents with the
-    # canonical GIVER_QUAT regardless of side. What DOES flip for a reversed pair
-    # (receiver on +Y => giver on -Y): the receiver threads from its own +Y side
-    # (its grasp frame is reflected across Y=0), and the rendezvous mirrors to the
-    # giver's own -Y side so the arms present on their own halves instead of
-    # crossing. Side read from the base; an explicit/overridden meet is verbatim.
+    # reach the SAME orientation set. The giver presents with ``giver_quat``
+    # regardless of side; for a reversed pair (receiver on +Y) the receiver
+    # threads from its own +Y side (grasp frame reflected across Y=0). Side is
+    # read from the base and drives the ``_rim_grasp`` mirror below. The meet
+    # point is taken verbatim — tsh-station-geometry already computes it for the
+    # actual base configuration.
     recv_on_plus_y = float(
         ctx.tool("libero-yam.arm_base_pose", arm_id=receiver_arm)["position"][1]) > 0.0
-    if recv_on_plus_y and default_meet and not override:
-        mx, my, mz = meet_xyz
-        meet_xyz = (mx, -my, mz)
 
-    # Opt-in: derive the meet point AND the giver presentation orientation from
-    # the arm-base geometry instead of the tuned constants (self-configures for a
-    # restationed pair). Off by default; the tuned MEET_XYZ / GIVER_QUAT are the
-    # fallback the probe seeds from.
-    giver_quat = GIVER_QUAT
-    recv_base_quat = RECV_QUAT
-    if os.environ.get("GAP_DERIVE_MEET") and default_meet and not override:
-        from ._station_geometry import derive_station_geometry
-
-        def _giver_present(m, q):  # can the giver present the tape at m, orient q?
-            return plan_tool_move(ctx, giver_arm, list(m), q, tool_offset=tig,
-                                  execute=False) is not None
-
-        def _recv_thread(m, q):  # can the receiver thread the rim at m, orient q?
-            (tx, ty, tz), rq = _rim_grasp(m[0], m[1], m[2], RECV_GRASP_ANGLE_DEG,
-                                          recv_on_plus_y, quat=q)
-            return plan_tool_move(ctx, receiver_arm, [tx + RECV_PRE_BACK, ty, tz],
-                                  rq, execute=False) is not None
-
-        meet, giver_quat, recv_base_quat = derive_station_geometry(
-            ctx, giver_arm=giver_arm, receiver_arm=receiver_arm,
-            giver_present_probe=_giver_present, recv_thread_probe=_recv_thread)
-        meet_xyz = tuple(meet)
-        print(f"[exchange] derived meet_xyz={[round(v, 4) for v in meet_xyz]} "
-              f"giver_quat={[round(v, 4) for v in giver_quat]} (GAP_DERIVE_MEET)",
-              flush=True)
+    # The giver presents with ``giver_quat``; the receiver threads with the
+    # canonical ``recv_quat`` (``_rim_grasp`` mirrors it for a +Y receiver), both
+    # supplied base-geometry-derived by tsh-station-geometry.
+    recv_base_quat = recv_quat
 
     def _hole():
         """Live tape (hole) centre from the giver's FK + the rigid tape-in-giver
@@ -183,10 +192,11 @@ def run(ctx: NodeContext, *,
     # 1. Giver presents the tape "o" face-on at the meeting point: the TAPE is
     #    the end effector (tool_offset=tig), so cuRobo plans the tape centre to
     #    meet_xyz directly — repeatable regardless of how the ring settled on the
-    #    finger.
-    plan_tool_move(ctx, giver_arm, meet_xyz, giver_quat, tool_offset=tig,
-                   position_threshold=PLAN_POSITION_THRESHOLD,
-                   rotation_threshold=PLAN_ROTATION_THRESHOLD)
+    #    finger. Skipped when a transport_held node already presented.
+    if not skip_present:
+        plan_tool_move(ctx, giver_arm, meet_xyz, giver_quat, tool_offset=tig,
+                       position_threshold=PLAN_POSITION_THRESHOLD,
+                       rotation_threshold=PLAN_ROTATION_THRESHOLD)
 
     # 2. Receiver opens and pre-positions on its OWN Y side, level with the hole
     #    and backed off in -X, so its finger can sweep into the hole face along +X.
@@ -203,7 +213,7 @@ def run(ctx: NodeContext, *,
     for dangle in RECV_ANGLE_SWEEP_DEG:
         angle = RECV_GRASP_ANGLE_DEG + dangle ## increment the angle
         (tx, ty, tz), rq = _rim_grasp(hx, hy, hz, angle, recv_on_plus_y,
-                                      quat=recv_base_quat)
+                                      quat=recv_base_quat, recv_grasp_dy=recv_grasp_dy)
         pre_traj = plan_tool_move(ctx, receiver_arm, [tx + RECV_PRE_BACK, ty, tz], rq,
                                   execute=False)
         if pre_traj is None:
@@ -223,7 +233,7 @@ def run(ctx: NodeContext, *,
     #    receiver wrist stays on the open side the whole time.
     hx, hy, hz = _hole()
     (tx, ty, tz), recv_quat = _rim_grasp(hx, hy, hz, angle, recv_on_plus_y,
-                                         quat=recv_base_quat)
+                                         quat=recv_base_quat, recv_grasp_dy=recv_grasp_dy)
 
     #### BOTH OF THE BELOW were heavily tuned
     ### line up squarely with the tape
@@ -235,11 +245,15 @@ def run(ctx: NodeContext, *,
                        distance=RECV_INSERT_OVERSHOOT - RECV_PRE_BACK,
                        direction=(1.0, 0.0, 0.0))
 
-    # 4. Receiver closes on the rim. BEFORE the giver releases (grip still rigid),
-    #    recover the tape's world pose from the giver's FK and express the tape
-    #    centre in the RECEIVER TCP frame — the measured held-tape offset place
-    #    needs. The receiver's own grasp error is thereby accounted for; no GT.
-    ctx.tool("robot.close_gripper", arm_id=receiver_arm)
+    # 4. Receiver closes on the rim and settles BEFORE the giver moves at all — the
+    #    settle steps run the sim to let the receiver's jaw contact stabilize while
+    #    the giver's gripper command hasn't fired yet, so the giver can't start
+    #    releasing while the receiver's grip is still closing. Then recover the
+    #    tape's world pose from the giver's FK and express the tape centre in the
+    #    RECEIVER TCP frame — the measured held-tape offset place needs. The
+    #    receiver's own grasp error is thereby accounted for; no GT.
+    ctx.tool("robot.close_gripper", arm_id=receiver_arm,
+             settle_steps=RECV_CLOSE_SETTLE_STEPS)
     tape_world = np.array(_hole())
     p_recv, R_recv = _ee(ctx, receiver_arm)
     # The ring slides ~2cm back into the receiver's designed rim seat the instant
@@ -267,5 +281,7 @@ def run(ctx: NodeContext, *,
                    [tx + RECV_PRE_BACK, ty + recv_retract, tz], recv_quat)
 
     return {"handed_over": True, "receiver_offset": receiver_offset,
-            "giver_tcp": giver_tcp, "receiver_tcp": receiver_tcp}
+            "held_offset": receiver_offset,
+            "giver_tcp": giver_tcp, "receiver_tcp": receiver_tcp,
+            "giver_arm": int(giver_arm), "receiver_arm": int(receiver_arm)}
 

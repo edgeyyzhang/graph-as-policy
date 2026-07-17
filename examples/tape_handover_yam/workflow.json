@@ -2,12 +2,72 @@
   "version": 3,
   "meta": {
     "name": "tape_spool_handover_yam",
-    "description": "Non-policy bimanual tape handover on LIBERO-YAM (scripted primitives + canonical curobo bundle)."
+    "description": "Routed bimanual tape handover on LIBERO-YAM: probe reachability, hand over only when the destination is out of the picking arm's reach, verify each stage, recover by re-perceiving."
   },
   "nodes": {
+    "gripper_geometry": {
+      "type": "subgraph",
+      "ref": "gripper_geometry"
+    },
+    "station_geometry": {
+      "type": "subgraph",
+      "ref": "station_geometry"
+    },
+    "perceive_dest": {
+      "type": "subgraph",
+      "ref": "perceive_dest"
+    },
+    "perceive_target": {
+      "type": "subgraph",
+      "ref": "perceive_target"
+    },
+    "ring_geometry": {
+      "type": "subgraph",
+      "ref": "ring_geometry"
+    },
+    "route": {
+      "type": "subgraph",
+      "ref": "route"
+    },
+    "pickup": {
+      "type": "subgraph",
+      "ref": "pickup"
+    },
+    "verify_grasp": {
+      "type": "subgraph",
+      "ref": "verify_grasp"
+    },
+    "present": {
+      "type": "subgraph",
+      "ref": "present"
+    },
     "handover": {
       "type": "subgraph",
-      "ref": "handover_sg"
+      "ref": "handover"
+    },
+    "place": {
+      "type": "subgraph",
+      "ref": "place"
+    },
+    "verify_place": {
+      "type": "subgraph",
+      "ref": "verify_place"
+    },
+    "dispatch": {
+      "type": "router",
+      "inputs": {
+        "route": {
+          "$ref": "route.route"
+        }
+      },
+      "script": "scripts/dispatch_route.py"
+    },
+    "next_item": {
+      "type": "router",
+      "inputs": {
+        "total_items": 1
+      },
+      "script": "scripts/next_item.py"
     },
     "done": {
       "type": "end",
@@ -19,7 +79,15 @@
       "recovery": [
         {
           "tool": "robot.open_gripper",
-          "inputs": {}
+          "inputs": {
+            "arm_id": 0
+          }
+        },
+        {
+          "tool": "robot.open_gripper",
+          "inputs": {
+            "arm_id": 1
+          }
         }
       ]
     }
@@ -27,95 +95,240 @@
   "edges": [
     [
       "START",
-      "handover"
+      "gripper_geometry"
     ]
   ],
   "conditional_edges": {
+    "gripper_geometry": {
+      "router_field": "exit",
+      "mapping": {
+        "derived": "station_geometry",
+        "failed": "abort"
+      }
+    },
+    "station_geometry": {
+      "router_field": "exit",
+      "mapping": {
+        "derived": "perceive_dest",
+        "failed": "abort"
+      }
+    },
+    "perceive_dest": {
+      "router_field": "exit",
+      "mapping": {
+        "perceived": "perceive_target",
+        "not_found": "abort"
+      }
+    },
+    "perceive_target": {
+      "router_field": "exit",
+      "mapping": {
+        "perceived": "ring_geometry",
+        "not_found": "abort"
+      }
+    },
+    "ring_geometry": {
+      "router_field": "exit",
+      "mapping": {
+        "derived": "route",
+        "degenerate": "abort"
+      }
+    },
+    "route": {
+      "router_field": "exit",
+      "mapping": {
+        "direct": "pickup",
+        "needs_handover": "pickup",
+        "unreachable": "abort"
+      }
+    },
+    "pickup": {
+      "router_field": "exit",
+      "mapping": {
+        "grasped": "verify_grasp",
+        "failed": "abort"
+      }
+    },
+    "verify_grasp": {
+      "router_field": "exit",
+      "mapping": {
+        "holding": "dispatch",
+        "retry": "perceive_target",
+        "give_up": "abort",
+        "failed": "abort"
+      }
+    },
+    "present": {
+      "router_field": "exit",
+      "mapping": {
+        "transported": "handover",
+        "failed": "abort"
+      }
+    },
     "handover": {
       "router_field": "exit",
       "mapping": {
-        "placed": "done",
+        "handed_over": "place",
         "failed": "abort"
+      }
+    },
+    "place": {
+      "router_field": "exit",
+      "mapping": {
+        "placed": "verify_place",
+        "failed": "abort"
+      }
+    },
+    "verify_place": {
+      "router_field": "exit",
+      "mapping": {
+        "placed": "next_item",
+        "retry": "perceive_target",
+        "give_up": "abort",
+        "failed": "abort"
+      }
+    },
+    "dispatch": {
+      "router_field": null,
+      "mapping": {
+        "place": "place",
+        "present": "present"
+      }
+    },
+    "next_item": {
+      "router_field": null,
+      "mapping": {
+        "done": "done",
+        "next": "perceive_dest"
       }
     }
   },
   "subgraphs": {
-    "handover_sg": {
-      "skill": "tsh-bimanual-handover",
+    "gripper_geometry": {
+      "skill": "tsh-gripper-geometry",
       "inputs": {},
-      "outputs": {},
+      "outputs": {
+        "fingertip_axial": {
+          "$ref": "derive.fingertip_axial"
+        },
+        "finger_half_gap": {
+          "$ref": "derive.finger_half_gap"
+        }
+      },
+      "nodes": {
+        "derive": {
+          "type": "script",
+          "script": "scripts/gripper_geometry/gripper_geometry.py"
+        },
+        "derived": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "derive"
+        ],
+        [
+          "derive",
+          "derived"
+        ],
+        [
+          "derived",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "derived"
+        ]
+      },
+      "on_error": "failed"
+    },
+    "station_geometry": {
+      "skill": "tsh-station-geometry",
+      "inputs": {},
+      "outputs": {
+        "meet_xyz": {
+          "$ref": "derive.meet_xyz"
+        },
+        "giver_quat": {
+          "$ref": "derive.giver_quat"
+        },
+        "recv_quat": {
+          "$ref": "derive.recv_quat"
+        }
+      },
+      "nodes": {
+        "derive": {
+          "type": "script",
+          "script": "scripts/station_geometry/station_geometry.py"
+        },
+        "derived": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "derive"
+        ],
+        [
+          "derive",
+          "derived"
+        ],
+        [
+          "derived",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "derived"
+        ]
+      },
+      "on_error": "failed"
+    },
+    "perceive_dest": {
+      "skill": "tsh-perceive",
+      "inputs": {},
+      "outputs": {
+        "dest_found": {
+          "$ref": "perceive.found"
+        },
+        "dest_cloud": {
+          "$ref": "perceive.cloud"
+        },
+        "dest_xyz": {
+          "$ref": "perceive.top_xyz"
+        },
+        "dest_top_xyz": {
+          "$ref": "perceive.top_xyz"
+        },
+        "dest_half_z": {
+          "$ref": "perceive.half_z"
+        }
+      },
       "nodes": {
         "observe": {
           "type": "tool",
           "tool": "robot.get_observation"
         },
-        "perceive_duct": {
+        "perceive": {
           "type": "script",
           "inputs": {
-            "target_key": "duct_tape_1",
             "cameras": {
               "$ref": "observe.cameras"
-            }
+            },
+            "object_query": "gray tape"
           },
-          "script": "scripts/perceive_duct.py"
+          "script": "scripts/perceive_dest/perceive_object.py"
         },
-        "perceive_tape": {
-          "type": "script",
-          "inputs": {
-            "object_key": "yellow_tape_1",
-            "cameras": {
-              "$ref": "observe.cameras"
-            }
-          },
-          "script": "scripts/perceive_tape.py"
-        },
-        "pickup": {
-          "type": "script",
-          "inputs": {
-            "tape_xyz": {
-              "$ref": "perceive_tape.tape_xyz"
-            },
-            "hole_radius": {
-              "$ref": "perceive_tape.hole_radius"
-            },
-            "rim_radius": {
-              "$ref": "perceive_tape.rim_radius"
-            },
-            "arm_id": 0
-          },
-          "script": "scripts/pickup.py"
-        },
-        "bimanual_exchange": {
-          "type": "script",
-          "inputs": {
-            "giver_arm": 0,
-            "receiver_arm": 1,
-            "tape_in_giver": {
-              "$ref": "pickup.tape_in_giver"
-            }
-          },
-          "script": "scripts/bimanual_exchange.py"
-        },
-        "place": {
-          "type": "script",
-          "inputs": {
-            "receiver_offset": {
-              "$ref": "bimanual_exchange.receiver_offset"
-            },
-            "duct_xyz": {
-              "$ref": "perceive_duct.duct_xyz"
-            },
-            "tape_half_z": {
-              "$ref": "perceive_tape.tape_half_z"
-            },
-            "tape_cloud": {
-              "$ref": "perceive_tape.tape_cloud"
-            },
-            "arm_id": 1
-          },
-          "script": "scripts/place.py"
-        },
-        "placed": {
+        "perceived": {
           "type": "noop"
         }
       },
@@ -126,22 +339,621 @@
         ],
         [
           "observe",
-          "perceive_duct"
+          "perceive"
         ],
         [
-          "perceive_duct",
-          "perceive_tape"
+          "perceive",
+          "perceived"
         ],
         [
-          "perceive_tape",
+          "perceived",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "perceived"
+        ]
+      },
+      "on_error": "not_found"
+    },
+    "perceive_target": {
+      "skill": "tsh-perceive",
+      "inputs": {},
+      "outputs": {
+        "target_found": {
+          "$ref": "perceive.found"
+        },
+        "target_cloud": {
+          "$ref": "perceive.cloud"
+        },
+        "target_xyz": {
+          "$ref": "perceive.center_xyz"
+        },
+        "target_top_xyz": {
+          "$ref": "perceive.top_xyz"
+        },
+        "target_half_z": {
+          "$ref": "perceive.half_z"
+        }
+      },
+      "nodes": {
+        "observe": {
+          "type": "tool",
+          "tool": "robot.get_observation"
+        },
+        "perceive": {
+          "type": "script",
+          "inputs": {
+            "cameras": {
+              "$ref": "observe.cameras"
+            },
+            "object_query": "yellow tape"
+          },
+          "script": "scripts/perceive_target/perceive_object.py"
+        },
+        "perceived": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "observe"
+        ],
+        [
+          "observe",
+          "perceive"
+        ],
+        [
+          "perceive",
+          "perceived"
+        ],
+        [
+          "perceived",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "perceived"
+        ]
+      },
+      "on_error": "not_found"
+    },
+    "ring_geometry": {
+      "skill": "tsh-ring-geometry",
+      "inputs": {
+        "target_cloud": "PointCloud",
+        "target_xyz": "Vec3",
+        "target_half_z": "float"
+      },
+      "outputs": {
+        "hole_radius": {
+          "$ref": "ring.hole_radius"
+        },
+        "rim_radius": {
+          "$ref": "ring.rim_radius"
+        }
+      },
+      "nodes": {
+        "ring": {
+          "type": "script",
+          "inputs": {
+            "cloud": {
+              "$ref": "in.target_cloud"
+            },
+            "center_xyz": {
+              "$ref": "in.target_xyz"
+            },
+            "half_z": {
+              "$ref": "in.target_half_z"
+            }
+          },
+          "script": "scripts/ring_geometry/ring_geometry.py"
+        },
+        "derived": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "ring"
+        ],
+        [
+          "ring",
+          "derived"
+        ],
+        [
+          "derived",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "derived"
+        ]
+      },
+      "on_error": "degenerate"
+    },
+    "route": {
+      "skill": "tsh-route",
+      "inputs": {
+        "target_xyz": "Vec3",
+        "dest_xyz": "Vec3",
+        "target_half_z": "float",
+        "hole_radius": "float",
+        "rim_radius": "float",
+        "fingertip_axial": "float",
+        "finger_half_gap": "float"
+      },
+      "outputs": {
+        "route": {
+          "$ref": "route.route"
+        },
+        "pick_arm": {
+          "$ref": "route.pick_arm"
+        },
+        "place_arm": {
+          "$ref": "route.place_arm"
+        },
+        "giver_arm": {
+          "$ref": "route.giver_arm"
+        },
+        "receiver_arm": {
+          "$ref": "route.receiver_arm"
+        }
+      },
+      "nodes": {
+        "route": {
+          "type": "script",
+          "inputs": {
+            "target_xyz": {
+              "$ref": "in.target_xyz"
+            },
+            "dest_xyz": {
+              "$ref": "in.dest_xyz"
+            },
+            "half_z": {
+              "$ref": "in.target_half_z"
+            },
+            "hole_radius": {
+              "$ref": "in.hole_radius"
+            },
+            "rim_radius": {
+              "$ref": "in.rim_radius"
+            },
+            "fingertip_axial": {
+              "$ref": "in.fingertip_axial"
+            },
+            "finger_half_gap": {
+              "$ref": "in.finger_half_gap"
+            }
+          },
+          "script": "scripts/route/route.py"
+        },
+        "direct": {
+          "type": "noop"
+        },
+        "needs_handover": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "route"
+        ],
+        [
+          "direct",
+          "END"
+        ],
+        [
+          "needs_handover",
+          "END"
+        ]
+      ],
+      "conditional_edges": {
+        "route": {
+          "router_field": "route",
+          "mapping": {
+            "direct": "direct",
+            "handover": "needs_handover"
+          }
+        }
+      },
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "direct",
+          "needs_handover"
+        ]
+      },
+      "on_error": "unreachable"
+    },
+    "pickup": {
+      "skill": "tsh-pickup",
+      "inputs": {
+        "target_xyz": "Vec3",
+        "hole_radius": "float",
+        "rim_radius": "float",
+        "fingertip_axial": "float",
+        "finger_half_gap": "float",
+        "pick_arm": "int"
+      },
+      "outputs": {
+        "grasped": {
+          "$ref": "pickup.grasped"
+        },
+        "held_offset": {
+          "$ref": "pickup.held_offset"
+        },
+        "tape_in_giver": {
+          "$ref": "pickup.tape_in_giver"
+        },
+        "grasp_tcp": {
+          "$ref": "pickup.grasp_tcp"
+        },
+        "rim_radius": {
+          "$ref": "pickup.rim_radius"
+        },
+        "pick_arm": {
+          "$ref": "pickup.pick_arm"
+        }
+      },
+      "nodes": {
+        "pickup": {
+          "type": "script",
+          "inputs": {
+            "tape_xyz": {
+              "$ref": "in.target_xyz"
+            },
+            "hole_radius": {
+              "$ref": "in.hole_radius"
+            },
+            "rim_radius": {
+              "$ref": "in.rim_radius"
+            },
+            "fingertip_axial": {
+              "$ref": "in.fingertip_axial"
+            },
+            "finger_half_gap": {
+              "$ref": "in.finger_half_gap"
+            },
+            "arm_id": {
+              "$ref": "in.pick_arm"
+            }
+          },
+          "script": "scripts/pickup/pickup.py"
+        },
+        "grasped": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
           "pickup"
         ],
         [
           "pickup",
-          "bimanual_exchange"
+          "grasped"
         ],
         [
-          "bimanual_exchange",
+          "grasped",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "grasped"
+        ]
+      },
+      "on_error": "failed",
+      "stage": "grasp"
+    },
+    "verify_grasp": {
+      "skill": "tsh-verify-grasp",
+      "inputs": {
+        "pick_arm": "int"
+      },
+      "outputs": {
+        "verdict": {
+          "$ref": "check.verdict"
+        },
+        "holding": {
+          "$ref": "check.holding"
+        },
+        "fraction": {
+          "$ref": "check.fraction"
+        }
+      },
+      "nodes": {
+        "observe": {
+          "type": "tool",
+          "tool": "robot.get_observation"
+        },
+        "check": {
+          "type": "script",
+          "inputs": {
+            "arm_id": {
+              "$ref": "in.pick_arm"
+            },
+            "object_query": "yellow tape",
+            "cameras": {
+              "$ref": "observe.cameras"
+            }
+          },
+          "script": "scripts/verify_grasp/verify_grasp.py"
+        },
+        "holding": {
+          "type": "noop"
+        },
+        "retry": {
+          "type": "noop"
+        },
+        "give_up": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "observe"
+        ],
+        [
+          "observe",
+          "check"
+        ],
+        [
+          "holding",
+          "END"
+        ],
+        [
+          "retry",
+          "END"
+        ],
+        [
+          "give_up",
+          "END"
+        ]
+      ],
+      "conditional_edges": {
+        "check": {
+          "router_field": "verdict",
+          "mapping": {
+            "holding": "holding",
+            "retry": "retry",
+            "give_up": "give_up"
+          }
+        }
+      },
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "holding",
+          "retry",
+          "give_up"
+        ]
+      },
+      "on_error": "failed"
+    },
+    "present": {
+      "skill": "tsh-transport-held",
+      "inputs": {
+        "giver_arm": "int",
+        "held_offset": "Vec3",
+        "meet_xyz": "Vec3",
+        "giver_quat": "Quaternion",
+        "target_cloud": "PointCloud"
+      },
+      "outputs": {
+        "transported": {
+          "$ref": "transport.transported"
+        },
+        "held_tcp": {
+          "$ref": "transport.held_tcp"
+        }
+      },
+      "nodes": {
+        "transport": {
+          "type": "script",
+          "inputs": {
+            "arm_id": {
+              "$ref": "in.giver_arm"
+            },
+            "held_offset": {
+              "$ref": "in.held_offset"
+            },
+            "target_xyz": {
+              "$ref": "in.meet_xyz"
+            },
+            "target_quat": {
+              "$ref": "in.giver_quat"
+            },
+            "held_cloud": {
+              "$ref": "in.target_cloud"
+            }
+          },
+          "script": "scripts/present/transport_held.py"
+        },
+        "transported": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "transport"
+        ],
+        [
+          "transport",
+          "transported"
+        ],
+        [
+          "transported",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "transported"
+        ]
+      },
+      "on_error": "failed",
+      "stage": "transport"
+    },
+    "handover": {
+      "skill": "tsh-handover",
+      "inputs": {
+        "giver_arm": "int",
+        "receiver_arm": "int",
+        "tape_in_giver": "Vec3",
+        "rim_radius": "float",
+        "meet_xyz": "Vec3",
+        "giver_quat": "Quaternion",
+        "recv_quat": "Quaternion"
+      },
+      "outputs": {
+        "handed_over": {
+          "$ref": "exchange.handed_over"
+        },
+        "receiver_offset": {
+          "$ref": "exchange.receiver_offset"
+        },
+        "held_offset": {
+          "$ref": "exchange.held_offset"
+        },
+        "giver_tcp": {
+          "$ref": "exchange.giver_tcp"
+        },
+        "receiver_tcp": {
+          "$ref": "exchange.receiver_tcp"
+        },
+        "giver_arm": {
+          "$ref": "exchange.giver_arm"
+        },
+        "receiver_arm": {
+          "$ref": "exchange.receiver_arm"
+        }
+      },
+      "nodes": {
+        "exchange": {
+          "type": "script",
+          "inputs": {
+            "giver_arm": {
+              "$ref": "in.giver_arm"
+            },
+            "receiver_arm": {
+              "$ref": "in.receiver_arm"
+            },
+            "tape_in_giver": {
+              "$ref": "in.tape_in_giver"
+            },
+            "rim_radius": {
+              "$ref": "in.rim_radius"
+            },
+            "meet_xyz": {
+              "$ref": "in.meet_xyz"
+            },
+            "giver_quat": {
+              "$ref": "in.giver_quat"
+            },
+            "recv_quat": {
+              "$ref": "in.recv_quat"
+            },
+            "skip_present": true
+          },
+          "script": "scripts/handover/bimanual_exchange.py"
+        },
+        "handed_over": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "exchange"
+        ],
+        [
+          "exchange",
+          "handed_over"
+        ],
+        [
+          "handed_over",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "handed_over"
+        ]
+      },
+      "on_error": "failed",
+      "stage": "transport"
+    },
+    "place": {
+      "skill": "tsh-place",
+      "inputs": {
+        "held_offset": "Vec3",
+        "dest_xyz": "Vec3",
+        "target_half_z": "float",
+        "target_cloud": "PointCloud",
+        "place_arm": "int"
+      },
+      "outputs": {
+        "placed": {
+          "$ref": "place.placed"
+        },
+        "place_tcp": {
+          "$ref": "place.place_tcp"
+        },
+        "place_arm": {
+          "$ref": "place.place_arm"
+        }
+      },
+      "nodes": {
+        "place": {
+          "type": "script",
+          "inputs": {
+            "held_offset": {
+              "$ref": "in.held_offset"
+            },
+            "dest_xyz": {
+              "$ref": "in.dest_xyz"
+            },
+            "arm_id": {
+              "$ref": "in.place_arm"
+            },
+            "tape_half_z": {
+              "$ref": "in.target_half_z"
+            },
+            "tape_cloud": {
+              "$ref": "in.target_cloud"
+            }
+          },
+          "script": "scripts/place/place.py"
+        },
+        "placed": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
           "place"
         ],
         [
@@ -158,6 +970,100 @@
         "router_field": null,
         "success_values": [
           "placed"
+        ]
+      },
+      "on_error": "failed",
+      "stage": "place"
+    },
+    "verify_place": {
+      "skill": "tsh-verify-place",
+      "inputs": {
+        "dest_xyz": "Vec3",
+        "target_half_z": "float"
+      },
+      "outputs": {
+        "verdict": {
+          "$ref": "check.verdict"
+        },
+        "placed": {
+          "$ref": "check.placed"
+        },
+        "xy_error_m": {
+          "$ref": "check.xy_error_m"
+        },
+        "z_error_m": {
+          "$ref": "check.z_error_m"
+        }
+      },
+      "nodes": {
+        "observe": {
+          "type": "tool",
+          "tool": "robot.get_observation"
+        },
+        "check": {
+          "type": "script",
+          "inputs": {
+            "object_query": "yellow tape",
+            "dest_xyz": {
+              "$ref": "in.dest_xyz"
+            },
+            "half_z": {
+              "$ref": "in.target_half_z"
+            },
+            "cameras": {
+              "$ref": "observe.cameras"
+            }
+          },
+          "script": "scripts/verify_place/verify_place.py"
+        },
+        "placed": {
+          "type": "noop"
+        },
+        "retry": {
+          "type": "noop"
+        },
+        "give_up": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "observe"
+        ],
+        [
+          "observe",
+          "check"
+        ],
+        [
+          "placed",
+          "END"
+        ],
+        [
+          "retry",
+          "END"
+        ],
+        [
+          "give_up",
+          "END"
+        ]
+      ],
+      "conditional_edges": {
+        "check": {
+          "router_field": "verdict",
+          "mapping": {
+            "placed": "placed",
+            "retry": "retry",
+            "give_up": "give_up"
+          }
+        }
+      },
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "placed",
+          "retry",
+          "give_up"
         ]
       },
       "on_error": "failed"
