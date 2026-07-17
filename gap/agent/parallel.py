@@ -66,6 +66,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from gap_core.errors import GuardLimitExceeded
+
 logger = logging.getLogger(__name__)
 
 #: Comma-separated GPU ids to round-robin MuJoCo EGL across, e.g.
@@ -222,6 +224,14 @@ class WorkerState:
     skill_registry: Any = None
     connector: Any = None
     tool_registry: Any = None
+    tool_bundle_manager: Any = None
+    """Persistent ToolBundleManager for this worker's RPC bundles. Booted
+    once and reused across trials — re-booting per trial would re-register
+    the RPC tools into the (connector-scoped, trial-persistent) registry and
+    collide. Rebuilt when the connector — and thus the registry — changes."""
+    tool_bundle_registry: Any = None
+    """The tool_registry ``tool_bundle_manager`` booted into; identity-compared
+    against ``tool_registry`` to detect a connector/registry swap."""
     last_init: tuple[str, int] | None = None
     """``(suite_name, task_id)`` of the live connector. When the next
     WorkItem matches we skip construction and just ``reset(seed)``."""
@@ -442,6 +452,13 @@ def worker_cleanup(state: WorkerState | None) -> None:
             _close()
     except Exception:
         logger.debug("worker_cleanup failed", exc_info=True)
+    if state.tool_bundle_manager is not None:
+        try:
+            state.tool_bundle_manager.shutdown_all()
+        except Exception:
+            logger.debug("worker_cleanup: tool bundle shutdown failed", exc_info=True)
+    state.tool_bundle_manager = None
+    state.tool_bundle_registry = None
     state.trial_runner = None
     state.connector = None
     state.tool_registry = None
@@ -552,7 +569,6 @@ def _execute_trial(
     # from PRESETS unless overridden in `policies:`); a missing/unstartable
     # server fails the trial here with a clear error.
     from gap.runtime.policy_boot import boot_policies
-    from gap.runtime.tool_bundle_boot import boot_tool_bundles
 
     policy_manager, policy_executor = boot_policies(
         item.workflow_dir,
@@ -572,14 +588,36 @@ def _execute_trial(
     # with "Tool 'sam3.segment_text' not found". gap.execute() does the same
     # boot on the single-run path (gap/runtime/execute.py:169); the
     # benchmark trial path was missing it.
-    tool_bundle_manager = None
+    # Boot the workflow's RPC tool bundles once per worker and reuse them.
+    # The manager is rebuilt only when the connector — and thus the
+    # tool_registry — was swapped (task switch); on same-task trials the
+    # registry persists, so re-registering would collide. Only bundles not
+    # already loaded are booted, so a later workflow needing an extra bundle
+    # still gets it.
     if state.skill_registry is not None:
         try:
-            tool_bundle_manager = boot_tool_bundles(
-                item.workflow_dir,
-                state.skill_registry,
-                state.tool_registry,
+            from gap.runtime.tool_bundle_boot import required_rpc_tool_bundles
+            from gap.runtime.tool_bundle_manager import ToolBundleManager
+
+            if (
+                state.tool_bundle_manager is None
+                or state.tool_bundle_registry is not state.tool_registry
+            ):
+                if state.tool_bundle_manager is not None:
+                    state.tool_bundle_manager.shutdown_all()
+                state.tool_bundle_manager = ToolBundleManager(
+                    skill_registry=state.skill_registry,
+                    tool_registry=state.tool_registry,
+                )
+                state.tool_bundle_registry = state.tool_registry
+            required = required_rpc_tool_bundles(
+                item.workflow_dir, state.skill_registry,
             )
+            missing = set(required) - set(
+                state.tool_bundle_manager.loaded_bundles()
+            )
+            if missing:
+                state.tool_bundle_manager.boot_all(missing)
         except Exception as exc:
             logger.error(
                 "Trial %d (task %d): tool bundle boot failed: %s",
@@ -601,6 +639,18 @@ def _execute_trial(
         try:
             executor.execute()
             trial_result.exit_code = 0
+        except GuardLimitExceeded as exc:
+            # GuardLimitExceeded subclasses BaseException (so generic
+            # ``except Exception`` can't swallow it), but at the trial
+            # boundary a tripped safety guard is just a failed trial — catch
+            # it here so the worker survives, the video is saved, and the
+            # result is recorded instead of crashing the whole process.
+            trial_result.exit_code = 1
+            trial_result.execution_stderr += f"\nsafety guard tripped: {exc}"
+            logger.warning(
+                "Trial %d (task %d) hit a safety guard: %s",
+                item.trial_id, item.task_id, exc,
+            )
         except Exception as exc:
             trial_result.exit_code = 1
             trial_result.execution_stderr += f"\n{exc}"
@@ -614,11 +664,8 @@ def _execute_trial(
                 executor.close()
             except Exception:
                 pass
-        if tool_bundle_manager is not None:
-            try:
-                tool_bundle_manager.shutdown_all()
-            except Exception:
-                pass
+        # NB: the tool bundle manager is NOT shut down here — it persists on
+        # the WorkerState across trials and is torn down in worker_cleanup.
         if policy_executor is not None:
             policy_executor.close()
         if policy_manager is not None:

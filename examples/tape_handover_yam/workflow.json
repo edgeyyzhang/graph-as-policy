@@ -1,0 +1,166 @@
+{
+  "version": 3,
+  "meta": {
+    "name": "tape_spool_handover_yam",
+    "description": "Non-policy bimanual tape handover on LIBERO-YAM (scripted primitives + canonical curobo bundle)."
+  },
+  "nodes": {
+    "handover": {
+      "type": "subgraph",
+      "ref": "handover_sg"
+    },
+    "done": {
+      "type": "end",
+      "status": "success"
+    },
+    "abort": {
+      "type": "end",
+      "status": "failure",
+      "recovery": [
+        {
+          "tool": "robot.open_gripper",
+          "inputs": {}
+        }
+      ]
+    }
+  },
+  "edges": [
+    [
+      "START",
+      "handover"
+    ]
+  ],
+  "conditional_edges": {
+    "handover": {
+      "router_field": "exit",
+      "mapping": {
+        "placed": "done",
+        "failed": "abort"
+      }
+    }
+  },
+  "subgraphs": {
+    "handover_sg": {
+      "skill": "tsh-bimanual-handover",
+      "inputs": {},
+      "outputs": {},
+      "nodes": {
+        "observe": {
+          "type": "tool",
+          "tool": "robot.get_observation"
+        },
+        "perceive_duct": {
+          "type": "script",
+          "inputs": {
+            "target_key": "duct_tape_1",
+            "cameras": {
+              "$ref": "observe.cameras"
+            }
+          },
+          "script": "scripts/perceive_duct.py"
+        },
+        "perceive_tape": {
+          "type": "script",
+          "inputs": {
+            "object_key": "yellow_tape_1",
+            "cameras": {
+              "$ref": "observe.cameras"
+            }
+          },
+          "script": "scripts/perceive_tape.py"
+        },
+        "pickup": {
+          "type": "script",
+          "inputs": {
+            "tape_xyz": {
+              "$ref": "perceive_tape.tape_xyz"
+            },
+            "hole_radius": {
+              "$ref": "perceive_tape.hole_radius"
+            },
+            "rim_radius": {
+              "$ref": "perceive_tape.rim_radius"
+            },
+            "arm_id": 0
+          },
+          "script": "scripts/pickup.py"
+        },
+        "bimanual_exchange": {
+          "type": "script",
+          "inputs": {
+            "giver_arm": 0,
+            "receiver_arm": 1,
+            "tape_in_giver": {
+              "$ref": "pickup.tape_in_giver"
+            }
+          },
+          "script": "scripts/bimanual_exchange.py"
+        },
+        "place": {
+          "type": "script",
+          "inputs": {
+            "receiver_offset": {
+              "$ref": "bimanual_exchange.receiver_offset"
+            },
+            "duct_xyz": {
+              "$ref": "perceive_duct.duct_xyz"
+            },
+            "tape_half_z": {
+              "$ref": "perceive_tape.tape_half_z"
+            },
+            "tape_cloud": {
+              "$ref": "perceive_tape.tape_cloud"
+            },
+            "arm_id": 1
+          },
+          "script": "scripts/place.py"
+        },
+        "placed": {
+          "type": "noop"
+        }
+      },
+      "edges": [
+        [
+          "START",
+          "observe"
+        ],
+        [
+          "observe",
+          "perceive_duct"
+        ],
+        [
+          "perceive_duct",
+          "perceive_tape"
+        ],
+        [
+          "perceive_tape",
+          "pickup"
+        ],
+        [
+          "pickup",
+          "bimanual_exchange"
+        ],
+        [
+          "bimanual_exchange",
+          "place"
+        ],
+        [
+          "place",
+          "placed"
+        ],
+        [
+          "placed",
+          "END"
+        ]
+      ],
+      "conditional_edges": {},
+      "exit": {
+        "router_field": null,
+        "success_values": [
+          "placed"
+        ]
+      },
+      "on_error": "failed"
+    }
+  }
+}

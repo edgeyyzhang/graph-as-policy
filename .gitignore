@@ -19,3 +19,12 @@ node_modules/
 curobo_debug/
 .llm_cache/
 node_data/
+
+# --- TSH research artifacts (heavy runtime output; keep source, not data) ---
+benchmark_runs/
+examples/tape_handover_yam/generated/
+examples/tape_handover_yam/renders/
+examples/tape_handover_yam/dag_trace.json
+examples/tape_handover_yam/*.npy
+examples/tape_handover_yam/*.png
+my_graph/

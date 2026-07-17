@@ -1,0 +1,42 @@
+[project]
+name = "tsh-skills"
+version = "0.1.0"
+description = "A gap skill registry: robot skill and tool bundles."
+requires-python = ">=3.10"
+dependencies = ["graph-as-policy"]
+
+[project.optional-dependencies]
+# One pip extra per bundle (extra name == bundle name; use [] when the
+# bundle has no deps of its own). `gap check` derives install hints from
+# this table.
+libero-yam = []  # static type declarations for LiberoYamSimConnector tools; no extra deps
+tsh-canonicalize = []
+# Scripted (non-policy) bimanual handover. No deps of its own — IK + controller
+# come from LIBERO-YAM via gap.connector.libero_yam.
+tsh-bimanual-handover = []
+# TODO(serving): add the openpi git dep + model deps once a TSH checkpoint
+# exists and the VLA loop graduates to a served policy.
+tsh-pi05 = []
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+# Developing against a side-by-side gap checkout? Uncomment:
+# [tool.uv.sources]
+# graph-as-policy = { path = "../graph-as-policy", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# This package is a dependency-metadata carrier; bundles load by path.
+bypass-selection = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not gpu and not llm'"
+markers = [
+  "gpu: needs model weights + an NVIDIA GPU",
+  "llm: needs a live LLM API key",
+]

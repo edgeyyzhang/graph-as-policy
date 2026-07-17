@@ -1492,6 +1492,7 @@ dependencies = [
     { name = "einops" },
     { name = "fastapi" },
     { name = "future" },
+    { name = "google-genai" },
     { name = "graph-as-policy-core" },
     { name = "gym" },
     { name = "gymnasium" },
@@ -1578,6 +1579,7 @@ requires-dist = [
     { name = "einops", specifier = ">=0.4.1" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "future", specifier = ">=0.18.2" },
+    { name = "google-genai", specifier = ">=1.59.0" },
     { name = "google-genai", marker = "extra == 'vertex'", specifier = ">=1.0,<1.60" },
     { name = "graph-as-policy", extras = ["libero"], marker = "extra == 'grocery'" },
     { name = "graph-as-policy", extras = ["libero"], marker = "extra == 'quickstart'" },
@@ -2568,7 +2570,7 @@ wheels = [
 [[package]]
 name = "libero"
 version = "0.2.0"
-source = { editable = "../graph-as-policy/third_party/Variational-Automation-Benchmark" }
+source = { editable = "third_party/Variational-Automation-Benchmark" }
 
 [[package]]
 name = "librt"
@@ -4074,7 +4076,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "graph-as-policy", editable = "../graph-as-policy" }]
+requires-dist = [{ name = "graph-as-policy", editable = "." }]
 provides-extras = ["perceiving-objects", "perceiving-objects-oneshot", "perceiving-objects-multiview", "perceiving-object-parts", "grasping-with-planner", "grasping-direct-ik", "grasping-short-axis", "transporting-objects", "tracking-objects", "quickstart", "grocery", "all"]
 
 [package.metadata.requires-dev]
@@ -5095,7 +5097,7 @@ wheels = [
 [[package]]
 name = "robosuite"
 version = "1.4.0"
-source = { editable = "../graph-as-policy/third_party/robosuite" }
+source = { editable = "third_party/robosuite" }
 dependencies = [
     { name = "mujoco" },
     { name = "numba" },

@@ -13,8 +13,9 @@ task: "auto"   # per-task prompts resolved from LIBERO metadata
 skills: ../../../open-robot-skills
 
 llm:
-  provider: anthropic
-  # model: claude-opus-4-8        # default; uncomment to pin
+  provider: vertex
+  model: claude-opus-4-8
+  project_id: autolab-res
 
 benchmark:
   families: [grocery_packing]
@@ -22,8 +23,10 @@ benchmark:
   modes: [llm_generation]
   n_tasks: 1
   task_ids: [0]
-  n_seeds: 1
-  num_workers: 1
+  n_seeds: 10          # ← 10 trials instead of 1
+  num_workers: 1       # single 24GB GPU: one worker's stack (sam3+dino+curobo+sim) ~fills it; 2 workers OOM
   record_video: true
   smoke: true
   output_dir: ../../benchmark_runs/smoke
+safety_limits:
+  max_planning_calls: 100   # keep what you added, or the clean-all loop trips the guard

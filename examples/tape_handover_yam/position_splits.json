@@ -1,0 +1,2522 @@
+[
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": true,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.6,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.4,
+      -0.5
+    ],
+    "golden": false,
+    "split": "train"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.4,
+      -0.375
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.375
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.5,
+      -0.25
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.5,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.375
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.5
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.375
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.375
+    ],
+    "duct_xy": [
+      0.55,
+      -0.375
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.4,
+      0.375
+    ],
+    "duct_xy": [
+      0.45,
+      -0.25
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.25
+    ],
+    "duct_xy": [
+      0.6,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.45,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.375
+    ],
+    "duct_xy": [
+      0.5,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.4,
+      -0.25
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.25
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.25
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.45,
+      0.5
+    ],
+    "duct_xy": [
+      0.55,
+      -0.5
+    ],
+    "golden": false,
+    "split": "test"
+  },
+  {
+    "yellow_xy": [
+      0.55,
+      0.5
+    ],
+    "duct_xy": [
+      0.6,
+      -0.25
+    ],
+    "golden": false,
+    "split": "test"
+  }
+]
