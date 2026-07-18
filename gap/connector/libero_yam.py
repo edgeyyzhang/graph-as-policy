@@ -33,6 +33,11 @@ from gap.envs.libero_yam_env import YAM_TCP_OFFSET
 from gap_core.tools import ToolRegistry
 
 
+# Stream every Nth interpolated curobo waypoint in _execute_plan (each played one
+# 30 Hz sim step). 2 roughly halves transit time vs streaming all waypoints; the
+# final waypoint is always executed + converged so end-pose accuracy is unchanged.
+_EXEC_WAYPOINT_STRIDE = 2
+
 # Finger joint's fully-open value (URDF `left_finger` prismatic upper limit).
 # yam.yml locks the finger CLOSED; we lock it OPEN instead (see _yam_robot_cfg)
 # so the collision model always over-approximates the finger footprint.
@@ -391,7 +396,7 @@ class LiberoYamSimConnector(SimConnector):
         obs.update(self.env.camera_frames())
         return self._build_observation(obs)
 
-    def open_gripper(self, settle_steps: int = 40, arm_id: int = 0,
+    def open_gripper(self, settle_steps: int = 10, arm_id: int = 0,
                      fraction: float = 1.0) -> dict:
         """Open the gripper to ``fraction`` (0 = closed, 1 = fully open).
 
@@ -399,14 +404,14 @@ class LiberoYamSimConnector(SimConnector):
         the fingers wide enough to collide with a nearby arm during a bimanual
         exchange.
         """
-        settle = settle_steps if settle_steps > 0 else 40
+        settle = settle_steps if settle_steps > 0 else 10
         self.set_gripper(float(fraction), arm_id=arm_id)
         for _ in range(settle):
             self.step_once()
         position = self.get_gripper_fraction(arm_id=arm_id)
         return {"position": position}
 
-    def close_gripper(self, settle_steps: int = 60, arm_id: int = 0,
+    def close_gripper(self, settle_steps: int = 20, arm_id: int = 0,
                       ramp_steps: int = 0) -> dict:
         """Close the gripper, optionally ramping the jaws shut for a gentler grasp.
 
@@ -500,7 +505,7 @@ class LiberoYamSimConnector(SimConnector):
         }
 
     def _execute_plan(self, trajectory: dict, arm_id: int = 0,
-                      max_steps: int = 200) -> dict:
+                      max_steps: int = 22) -> dict:
         """Stream-execute a cuRobo joint ``Trajectory`` on the given arm.
 
         The canonical ``curobo.plan_to_pose`` tool only plans; this runs the
@@ -516,10 +521,16 @@ class LiberoYamSimConnector(SimConnector):
         wps = (trajectory or {}).get("waypoints") or []
         if not wps:
             raise ToolError("libero-yam.execute_trajectory", "trajectory has no waypoints")
-        for wp in wps[:-1]:
+        # Stream every _EXEC_WAYPOINT_STRIDE-th interpolated waypoint (each one sim
+        # step): the curobo bundle interpolates at 1/15 s but the sim steps at 30 Hz,
+        # so playing every waypoint already runs 2x the planned speed; striding by 2
+        # runs ~4x, roughly halving transit time. The final waypoint is always
+        # streamed and then blocking-converged, so end-pose accuracy is unchanged.
+        for wp in wps[:-1:_EXEC_WAYPOINT_STRIDE]:
             self.move_to_joints(wp["positions"], max_steps=0, arm_id=arm_id)
         self.move_to_joints(
-            wps[-1]["positions"], tolerance=0.03, max_steps=max_steps, arm_id=arm_id)
+            wps[-1]["positions"], tolerance=0.03, max_steps=max_steps, arm_id=arm_id,
+            settle_steps=3)
         return {"executed": True, "waypoints": len(wps)}
 
 

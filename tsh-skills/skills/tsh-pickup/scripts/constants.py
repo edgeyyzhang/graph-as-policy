@@ -174,8 +174,8 @@ PLAN_ROTATION_THRESHOLD = 0.05  # rad
 
 # ── Gripper actuation timing ────────────────────────────────────────────────────
 # ramp then settle so the light ring is not kicked as the jaws seat on close.
-GRASP_CLOSE_SETTLE_STEPS = 150  # sim steps to settle the giver grip after the ramp
-GRASP_CLOSE_RAMP_STEPS   = 60   # sim steps to ramp the jaws gently closed
+GRASP_CLOSE_SETTLE_STEPS = 18   # sim steps to settle the giver grip after the ramp
+GRASP_CLOSE_RAMP_STEPS   = 12   # sim steps to ramp the jaws gently closed
 RECV_OPEN_SETTLE_STEPS   = 200  # sim steps to settle the receiver's pre-thread open
 GIVER_RELEASE_FRACTION   = 0.5  # partial giver open at the grab instant, before full release
 

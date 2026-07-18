@@ -39,6 +39,15 @@ from gap.connector.libero_yam import libero_yam as _libero_yam
 from gap.runtime.execute import execute
 
 HERE = Path(__file__).resolve().parent
+# Renders capture 1 of every RENDER_STRIDE control steps (offscreen-render cost),
+# so the mp4 must be encoded at CONTROL_HZ / RENDER_STRIDE to play back in real
+# time — encoding sparse frames at the full CONTROL_HZ is what made older clips
+# look ~8x sped up. Same subsample<->fps pairing as grocery-packing-benchmark.
+CONTROL_HZ = 30
+# GAP_RENDER_STRIDE=1 renders every control step (smooth, real-time 30 fps but
+# more offscreen-render cost); the default 8 renders 1-of-8 for cheap review clips.
+RENDER_STRIDE = int(os.environ.get("GAP_RENDER_STRIDE", "8"))
+RENDER_FPS = CONTROL_HZ / RENDER_STRIDE
 # Passing skills= explicitly REPLACES sibling auto-discovery, so open-robot-skills
 # must be listed too — perception + planning use its grounding-dino / sam3 /
 # curobo bundles (base first, tsh-skills layered on top).
@@ -162,7 +171,7 @@ def main(argv=None) -> int:
         if renderer is None:
             return
         n[0] += 1
-        if n[0] % 8 == 0:
+        if n[0] % RENDER_STRIDE == 0:
             renderer.update_scene(e.data, camera=cam)
             frames.append(renderer.render().copy())
             wall_alpha = env.model.geom_rgba[back_wall_gid, 3]
@@ -204,7 +213,7 @@ def main(argv=None) -> int:
     for name, buf in (("handover.mp4", frames), ("handover_opposite.mp4", frames_opp)):
         if buf:
             out = renders / name
-            with imageio.get_writer(str(out), fps=30, codec="h264", quality=8) as w:
+            with imageio.get_writer(str(out), fps=RENDER_FPS, codec="h264", quality=8) as w:
                 for f in buf:
                     w.append_data(f)
             print(f"wrote {out} ({len(buf)} frames)")

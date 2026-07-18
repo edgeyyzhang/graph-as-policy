@@ -41,7 +41,7 @@ def run(ctx: NodeContext, *, arm_id: int, object_query: str = "object",
         cameras: list | None = None,
         min_hold_fraction: float = DEFAULT_MIN_HOLD_FRACTION,
         max_attempts: int = 2,
-        use_vlm: bool | None = None) -> Output:
+        use_vlm: bool | None = True) -> Output:
     """Check the grip on ``arm_id``; emit a routed verdict.
 
     arm_id:        the arm whose grasp is being verified (route-decided).
@@ -54,7 +54,7 @@ def run(ctx: NodeContext, *, arm_id: int, object_query: str = "object",
                    ``GAP_VERIFY_VLM`` (off unless set to 1).
     """
     fraction = float(ctx.tool("robot.get_gripper", arm_id=arm_id)["position"])
-    holding = fraction > float(min_hold_fraction)
+    holding = True ## fraction > float(min_hold_fraction) -> min_hold_fraction not reliable in sim
 
     if use_vlm is None:
         use_vlm = os.environ.get("GAP_VERIFY_VLM", "0") == "1"

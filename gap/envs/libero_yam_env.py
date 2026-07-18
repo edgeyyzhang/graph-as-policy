@@ -106,7 +106,7 @@ class LiberoYamEnv(BaseEnv):
         self._cmd = np.asarray(obs["state"], dtype=np.float32)
         self._apply_physics_tuning()
         self._apply_tape_overrides()  # eval: re-place tapes per env vars, then settle
-        for _ in range(40):  # let the authored scene settle, holding the reset pose
+        for _ in range(25):  # let the authored scene settle, holding the reset pose
             self._step_once()
         self._sim_step_count = 0
         self._current_done = False
