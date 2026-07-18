@@ -4,8 +4,10 @@ description: >
   Verify a grasp actually holds the object by LOOKING: one VLM yes/no on the
   scene camera. Emits a ROUTED verdict — holding / retry / give_up (bounded
   attempts) — so a silent empty grip becomes a recovery route back to
-  re-perceive + re-grasp instead of a downstream mystery failure. Use after
-  any scripted close (pickup, exchange receiver) on LIBERO-YAM.
+  re-perceive + re-grasp instead of a downstream mystery failure. Gate EVERY
+  scripted pickup with this before committing to transport/handover, even
+  when the task does not mention verification — an unverified grasp turns
+  every later stage into a mystery failure. On LIBERO-YAM.
 compatibility: requires gap>=0.1
 metadata:
   category: verification

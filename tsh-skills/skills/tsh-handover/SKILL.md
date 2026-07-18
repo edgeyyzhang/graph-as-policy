@@ -9,7 +9,9 @@ description: >
   receiver TCP frame — receiver_offset — so place can track the held tape by FK
   with no ground truth. Meet point and presentation orientations come from
   tsh-station-geometry (or the tuned constants). Use for the giver→receiver
-  exchange of a perceived tape ring on LIBERO-YAM.
+  exchange of a perceived tape ring on LIBERO-YAM. giver_arm/receiver_arm come
+  from tsh-route; when the task pins them, bind literal ints inside the
+  subgraph and omit those inputs (same for skip_present — always a literal).
 compatibility: requires gap>=0.1
 metadata:
   category: motion
@@ -33,11 +35,13 @@ gap:
     meet_xyz: Vec3                 # from tsh-station-geometry; REQUIRED, no tuned fallback
     giver_quat: Quaternion        # from tsh-station-geometry; REQUIRED, no tuned fallback, wxyz
     recv_quat: Quaternion         # from tsh-station-geometry; REQUIRED, no tuned fallback, wxyz canonical
-    giver_arm: int                 # route-decided giving arm (0=left, 1=right). Default 0.
-    receiver_arm: int              # route-decided receiving arm. Default 1.
-    skip_present: bool             # True when a preceding tsh-transport-held (present) node already
-                                    # carried the tape to meet_xyz; the exchange then starts at the
-                                    # receiver approach. Default False (exchange presents it itself).
+    giver_arm: int                 # giving arm from tsh-route (0=left, 1=right). Task pins the
+                                    # arms? Pass LITERALS in the node inputs and OMIT these two
+                                    # subgraph inputs.
+    receiver_arm: int              # receiving arm from tsh-route. Default 1.
+    # NOT an input: skip_present (bool, script default False) is a LITERAL on the
+    # node — set True only when a preceding tsh-transport-held (present) node
+    # already carried the tape to meet_xyz; never wire it cross-subgraph.
   produces_outputs:
     handed_over: bool
     receiver_offset: Vec3          # tape centre in the receiver TCP frame (m), measured before release
@@ -103,7 +107,9 @@ bimanual_exchange
    Inputs: `tape_in_giver=Ref("in.tape_in_giver")`, `rim_radius=Ref("in.rim_radius")`,
    `meet_xyz=Ref("in.meet_xyz")`, `giver_quat=Ref("in.giver_quat")`,
    `recv_quat=Ref("in.recv_quat")`, `giver_arm=Ref("in.giver_arm")`,
-   `receiver_arm=Ref("in.receiver_arm")`, and `skip_present=True` when a
+   `receiver_arm=Ref("in.receiver_arm")` (or literal ints with the arm
+   subgraph inputs omitted, when the task pins them), and the LITERAL
+   `skip_present=True` when a
    `present` node already carried the tape to `meet_xyz`.
    Returns `{handed_over, receiver_offset, held_offset, giver_tcp, receiver_tcp,
    giver_arm, receiver_arm}`.

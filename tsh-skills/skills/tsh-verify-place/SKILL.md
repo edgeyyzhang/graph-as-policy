@@ -9,8 +9,9 @@ description: >
   rest height (destination top + 2 x half thickness). Emits a ROUTED
   verdict — placed / retry / give_up — so a dropped or bounced object loops
   the graph back through the full pipeline (re-perceive wherever it landed,
-  re-route, re-pick) instead of silently ending "done". Use after tsh-place
-  on LIBERO-YAM.
+  re-route, re-pick) instead of silently ending "done". Finish EVERY
+  tsh-place with this gate before declaring done, even when the task does
+  not mention verification. On LIBERO-YAM.
 compatibility: requires gap>=0.1
 metadata:
   category: verification

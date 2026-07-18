@@ -8,6 +8,8 @@ description: >
   closing it anchors the tape centre in the giver TCP frame and emits it as the
   rigid ``tape_in_giver`` offset the exchange tracks by FK. Use to acquire a
   perceived tape ring for a scripted bimanual handover on LIBERO-YAM.
+  ``pick_arm`` comes from tsh-route; when the task pins the arm instead, bind
+  the script's arm literally inside the subgraph and omit the input.
 compatibility: requires gap>=0.1
 metadata:
   category: grasping
@@ -24,12 +26,18 @@ gap:
     grasped: Tape ring held; held_offset + grasp_tcp + rim_radius bound in the outputs.
     failed: A grasp leg had no cuRobo plan (raise routes to abort).
   required_inputs:
-    tape_xyz: Vec3                 # world grasp point, from tsh-perceive (its <name>_xyz output)
+    # Names follow the upstream producers' output names exactly (tsh-perceive's
+    # target_ prefix, tsh-route's pick_arm) so the coordinator can wire by name;
+    # the subgraph rebinds them to the script's kwargs (see the state flow below).
+    target_xyz: Vec3               # world grasp point — tsh-perceive's <name>_xyz (target_ prefix);
+                                    # rebind to the script's tape_xyz kwarg
     hole_radius: float             # perceived inner radius (m); REQUIRED, no tuned fallback
     rim_radius: float              # perceived outer radius (m); REQUIRED, no tuned fallback
     fingertip_axial: float         # from tsh-gripper-geometry; REQUIRED, no tuned fallback
     finger_half_gap: float         # from tsh-gripper-geometry; REQUIRED, no tuned fallback
-    arm_id: int                    # picking arm (route-decided; 0=left, 1=right). Default 0.
+    pick_arm: int                  # picking arm from tsh-route (0=left, 1=right); rebind to the
+                                    # script's arm_id kwarg. Task pins the arm? Pass arm_id a
+                                    # LITERAL in the node inputs and OMIT this subgraph input.
   produces_outputs:
     grasped: bool
     held_offset: Vec3             # tape centre in the picking arm's TCP frame (m), rigid under
@@ -90,11 +98,13 @@ pickup
 ```
 
 1. **`pickup`** — `type: script`, `scripts/<sg>/pickup.py`. Inputs:
-   `tape_xyz=Ref("in.tape_xyz")`, `hole_radius=Ref("in.hole_radius")`,
+   `tape_xyz=Ref("in.target_xyz")`, `hole_radius=Ref("in.hole_radius")`,
    `rim_radius=Ref("in.rim_radius")`,
    `fingertip_axial=Ref("in.fingertip_axial")`,
    `finger_half_gap=Ref("in.finger_half_gap")`, plus
-   `arm_id=Ref("in.arm_id")` (route-decided picking arm).
+   `arm_id=Ref("in.pick_arm")` (route-decided picking arm — or a literal
+   `arm_id=0` with the `pick_arm` subgraph input omitted, when the task pins
+   the arm).
    Returns `{grasped, held_offset, tape_in_giver, grasp_tcp, rim_radius, pick_arm}`.
 
 Bind the outputs (`held_offset` + `rim_radius` feed the shared transport / the

@@ -12,7 +12,9 @@ description: >
   top-face centre, body-centre, half thickness). A raise_if_missing=False
   mode returns found=false cleanly for clean-all-items loops. Use to
   localize any tabletop target — the pickup tape, the place destination, or
-  each item of a sorting loop — on LIBERO-YAM.
+  each item of a sorting loop — on LIBERO-YAM. Order matters: perceive the
+  place DESTINATION first, while its view is clean (at place time the held
+  object and gripper occlude it).
 compatibility: requires gap>=0.1
 metadata:
   category: perception

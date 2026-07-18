@@ -23,6 +23,7 @@ node_data/
 # --- TSH research artifacts (heavy runtime output; keep source, not data) ---
 benchmark_runs/
 examples/tape_handover_yam/generated/
+examples/tape_handover_yam/generated_v*/
 examples/tape_handover_yam/renders/
 examples/tape_handover_yam/dag_trace.json
 examples/tape_handover_yam/*.npy

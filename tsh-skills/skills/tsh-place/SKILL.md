@@ -8,7 +8,9 @@ description: >
   about the tape's vertical axis for a reachable pose, approach the hover with
   the tape attached as a cuRobo collision body, set down flush (destination top +
   perceived tape half-thickness), release, and retract straight up. Serves both
-  the direct and handed-over routes on LIBERO-YAM.
+  the direct and handed-over routes on LIBERO-YAM. place_arm comes from
+  tsh-route; when the task pins the arm, bind a literal int inside the
+  subgraph and omit that input.
 compatibility: requires gap>=0.1
 metadata:
   category: motion
@@ -30,9 +32,15 @@ gap:
                                     # direct route, or the exchange's receiver_offset after a handover
                                     # (latest-producer cross-subgraph binding; both FK-measured, no GT)
     dest_xyz: Vec3                 # from tsh-perceive (destination top-face centre; e.g. duct)
-    tape_half_z: float             # from tsh-perceive (flush rest height); REQUIRED, no tuned fallback
-    tape_cloud: PointCloud         # from tsh-perceive (attached collision body); REQUIRED, no tuned fallback
-    place_arm: int                 # route-decided placing arm (0=left, 1=right). Default 1.
+    target_half_z: float           # the PLACED object's half thickness — tsh-perceive's <name>_half_z
+                                    # (target_ prefix); rebind to the script's tape_half_z kwarg.
+                                    # REQUIRED, no tuned fallback
+    target_cloud: PointCloud       # the placed object's cloud (attached collision body) — tsh-perceive's
+                                    # <name>_cloud (target_ prefix); rebind to the script's tape_cloud
+                                    # kwarg. REQUIRED, no tuned fallback
+    place_arm: int                 # placing arm from tsh-route (0=left, 1=right); rebind to the
+                                    # script's arm_id kwarg. Task pins the arm? Pass arm_id a
+                                    # LITERAL in the node inputs and OMIT this subgraph input.
   produces_outputs:
     placed: bool
     place_tcp: Se3Pose             # world TCP pose matching the RESTING tape
@@ -86,8 +94,10 @@ place
 
 1. **`place`** — `type: script`, `scripts/<sg>/place.py`. Inputs:
    `held_offset=Ref("in.held_offset")`, `dest_xyz=Ref("in.dest_xyz")`,
-   `tape_half_z=Ref("in.tape_half_z")`, `tape_cloud=Ref("in.tape_cloud")`,
-   `arm_id=Ref("in.place_arm")` (route-decided placing arm).
+   `tape_half_z=Ref("in.target_half_z")`, `tape_cloud=Ref("in.target_cloud")`,
+   `arm_id=Ref("in.place_arm")` (route-decided placing arm — or a literal
+   `arm_id=1` with the `place_arm` subgraph input omitted, when the task pins
+   the arm).
    Returns `{placed, place_tcp, place_arm}`.
 
 Bind the outputs (`place_tcp` feeds a return leg that re-acquires the tape):
