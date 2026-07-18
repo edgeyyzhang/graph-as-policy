@@ -85,7 +85,25 @@ def perceive_top_face(ctx: NodeContext, cameras: list[CameraFrame], key: str = "
     seg = ctx.tool("sam3.segment_box", image=cam["rgb"], box=box)
     # Highest-confidence mask isolates the pixels belonging to the object's face.
     mask = np.asarray(seg["masks"][0])
+    return top_face_from_mask(cam, mask, top_slab, label=query,
+                              raise_if_missing=raise_if_missing)
 
+
+def top_face_from_mask(cam, mask, top_slab: float = PERCEIVE_TOP_SLAB, *,
+                       label: str = "", raise_if_missing: bool = True,
+                       floor_trim: bool = True):
+    """Back-project a pixel ``mask`` and finish on the robust top face.
+
+    The segmentation-agnostic second half of :func:`perceive_top_face` —
+    the CV segmenter (``_perceive_cv``) feeds its masks through the SAME
+    estimators, so the two paths cannot drift apart downstream. Returns
+    ``(x, y, top_z, pts)`` (or ``None`` with ``raise_if_missing=False``).
+
+    ``floor_trim`` drops the bottom ``PERCEIVE_FLOOR_PCTILE`` of the cloud —
+    needed for SAM masks (which leak table pixels), but a mask that is
+    already height-filtered (the CV path) passes ``False``: the trim would
+    chop real low side points and bias ``half_z`` short.
+    """
     # Use the camera info to back-project those pixels into the world frame.
     c2w = pose_to_matrix(cam["pose"])
     K = np.asarray(cam["intrinsics"], dtype=float)
@@ -101,12 +119,13 @@ def perceive_top_face(ctx: NodeContext, cameras: list[CameraFrame], key: str = "
                         np.ones_like(zc)], axis=1)
     pts = (c2w @ cam_pts.T).T[:, :3]
     ## Noisy data filtering, floor removal + outlier rejection
-    z_floor = np.percentile(pts[:, 2], PERCEIVE_FLOOR_PCTILE)
-    pts = pts[pts[:, 2] > z_floor]
+    if floor_trim:
+        z_floor = np.percentile(pts[:, 2], PERCEIVE_FLOOR_PCTILE)
+        pts = pts[pts[:, 2] > z_floor]
     if len(pts) == 0:
         if not raise_if_missing:
             return None
-        raise RuntimeError(f"perceive: empty cloud for '{query}'")
+        raise RuntimeError(f"perceive: empty cloud for '{label}'")
     # Reject the high-z depth-discontinuity spray. At grazing view angles a
     # minority of mask-edge / gripper-adjacent pixels back-project ~10 cm ABOVE
     # the object; the 98th-percentile top face then latches onto them and the

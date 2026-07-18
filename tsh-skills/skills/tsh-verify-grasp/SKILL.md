@@ -1,21 +1,18 @@
 ---
 name: tsh-verify-grasp
 description: >
-  Verify a grasp actually holds the object, from the gripper's own
-  proprioception (jaws closed onto the tape wall stop at a nonzero open
-  fraction; closed on air reads ~0), optionally confirmed by a VLM yes/no on
-  the scene camera. Emits a ROUTED verdict — holding / retry / give_up
-  (bounded attempts) — so a silent empty grip becomes a recovery route back
-  to re-perceive + re-grasp instead of a downstream mystery failure. Use
-  after any scripted close (pickup, exchange receiver) on LIBERO-YAM.
+  Verify a grasp actually holds the object by LOOKING: one VLM yes/no on the
+  scene camera. Emits a ROUTED verdict — holding / retry / give_up (bounded
+  attempts) — so a silent empty grip becomes a recovery route back to
+  re-perceive + re-grasp instead of a downstream mystery failure. Use after
+  any scripted close (pickup, exchange receiver) on LIBERO-YAM.
 compatibility: requires gap>=0.1
 metadata:
   category: verification
-  tags: [tsh, verify, grasp, recovery, yam]
+  tags: [tsh, verify, grasp, recovery, vlm, yam]
 gap:
   allowed_tools:
     - robot.get_observation
-    - robot.get_gripper
     - vlm.query_yes_no
   exit_conditions:
     holding: The grip holds; continue the pipeline.
@@ -26,7 +23,6 @@ gap:
   produces_outputs:
     verdict: str              # the routing field
     holding: bool
-    fraction: float           # measured gripper open fraction
   hard_rules:
     - >
       The verdict is ROUTED, never raised — a failed verify is recoverable
@@ -41,16 +37,20 @@ gap:
 
 # tsh-verify-grasp
 
-The cheapest useful postcondition gate: a closed-on-air gripper reads an
-open fraction near 0, a seated ring-wall grip reads ~0.2-0.4. One tool call,
-no perception, no sim-time cost — and it converts the most common silent
-grasp failure into an explicit routed branch the graph (and the refine loop)
-can see and recover from.
+The postcondition gate for a scripted close: ask a VLM "is the object
+grasped by a robot gripper, lifted clearly off the table?" on the scene
+camera. It converts the most common silent grasp failure into an explicit
+routed branch the graph (and the refine loop) can see and recover from.
 
-Enable the optional VLM confirm (`GAP_VERIFY_VLM=1`, or `use_vlm=True` on
-the node) to also ask "is the object held, lifted off the table?" on the
-scene camera — catches the rarer pinched-but-slipping case the fraction
-alone misses.
+Why not proprioception: in sim the finger stop fraction barely separates
+closed-on-air from a seated ring-wall grip, so the fraction gate mis-verdicts
+both ways. The VLM look is the whole check.
+
+Two validated prompt rules (see the script docstring): the prompt is
+ARM-AGNOSTIC (the agentview mirrors left/right, so naming a side makes the
+VLM judge the wrong arm), and the wrist close-up is deliberately NOT sent
+(at home pose it frames the on-table object between the open fingers, which
+flips an empty grip to a false YES).
 
 ## When to use
 
@@ -61,8 +61,8 @@ alone misses.
 ## When NOT to use
 
 - Mid-exchange (between receiver close and giver release) — both grippers
-  touch the tape there; the fraction is ambiguous and the exchange has its
-  own settle logic.
+  touch the tape there and partially occlude it; the view is ambiguous and
+  the exchange has its own settle logic.
 
 ## Recommended subgraph state flow
 
@@ -72,8 +72,8 @@ observe → check ──("holding")──▶ holding → END
                 └─("give_up")──▶ give_up → END
 ```
 
-1. **`observe`** — `type: tool`, `tool: "robot.get_observation"` (only
-   needed for the VLM confirm; keep it — one capture is cheap).
+1. **`observe`** — `type: tool`, `tool: "robot.get_observation"` (MANDATORY —
+   the VLM check needs the fresh cameras).
 2. **`check`** — `type: script`, `scripts/<sg>/verify_grasp.py`,
    `inputs={"arm_id": Ref("in.pick_arm"), "object_query": "yellow tape",
    "cameras": Ref("observe.cameras")}`.
@@ -92,3 +92,5 @@ At the TOP level, map the subgraph exits:
 
 - `tsh-verify-place` — the place-side twin.
 - `tsh-pickup` — the producer this gates.
+- `open-robot-skills/tools/vlm` — the `vlm.query_yes_no` bundle
+  (provider/model via `GAP_VLM_*`).

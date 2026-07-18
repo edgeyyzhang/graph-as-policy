@@ -55,9 +55,11 @@ SG_SCRIPTS: dict[str, tuple[str, list[str]]] = {
     "station_geometry": ("tsh-station-geometry",
                          ["station_geometry.py", "_station_geometry.py"]),
     "perceive_dest":    ("tsh-perceive",
-                         ["perceive_object.py", "_perceive.py", "constants.py"]),
+                         ["perceive_object_cv.py", "_perceive_cv.py",
+                          "_perceive.py", "constants.py"]),
     "perceive_target":  ("tsh-perceive",
-                         ["perceive_object.py", "_perceive.py", "constants.py"]),
+                         ["perceive_object_cv.py", "_perceive_cv.py",
+                          "_perceive.py", "constants.py"]),
     "ring_geometry":    ("tsh-ring-geometry",
                          ["ring_geometry.py", "_ring.py", "constants.py"]),
     "route":            ("tsh-route",
@@ -72,7 +74,8 @@ SG_SCRIPTS: dict[str, tuple[str, list[str]]] = {
     "place":            ("tsh-place",
                          ["place.py", "_held.py", "_motion.py", "constants.py"]),
     "verify_place":     ("tsh-verify-place",
-                         ["verify_place.py", "_perceive.py", "constants.py"]),
+                         ["verify_place.py", "_perceive_cv.py", "_perceive.py",
+                          "constants.py"]),
 }
 
 # Canonical pick-and-place stage tags (consumed by the refine loop's
@@ -123,7 +126,7 @@ def _perceive_subgraph(name: str, query: str, prefix: str, *,
     sg = Subgraph(name=name, skill="tsh-perceive")
     sg.add_node("observe", type="tool", tool="robot.get_observation")
     sg.add_node("perceive", type="script",
-                script=f"scripts/{name}/perceive_object.py",
+                script=f"scripts/{name}/perceive_object_cv.py",
                 inputs={"cameras": Ref("observe.cameras"),
                         "object_query": query})
     sg.add_exit("perceived")
@@ -288,8 +291,7 @@ def build_workflow() -> Workflow:
         inputs={"pick_arm": "int"},
         verdicts={"holding": "holding", "retry": "retry", "give_up": "give_up"},
         outputs={"verdict": Ref("check.verdict"),
-                 "holding": Ref("check.holding"),
-                 "fraction": Ref("check.fraction")}))
+                 "holding": Ref("check.holding")}))
 
     # -- handover branch: present (shared held-transport), then exchange ----
     sg = Subgraph(name="present", skill="tsh-transport-held")

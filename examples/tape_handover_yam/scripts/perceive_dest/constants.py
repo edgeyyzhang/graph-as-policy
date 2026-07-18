@@ -213,3 +213,15 @@ RING_HOLE_MIN   = 0.015  # m — reject implausibly small holes
 RING_HOLE_MAX   = 0.080  # m — reject implausibly large holes
 RING_RIM_MARGIN = 0.005  # m — rim must exceed the hole by at least this
 
+# ── Classical-CV segmentation (_perceive_cv.py) ─────────────────────────────────
+# Parameters of the colour+height segmenter — like the percentiles above, these
+# tune ROBUST estimators, not scene positions. The table plane itself is
+# re-estimated from depth on every call.
+CV_TABLE_BIN        = 0.005  # m — height-histogram bin; the modal bin is the table plane
+CV_MIN_ABOVE_TABLE  = 0.004  # m — below this counts as table/shadow, not object
+CV_MAX_ABOVE_TABLE  = 0.20   # m — above this is arms/gate, never a resting object
+CV_MIN_BLOB_PX      = 300    # px — connected components smaller than this are speckle
+CV_ACHROMATIC_MAX_SAT = 60   # HSV S (0-255) ceiling for "gray"/"white" queries
+CV_ACHROMATIC_MIN_VAL = 90   # HSV V (0-255) floor for "gray"/"white" queries
+                             # (keeps dark shadows/cavities out of the grey mask)
+

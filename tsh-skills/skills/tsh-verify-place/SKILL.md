@@ -2,8 +2,9 @@
 name: tsh-verify-place
 description: >
   Verify the placed object actually rests on the destination — re-perceive
-  it after the retract (same DINO+SAM+depth core as perception; the view is
-  clean again) and check, with no ground truth, that its XY centre is within
+  it after the retract (same classical colour+height CV core as perception;
+  the view is clean again, and no model servers are needed) and check, with
+  no ground truth, that its XY centre is within
   tolerance of the destination centre and its top face is at the expected
   rest height (destination top + 2 x half thickness). Emits a ROUTED
   verdict — placed / retry / give_up — so a dropped or bounced object loops
@@ -13,12 +14,10 @@ description: >
 compatibility: requires gap>=0.1
 metadata:
   category: verification
-  tags: [tsh, verify, place, recovery, dino, sam3, yam]
+  tags: [tsh, verify, place, recovery, cv, yam]
 gap:
   allowed_tools:
     - robot.get_observation
-    - grounding-dino.detect
-    - sam3.segment_box
   exit_conditions:
     placed: Object rests on the destination; finish (or loop to the next item).
     retry: Missed/dropped, attempts remain — route BACK to the perceive subgraph.

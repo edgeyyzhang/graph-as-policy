@@ -178,8 +178,8 @@ PLAN_ROTATION_THRESHOLD = 0.05  # rad
 # ramp then settle so the light ring is not kicked as the jaws seat on close.
 GRASP_CLOSE_SETTLE_STEPS = 150  # sim steps to settle the giver grip after the ramp
 GRASP_CLOSE_RAMP_STEPS   = 60   # sim steps to ramp the jaws gently closed
-RECV_OPEN_SETTLE_STEPS   = 200  # sim steps to settle the receiver's pre-thread open
-RECV_CLOSE_SETTLE_STEPS  = 150  # sim steps to settle the receiver's rim grip closed —
+RECV_OPEN_SETTLE_STEPS   = 15   # sim steps to settle the receiver's pre-thread open
+RECV_CLOSE_SETTLE_STEPS  = 30   # sim steps to settle the receiver's rim grip closed —
                                 # matches GRASP_CLOSE_SETTLE_STEPS (the giver's own grasp
                                 # settle) so the receiver's jaw contact fully stabilizes
                                 # BEFORE the giver's open_gripper call fires (below the

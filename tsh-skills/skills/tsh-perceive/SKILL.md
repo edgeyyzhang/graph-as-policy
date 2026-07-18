@@ -2,14 +2,17 @@
 name: tsh-perceive
 description: >
   Generic RGB-D object localization, with no ground truth and no object
-  dimensions assumed. Grounding-DINO detect → SAM3 box segment → depth
-  back-projection to a world-frame cloud, finished on the robust TOP-FACE
-  slab. One skill, instantiated per object: the subgraph is parameterized by
-  a literal object query ("yellow tape", "gray tape", "red tape spool") and
-  emits name-prefixed geometry (cloud, top-face centre, body-centre, half
-  thickness). A raise_if_missing=False mode returns found=false cleanly for
-  clean-all-items loops. Use to localize any tabletop target — the pickup
-  tape, the place destination, or each item of a sorting loop — on LIBERO-YAM.
+  dimensions assumed. Two interchangeable segmenters feed the SAME robust
+  depth back-projection + top-face estimators: perceive_object_cv (DEFAULT —
+  classical colour + height-above-table segmentation, in-process, no model
+  servers) and perceive_object (Grounding-DINO detect → SAM3 box segment,
+  for targets with no nameable colour). One skill, instantiated per object:
+  the subgraph is parameterized by a literal object query ("yellow tape",
+  "gray tape", "red tape spool") and emits name-prefixed geometry (cloud,
+  top-face centre, body-centre, half thickness). A raise_if_missing=False
+  mode returns found=false cleanly for clean-all-items loops. Use to
+  localize any tabletop target — the pickup tape, the place destination, or
+  each item of a sorting loop — on LIBERO-YAM.
 compatibility: requires gap>=0.1
 metadata:
   category: perception
@@ -40,7 +43,8 @@ gap:
     <name>_top_xyz: Vec3           # top-face centre [x,y,top_z] (place target)
     <name>_half_z: float           # perceived half-thickness (m)
   canonical_scripts:
-    - perceive_object: scripts/perceive_object.py
+    - perceive_object_cv: scripts/perceive_object_cv.py  # DEFAULT: colour+height CV, no tool bundles
+    - perceive_object: scripts/perceive_object.py        # learned DINO+SAM variant
     - perceive_tape: scripts/perceive_tape.py     # legacy tape wrapper (adds ring radii)
     - perceive_duct: scripts/perceive_duct.py     # legacy duct wrapper (top face only)
   streaming: false
@@ -48,13 +52,25 @@ gap:
 
 # tsh-perceive
 
-One generic perceiver (`perceive_object`, the `_perceive.perceive_top_face`
-core): DINO detect → SAM box segment → depth back-projection, then a robust
-**top-face slab** for the centre and a 98th-percentile top face for height.
-It is object-agnostic — the DINO query is a per-instance literal, and the
+One generic perceiver with two interchangeable segmentation front-ends and a
+shared robust back half (`_perceive.top_face_from_mask`: depth
+back-projection, then a robust **top-face slab** for the centre and a
+98th-percentile top face for height):
+
+- **`perceive_object_cv`** (DEFAULT) — classical CV: per-pixel world height
+  from depth, table plane re-estimated per call (modal height bin), colour
+  mask from the query's colour word (HSV hue band; "gray"/"white" =
+  low-saturation band), morphology + largest interior connected component
+  (arm blobs always touch the image border and are rejected). Entirely
+  in-process — no model servers, no detector score noise, fails loudly
+  instead of mis-detecting a lookalike.
+- **`perceive_object`** — learned DINO detect → SAM box segment, for targets
+  that have no nameable colour or need open-vocabulary grounding.
+
+Both are object-agnostic — the query is a per-instance literal, and the
 outputs are unprefixed geometry fields the subgraph's `set_outputs` renames
 to its own prefix (`target_*`, `dest_*`, `red_stack_*`, ...). No ground-truth
-pose, no object dimensions, no scene constants.
+pose, no object dimensions, no scene positions assumed.
 
 Ring-specific derivations (hole/rim radii) do NOT live here — they are the
 separate `tsh-ring-geometry` post-processor on the emitted cloud. That split
@@ -98,12 +114,14 @@ observe → perceive
 
 1. **`observe`** — `type: tool`, `tool: "robot.get_observation"`,
    `inputs: {}`. Emits `cameras`.
-2. **`perceive`** — `type: script`, `scripts/<sg>/perceive_object.py`,
+2. **`perceive`** — `type: script`, `scripts/<sg>/perceive_object_cv.py`
+   (or `perceive_object.py` for the learned variant),
    `inputs={"cameras": Ref("observe.cameras"), "object_query": "yellow tape"}`.
    Returns `{found, cloud, top_xyz, center_xyz, half_z}`.
-   > `object_query` is a **literal** noun phrase (the DINO query), NOT a
-   > `Ref`. Pick a colour-anchored phrase when lookalike objects share the
-   > scene ("gray tape" for the duct, not "duct tape").
+   > `object_query` is a **literal** noun phrase, NOT a `Ref`. Make it
+   > colour-anchored — the CV variant keys its segmentation band off the
+   > colour word, and it also disambiguates lookalikes for DINO ("gray
+   > tape" for the duct, not "duct tape").
 
 Bind prefixed outputs (ALL of them — downstream skills wire by name):
 
@@ -139,7 +157,9 @@ conditional edge on `perceive.found` (`"True" → perceived`,
 
 ## See also
 
-- `scripts/_perceive.py` — the shared DINO+SAM+depth core.
+- `scripts/_perceive.py` — the shared back-projection + robust top-face core
+  (`top_face_from_mask`) and the DINO+SAM front-end.
+- `scripts/_perceive_cv.py` — the classical colour+height front-end.
 - `tsh-ring-geometry` — ring radii post-processor on the emitted cloud.
 - `perceiving-objects` (open-robot-skills) — the OBB-emitting generic
   perceiver (multi-camera KD-tree fusion, VLM disambiguation).

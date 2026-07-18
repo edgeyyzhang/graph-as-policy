@@ -18,7 +18,6 @@ def _verdict_agrees(w, outputs) -> bool:
 
 def _diag(w, outputs) -> dict:
     return {"verdict": outputs.get("verdict"),
-            "fraction": outputs.get("fraction"),
             "gt_grasped": w.body(TAPE).is_grasped()}
 
 

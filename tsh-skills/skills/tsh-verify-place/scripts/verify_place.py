@@ -1,8 +1,8 @@
 """Verify the placed object actually rests on the destination — by looking.
 
-Re-perceives the object AFTER the release (same DINO+SAM+depth core as the
-perception subgraphs; the gripper has retracted, so the view is clean again)
-and checks, with no ground truth, that:
+Re-perceives the object AFTER the release (same classical colour+height CV
+core as the perception subgraphs; the gripper has retracted, so the view is
+clean again) and checks, with no ground truth, that:
 
   * the object's XY centre is within ``xy_tol`` of the destination centre,
   * its top face is within ``z_tol`` of the expected rest height
@@ -23,7 +23,8 @@ import numpy as np
 
 from gap import NodeContext
 
-from ._perceive import estimate_half_thickness, perceive_top_face
+from ._perceive import estimate_half_thickness
+from ._perceive_cv import perceive_top_face_cv
 
 _ATTEMPTS = itertools.count(1)
 
@@ -40,7 +41,7 @@ def run(ctx: NodeContext, *, object_query: str, dest_xyz: list, half_z: float,
         max_attempts: int = 2) -> Output:
     """Re-perceive ``object_query`` and check it rests on the destination.
 
-    object_query: literal DINO noun phrase for the placed object.
+    object_query: literal colour-anchored noun phrase for the placed object.
     dest_xyz:     destination top-face centre (the perception the place used).
     half_z:       the object's perceived half thickness (rest-height model).
     cameras:      fresh observation cameras — MUST come from an ``observe``
@@ -50,8 +51,8 @@ def run(ctx: NodeContext, *, object_query: str, dest_xyz: list, half_z: float,
         dest_xyz = [dest_xyz["x"], dest_xyz["y"], dest_xyz["z"]]
     dest = np.asarray([float(v) for v in dest_xyz])
 
-    got = perceive_top_face(ctx, cameras, query=object_query,
-                            raise_if_missing=False)
+    got = perceive_top_face_cv(ctx, cameras, object_query,
+                               raise_if_missing=False)
     if got is None:
         xy_err = z_err = float("inf")
         placed = False
