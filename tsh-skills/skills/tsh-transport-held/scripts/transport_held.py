@@ -25,6 +25,7 @@ from ._held import (
     held_center_world,
     plan_held_move,
 )
+from .constants import PLAN_POSITION_THRESHOLD, PLAN_ROTATION_THRESHOLD
 
 
 class Output(TypedDict):
@@ -35,8 +36,8 @@ class Output(TypedDict):
 def run(ctx: NodeContext, *, arm_id: int, held_offset: list,
         target_xyz: list, target_quat: list,
         held_cloud=None,
-        position_threshold: float | None = None,
-        rotation_threshold: float | None = None) -> Output:
+        position_threshold: float = PLAN_POSITION_THRESHOLD,
+        rotation_threshold: float = PLAN_ROTATION_THRESHOLD) -> Output:
     """Plan + execute the held-object centre to ``target_xyz`` at ``target_quat``.
 
     arm_id:       the holding arm.
@@ -49,11 +50,8 @@ def run(ctx: NodeContext, *, arm_id: int, held_offset: list,
     """
     target = list(as_vec3(target_xyz))
     quat = as_wxyz(target_quat)
-    thresholds = {}
-    if position_threshold is not None:
-        thresholds["position_threshold"] = position_threshold
-    if rotation_threshold is not None:
-        thresholds["rotation_threshold"] = rotation_threshold
+    thresholds = {"position_threshold": position_threshold,
+                  "rotation_threshold": rotation_threshold}
 
     attached_ok = False
     if held_cloud is not None:

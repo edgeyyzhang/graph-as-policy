@@ -42,6 +42,8 @@ from .constants import (
     CV_MIN_ABOVE_TABLE,
     CV_MIN_BLOB_PX,
     CV_TABLE_BIN,
+    CV_TABLE_X,
+    CV_TABLE_Y,
     PERCEIVE_TOP_SLAB,
 )
 
@@ -75,6 +77,26 @@ def world_height_map(cam: CameraFrame) -> np.ndarray:
     wz = c2w[2, 0] * xc + c2w[2, 1] * yc + c2w[2, 2] * depth + c2w[2, 3]
     wz[~(depth > 0)] = np.nan
     return wz
+
+
+def table_footprint_mask(cam: CameraFrame) -> np.ndarray:
+    """Per-pixel mask: True where the pixel back-projects inside the table's
+    world XY footprint (``CV_TABLE_X``/``CV_TABLE_Y``). A resting object is
+    always within this box; the robot arms pass through it but their own
+    links extend well outside it, so this keeps an arm segment from ever
+    outscoring a real object in the largest-blob tie-break."""
+    c2w = pose_to_matrix(cam["pose"])
+    K = np.asarray(cam["intrinsics"], dtype=float)
+    depth = np.asarray(cam["depth"], dtype=float)
+    fx, fy, cx, cy = K[0, 0], K[1, 1], K[0, 2], K[1, 2]
+    h, w = depth.shape
+    us, vs = np.meshgrid(np.arange(w), np.arange(h))
+    xc = (us - cx) * depth / fx
+    yc = (vs - cy) * depth / fy
+    wx = c2w[0, 0] * xc + c2w[0, 1] * yc + c2w[0, 2] * depth + c2w[0, 3]
+    wy = c2w[1, 0] * xc + c2w[1, 1] * yc + c2w[1, 2] * depth + c2w[1, 3]
+    return ((wx >= CV_TABLE_X[0]) & (wx <= CV_TABLE_X[1])
+            & (wy >= CV_TABLE_Y[0]) & (wy <= CV_TABLE_Y[1]))
 
 
 def estimate_table_z(wz: np.ndarray) -> float:
@@ -121,8 +143,9 @@ def segment_query(cam: CameraFrame, query: str):
     table_z = estimate_table_z(wz)
     height = ((wz > table_z + CV_MIN_ABOVE_TABLE)
               & (wz < table_z + CV_MAX_ABOVE_TABLE))
+    footprint = table_footprint_mask(cam)
     color = _color_mask(np.asarray(cam["rgb"]), query)
-    mask = height if color is None else (height & color)
+    mask = height & footprint if color is None else (height & footprint & color)
 
     # Morphology: open kills speckle, close bridges shading/specular gaps.
     m8 = mask.astype(np.uint8)

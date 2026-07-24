@@ -26,10 +26,10 @@ gap:
     grasped: Tape ring held; held_offset + grasp_tcp + rim_radius bound in the outputs.
     failed: A grasp leg had no cuRobo plan (raise routes to abort).
   required_inputs:
-    # Names follow the upstream producers' output names exactly (tsh-perceive's
+    # Names follow the upstream producers' output names exactly (tsh-perceive-cv's
     # target_ prefix, tsh-route's pick_arm) so the coordinator can wire by name;
     # the subgraph rebinds them to the script's kwargs (see the state flow below).
-    target_xyz: Vec3               # world grasp point — tsh-perceive's <name>_xyz (target_ prefix);
+    target_xyz: Vec3               # world grasp point — tsh-perceive-cv's <name>_xyz (target_ prefix);
                                     # rebind to the script's tape_xyz kwarg
     hole_radius: float             # perceived inner radius (m); REQUIRED, no tuned fallback
     rim_radius: float              # perceived outer radius (m); REQUIRED, no tuned fallback
@@ -80,7 +80,7 @@ fallback for either.
 
 ## When to use
 
-- After `tsh-perceive` (tape) and `tsh-gripper-geometry`, to acquire the tape
+- After `tsh-perceive-cv` (tape) and `tsh-gripper-geometry`, to acquire the tape
   before `tsh-handover`.
 
 ## When NOT to use
@@ -128,7 +128,7 @@ sg.set_outputs(
 
 ## See also
 
-- `tsh-perceive` — supplies `tape_xyz` + ring radii.
+- `tsh-perceive-cv` — supplies `tape_xyz` + ring radii.
 - `tsh-gripper-geometry` — supplies `fingertip_axial` + `finger_half_gap`.
 - `tsh-transport-held` — consumes `held_offset` to carry the tape to the meet.
 - `tsh-handover` — consumes `held_offset` (a.k.a. `tape_in_giver`) + `rim_radius`.

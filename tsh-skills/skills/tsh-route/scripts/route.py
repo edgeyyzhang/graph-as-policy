@@ -54,13 +54,13 @@ def _as3(v):
     return [float(x) for x in v]
 
 
-def _place_hover_reachable(ctx: NodeContext, arm_id: int, dest_xyz, half_z,
+def _place_hover_reachable(ctx: NodeContext, arm_id: int, container_xyz, half_z,
                            offset_local) -> bool:
     """Probe the place hover (the most reach-constrained place waypoint) with
     the same yaw sweep place.py runs: pivot the TCP about the tape centre
     until any yaw plans. Mirrors place.py's sweep — probe only."""
     offset_local = np.asarray(offset_local, dtype=float)
-    dest = np.asarray(_as3(dest_xyz), dtype=float)
+    dest = np.asarray(_as3(container_xyz), dtype=float)
     centre = dest + np.array([0.0, 0.0, float(half_z)])
     hover = centre + np.array([0.0, 0.0, PLACE_Z_APPROACH])
     base_xy = np.asarray(
@@ -79,13 +79,13 @@ def _place_hover_reachable(ctx: NodeContext, arm_id: int, dest_xyz, half_z,
     return False
 
 
-def run(ctx: NodeContext, *, target_xyz: list, dest_xyz: list, half_z: float,
+def run(ctx: NodeContext, *, target_xyz: list, container_xyz: list, half_z: float,
         hole_radius: float, rim_radius: float,
         fingertip_axial: float, finger_half_gap: float) -> Output:
     """Probe grasp + place reachability per arm and pick the route.
 
     target_xyz: tape grasp point (body-centroid height), from perception.
-    dest_xyz:   destination top-face centre, from perception.
+    container_xyz:   destination top-face centre, from perception.
     half_z:     perceived tape half-thickness (place rest height).
     hole_radius / rim_radius: perceived ring geometry (tsh-ring-geometry).
     fingertip_axial / finger_half_gap: FK-derived gripper offsets
@@ -123,7 +123,7 @@ def run(ctx: NodeContext, *, target_xyz: list, dest_xyz: list, half_z: float,
     place_ok: dict[int, bool] = {}
     for a in arms:
         off = grasp_geom[a]["held_offset"] if grasp_ok[a] else recv_offset
-        place_ok[a] = _place_hover_reachable(ctx, a, dest_xyz, half_z, off)
+        place_ok[a] = _place_hover_reachable(ctx, a, container_xyz, half_z, off)
 
     # Prefer the grasp-capable arm nearer the tape (less reach = more margin).
     def _base_dist(a: int) -> float:
@@ -148,5 +148,5 @@ def run(ctx: NodeContext, *, target_xyz: list, dest_xyz: list, half_z: float,
 
     raise RuntimeError(
         f"route: grasp reachable (arms {pickers}) but no arm can reach the "
-        f"place hover at {[round(v, 3) for v in _as3(dest_xyz)]} — "
+        f"place hover at {[round(v, 3) for v in _as3(container_xyz)]} — "
         f"kinematic dead zone")

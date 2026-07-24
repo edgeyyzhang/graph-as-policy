@@ -33,10 +33,6 @@
       "type": "subgraph",
       "ref": "pickup"
     },
-    "verify_grasp": {
-      "type": "subgraph",
-      "ref": "verify_grasp"
-    },
     "present": {
       "type": "subgraph",
       "ref": "present"
@@ -48,10 +44,6 @@
     "place": {
       "type": "subgraph",
       "ref": "place"
-    },
-    "verify_place": {
-      "type": "subgraph",
-      "ref": "verify_place"
     },
     "dispatch": {
       "type": "router",
@@ -145,16 +137,7 @@
     "pickup": {
       "router_field": "exit",
       "mapping": {
-        "grasped": "verify_grasp",
-        "failed": "abort"
-      }
-    },
-    "verify_grasp": {
-      "router_field": "exit",
-      "mapping": {
-        "holding": "dispatch",
-        "retry": "perceive_target",
-        "give_up": "abort",
+        "grasped": "dispatch",
         "failed": "abort"
       }
     },
@@ -175,16 +158,7 @@
     "place": {
       "router_field": "exit",
       "mapping": {
-        "placed": "verify_place",
-        "failed": "abort"
-      }
-    },
-    "verify_place": {
-      "router_field": "exit",
-      "mapping": {
         "placed": "next_item",
-        "retry": "perceive_target",
-        "give_up": "abort",
         "failed": "abort"
       }
     },
@@ -294,7 +268,7 @@
       "on_error": "failed"
     },
     "perceive_dest": {
-      "skill": "tsh-perceive",
+      "skill": "tsh-perceive-cv",
       "inputs": {},
       "outputs": {
         "dest_found": {
@@ -360,7 +334,7 @@
       "on_error": "not_found"
     },
     "perceive_target": {
-      "skill": "tsh-perceive",
+      "skill": "tsh-perceive-cv",
       "inputs": {},
       "outputs": {
         "target_found": {
@@ -661,89 +635,6 @@
       "on_error": "failed",
       "stage": "grasp"
     },
-    "verify_grasp": {
-      "skill": "tsh-verify-grasp",
-      "inputs": {
-        "pick_arm": "int"
-      },
-      "outputs": {
-        "verdict": {
-          "$ref": "check.verdict"
-        },
-        "holding": {
-          "$ref": "check.holding"
-        }
-      },
-      "nodes": {
-        "observe": {
-          "type": "tool",
-          "tool": "robot.get_observation"
-        },
-        "check": {
-          "type": "script",
-          "inputs": {
-            "arm_id": {
-              "$ref": "in.pick_arm"
-            },
-            "object_query": "yellow tape",
-            "cameras": {
-              "$ref": "observe.cameras"
-            }
-          },
-          "script": "scripts/verify_grasp/verify_grasp.py"
-        },
-        "holding": {
-          "type": "noop"
-        },
-        "retry": {
-          "type": "noop"
-        },
-        "give_up": {
-          "type": "noop"
-        }
-      },
-      "edges": [
-        [
-          "START",
-          "observe"
-        ],
-        [
-          "observe",
-          "check"
-        ],
-        [
-          "holding",
-          "END"
-        ],
-        [
-          "retry",
-          "END"
-        ],
-        [
-          "give_up",
-          "END"
-        ]
-      ],
-      "conditional_edges": {
-        "check": {
-          "router_field": "verdict",
-          "mapping": {
-            "holding": "holding",
-            "retry": "retry",
-            "give_up": "give_up"
-          }
-        }
-      },
-      "exit": {
-        "router_field": null,
-        "success_values": [
-          "holding",
-          "retry",
-          "give_up"
-        ]
-      },
-      "on_error": "failed"
-    },
     "present": {
       "skill": "tsh-transport-held",
       "inputs": {
@@ -818,7 +709,6 @@
         "receiver_arm": "int",
         "tape_in_giver": "Vec3",
         "rim_radius": "float",
-        "meet_xyz": "Vec3",
         "giver_quat": "Quaternion",
         "recv_quat": "Quaternion"
       },
@@ -861,16 +751,12 @@
             "rim_radius": {
               "$ref": "in.rim_radius"
             },
-            "meet_xyz": {
-              "$ref": "in.meet_xyz"
-            },
             "giver_quat": {
               "$ref": "in.giver_quat"
             },
             "recv_quat": {
               "$ref": "in.recv_quat"
-            },
-            "skip_present": true
+            }
           },
           "script": "scripts/handover/bimanual_exchange.py"
         },
@@ -971,99 +857,6 @@
       },
       "on_error": "failed",
       "stage": "place"
-    },
-    "verify_place": {
-      "skill": "tsh-verify-place",
-      "inputs": {
-        "dest_xyz": "Vec3",
-        "target_half_z": "float"
-      },
-      "outputs": {
-        "verdict": {
-          "$ref": "check.verdict"
-        },
-        "placed": {
-          "$ref": "check.placed"
-        },
-        "xy_error_m": {
-          "$ref": "check.xy_error_m"
-        },
-        "z_error_m": {
-          "$ref": "check.z_error_m"
-        }
-      },
-      "nodes": {
-        "observe": {
-          "type": "tool",
-          "tool": "robot.get_observation"
-        },
-        "check": {
-          "type": "script",
-          "inputs": {
-            "object_query": "yellow tape",
-            "dest_xyz": {
-              "$ref": "in.dest_xyz"
-            },
-            "half_z": {
-              "$ref": "in.target_half_z"
-            },
-            "cameras": {
-              "$ref": "observe.cameras"
-            }
-          },
-          "script": "scripts/verify_place/verify_place.py"
-        },
-        "placed": {
-          "type": "noop"
-        },
-        "retry": {
-          "type": "noop"
-        },
-        "give_up": {
-          "type": "noop"
-        }
-      },
-      "edges": [
-        [
-          "START",
-          "observe"
-        ],
-        [
-          "observe",
-          "check"
-        ],
-        [
-          "placed",
-          "END"
-        ],
-        [
-          "retry",
-          "END"
-        ],
-        [
-          "give_up",
-          "END"
-        ]
-      ],
-      "conditional_edges": {
-        "check": {
-          "router_field": "verdict",
-          "mapping": {
-            "placed": "placed",
-            "retry": "retry",
-            "give_up": "give_up"
-          }
-        }
-      },
-      "exit": {
-        "router_field": null,
-        "success_values": [
-          "placed",
-          "retry",
-          "give_up"
-        ]
-      },
-      "on_error": "failed"
     }
   }
 }

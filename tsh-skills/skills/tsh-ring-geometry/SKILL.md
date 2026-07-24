@@ -32,6 +32,15 @@ gap:
     - >
       Outside the sanity band this skill RAISES (no tuned fallback) — route
       the failure to a re-perceive or abort; do not invent radii.
+    - >
+      Do NOT add any adapter/conversion node before `ring_geometry.py` to
+      reshape `center_xyz`. The script already accepts EITHER a Vec3 dict
+      `{x,y,z}` OR a plain `[x,y,z]` list — it coerces internally
+      (`isinstance(center_xyz, dict)` check). Wire `center_xyz` straight from
+      `Ref("in.target_xyz")` with no intermediate node; the same applies to
+      every other script in this catalog that takes a Vec3/Quaternion
+      argument (`as_vec3`/`as_wxyz` helpers do this everywhere) — none of
+      them need a pre-conversion shim.
   canonical_scripts:
     - ring_geometry: scripts/ring_geometry.py
   streaming: false
@@ -40,7 +49,7 @@ gap:
 # tsh-ring-geometry
 
 The ring-specific half of what the old fused tape perception did: perception
-itself is object-agnostic (`tsh-perceive`'s `perceive_object` emits cloud /
+itself is object-agnostic (`tsh-perceive-sam`'s `perceive_object` emits cloud /
 top face / half thickness for ANY object), and this skill derives the two
 numbers only a *ring* consumer needs — the hole and rim radii the ring grasp
 places its fingers by.
@@ -65,15 +74,16 @@ estimator lives next to `ring_grasp_poses`, the grasp-pose derivation that
 
 ## Recommended subgraph state flow
 
-1 state:
+1 state — exactly one node, no adapter/pre-conversion node before it:
 
 ```text
 ring_geometry
 ```
 
 1. **`ring_geometry`** — `type: script`, file `scripts/<sg>/ring_geometry.py`.
-   Inputs: `cloud=Ref("in.target_cloud")`, `center_xyz=Ref("in.target_xyz")`,
-   `half_z=Ref("in.target_half_z")`. Returns `{hole_radius, rim_radius}`.
+   Inputs: `cloud=Ref("in.target_cloud")`, `center_xyz=Ref("in.target_xyz")`
+   (wired DIRECTLY — no shim, see hard_rules), `half_z=Ref("in.target_half_z")`.
+   Returns `{hole_radius, rim_radius}`.
 
 Wire the exit linearly: `ring_geometry → derived → END`, with
 `set_on_error("degenerate")`. The script raises on a degenerate cloud, so no

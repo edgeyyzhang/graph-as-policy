@@ -341,7 +341,7 @@ class LiberoYamCuRoboIK:
         link6 = (rel - R @ np.asarray(YAM_TCP_OFFSET, dtype=np.float64)).astype(np.float32)
 
         self._load_world(planner, world_obstacles, base_pos)
-        planner.reset_seed()
+        planner.reset_seed() ### why are we reseting the seed every plan? this prevents warm start
 
         device_cfg = planner.config.device_cfg
         seed = seed_joints if seed_joints is not None else [0.0, 1.5, 1.5, 0.0, 0.0, 0.0]

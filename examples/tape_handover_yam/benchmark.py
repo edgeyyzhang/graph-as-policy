@@ -22,6 +22,10 @@ Env knobs:
     YELLOW_ANCHORS     override yellow anchors (comma-sep x:y pairs, e.g. "0.40:0.25,0.50:0.50")
     DUCT_ANCHORS       override duct anchors (same format; every yellow anchor is tried
                        against every duct anchor, so counts need not match)
+    SETTLE_STEPS       idle control steps held (last action) after the graph finishes,
+                       before reading task_completed() (default 30, ~1s at 30Hz) — lets
+                       a released object finish falling/settling before the one-shot,
+                       no-memory goal check samples it
 """
 
 from __future__ import annotations
@@ -74,6 +78,8 @@ _DEFAULT_SEEDS = 5
 # ── env knobs ───────────────────────────────────────────────────────────────
 _TRIAL_TIMEOUT_S = float(os.environ.get("TRIAL_TIMEOUT_S", "300"))
 _RECORD_VIDEO = os.environ.get("RECORD_VIDEO", "1") != "0"
+_SETTLE_STEPS = int(os.environ.get("SETTLE_STEPS", "30"))  # ~1s at 30Hz control,
+# held before the final task_completed() check — see call site for why
 
 
 def _parse_anchors(env_key: str, default: list[tuple[float, float]]) -> list[tuple[float, float]]:
@@ -164,6 +170,14 @@ def _run_trial_guarded(graph_dir: str, yellow_xy: tuple[float, float],
 
         result = gap.execute(graph_dir, conn, skills=_SKILLS)
         graph_ok = bool(result.success)
+        # task_completed() reflects only the LAST control step's goal check, with
+        # no memory of an earlier success — the graph's final action is place's
+        # retract, commanded while the released tape may still be mid-fall
+        # (PLACE_DROP_CLEARANCE leaves a few cm of intentional free-fall). Hold
+        # the last action for a short settle so the goal check isn't sampling a
+        # moving target at the exact instant execution stopped.
+        for _ in range(_SETTLE_STEPS):
+            env.step(env._cmd)
         ok = bool(env.task_completed())
         if result.error:
             note = str(result.error)

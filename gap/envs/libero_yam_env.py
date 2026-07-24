@@ -32,7 +32,7 @@ from .registry import EnvConfig
 
 # link_6 -> gripper-tip offset in the link_6 frame (matches the grasp_site and
 # LIBERO-YAM/scripts/yam_ik.py).
-YAM_TCP_OFFSET = (0.0, 0.0, 0.1347)
+YAM_TCP_OFFSET = (0.0, 0.0, 0.1347) # calculated myself
 
 # 14-D layout indices.
 _GRIP = {0: 6, 1: 13}      # gripper slot per arm
@@ -122,6 +122,7 @@ class LiberoYamEnv(BaseEnv):
         import mujoco
 
         m = self.model
+        ### some mujoco overrides, directly taken from LIBERO_YAM repo
         # Soften globally stiff contacts (same fix as oracle_pick_cream_cheese).
         m.geom_solref[m.geom_solref[:, 0] < 0.02, 0] = 0.02
         m.geom_solimp[:, 0] = np.minimum(m.geom_solimp[:, 0], 0.9)
@@ -130,6 +131,10 @@ class LiberoYamEnv(BaseEnv):
         # Stiffer contacts for tape convex-decomp geoms so fingers don't phase
         # through the ring wall. geom_priority=1 forces MuJoCo to use ONLY the
         # tape's solref for finger-tape contacts.
+
+        # ----------------------------------------------------------
+        # TAPE OVERRIDES
+        ### Mujoco Overrides specific to this task, ensure no "magical" grasp
         tape_bid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "yellow_tape_1__object")
         if tape_bid >= 0:
             for gi in range(m.ngeom):
@@ -140,35 +145,38 @@ class LiberoYamEnv(BaseEnv):
                     m.geom_priority[gi] = 1
                     m.geom_condim[gi] = 6
                     m.geom_friction[gi, 2] = 0.01
+            # Realistic tape rotational inertia (the arena compiler floors it too high).
+            m.body_inertia[tape_bid] = np.array([4.7e-5, 4.7e-5, 8.9e-5]) * 1.69
+            # Damp the tape's free joint. With zero damping the 50 g, low-inertia ring
+            # tumbles freely off the near-elastic tape contacts when the receiver
+            # releases it (multiple flips before it settles), and picks up spurious
+            # momentum from contact forces during other low-velocity moments too
+            # (e.g. the exchange's retract) — damping force scales with velocity, so
+            # it's near-zero while the ring is rigidly gripped and stationary, but NOT
+            # negligible whenever the tape is moving without being firmly held.
+            # The free joint is on the PARENT body (this "__object" body holds the
+            # tape's real mass/geoms but has no joint of its own).
+            jid = m.body_jntadr[m.body_parentid[tape_bid]]
+            if jid >= 0 and m.jnt_type[jid] == mujoco.mjtJoint.mjJNT_FREE:
+                adr = m.jnt_dofadr[jid]
+                m.dof_damping[adr:adr + 3] = 0.05    # translational (m/s drag)
+                m.dof_damping[adr + 3:adr + 6] = 0.005  # rotational (kills the flip)
+        # ----------------------------------------------------------
 
         # Stiffen gripper PD so fingers clamp the ring during reorientation
         # and resist the receiver's contact force at exchange.
+        ### Not entirely sure if this is faithful
         for side, kp in (("left", 2000.0), ("right", 800.0)):
             gid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{side}_gripper")
             if gid >= 0:
                 m.actuator_gainprm[gid, 0] = kp
                 m.actuator_biasprm[gid, 1] = -kp
                 m.actuator_biasprm[gid, 2] = -5.0
+        
 
-        # Realistic tape rotational inertia (the arena compiler floors it too high).
-        tape = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "yellow_tape_1__object")
-        if tape >= 0:
-            m.body_inertia[tape] = np.array([4.7e-5, 4.7e-5, 8.9e-5]) * 1.69
 
-        # Damp the tape's free joint. With zero damping the 50 g, low-inertia ring
-        # tumbles freely off the near-elastic tape contacts when the receiver
-        # releases it (multiple flips before it settles). A little damping
-        # dissipates that free-flight bounce/spin so it settles onto the duct;
-        # negligible while the ring is gripped (kp=2000 grip dominates) or carried
-        # with the arm, so the grasp/handover are unaffected.
-        for tape_body in ("yellow_tape_1", "yellow_tape_1__object"):
-            jid = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, f"{tape_body}_joint")
-            if jid >= 0 and m.jnt_type[jid] == mujoco.mjtJoint.mjJNT_FREE:
-                adr = m.jnt_dofadr[jid]
-                m.dof_damping[adr:adr + 3] = 0.05    # translational (m/s drag)
-                m.dof_damping[adr + 3:adr + 6] = 0.005  # rotational (kills the flip)
-                break
-
+    ## This is the way I have it setup: the tape is teleported to a new (x, y) position, 
+    ##  then the simulator is advanced 25 steps so gravity and contacts let it come to rest.
     def _apply_tape_overrides(self) -> None:
         """Generalization eval: re-place tape free bodies from env vars before the
         settle. ``GAP_YELLOW_XY`` / ``GAP_DUCT_XY`` = "x,y" in LIBERO world metres

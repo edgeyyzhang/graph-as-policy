@@ -27,8 +27,13 @@ gap:
     holding: bool
   hard_rules:
     - >
-      The verdict is ROUTED, never raised — a failed verify is recoverable
-      state; map retry to the re-perceive loop edge, give_up to abort.
+      `check.py` itself never raises for `holding`/`retry`/`give_up` — it
+      always returns a normal verdict string. `holding` and `retry` are
+      routed via `conditional_edges` to noop exits; `give_up` is
+      deliberately left OUT of that mapping so the unmatched value triggers
+      the subgraph's `on_error="give_up"` exit — see "Recommended subgraph
+      state flow" below. Do not add a third `give_up` node or a script that
+      calls `raise` for `give_up`.
     - >
       The retry bound is per-process (one run = one episode); do not rely on
       it resetting between items of a loop.
@@ -68,22 +73,42 @@ flips an empty grip to a false YES).
 
 ## Recommended subgraph state flow
 
+`give_up` is NOT a third routed node. Only TWO noop exits exist in the
+subgraph body — `holding` and `retry`:
+
 ```text
 observe → check ──("holding")──▶ holding → END
-                ├─("retry")────▶ retry → END
-                └─("give_up")──▶ give_up → END
+                └─("retry")────▶ retry   → END
 ```
+
+with `on_error: "give_up"` set on the subgraph (a sibling of `exit`, not a
+node). `check`'s `conditional_edges` mapping deliberately covers only
+`{"holding": "holding", "retry": "retry"}` — `give_up` is left OUT of the
+mapping on purpose. When `check.verdict == "give_up"` (attempts exhausted),
+the router lookup fails on that unmapped value, the executor treats the
+failure as the subgraph raising, and — because `on_error` is set — catches it
+and exits the subgraph with status `"give_up"` instead of propagating the
+error. That is the ONLY mechanism for reaching `give_up`; do not add a
+`give_up` noop node or any node that explicitly raises (e.g. a
+`raise_give_up` script node) — `on_error`'s value must not be a declared node
+name and must not appear as a `conditional_edges` mapping target (the
+validator rejects both), and an explicitly-added raise node still needs a
+normal outgoing edge like any other node, which defeats the point.
 
 1. **`observe`** — `type: tool`, `tool: "robot.get_observation"` (MANDATORY —
    the VLM check needs the fresh cameras).
 2. **`check`** — `type: script`, `scripts/<sg>/verify_grasp.py`,
    `inputs={"arm_id": Ref("in.pick_arm"), "object_query": "yellow tape",
    "cameras": Ref("observe.cameras")}`.
-3. Conditional edges on `check`'s `verdict` field to the three noop exits.
+3. Conditional edges on `check`'s `verdict` field, mapping ONLY `holding` and
+   `retry` to their noop exits. `exit.success_values` lists `["holding",
+   "retry"]` — `give_up` is not in there either; it lives solely in
+   `on_error`.
 
 At the TOP level, map the subgraph exits:
 `holding → <next stage>`, `retry → <the perceive subgraph>` (loop edge),
-`give_up → abort`.
+`give_up → abort` (the subgraph's `on_error` exit, wired like any other
+subgraph exit value).
 
 ## Checkpoints
 

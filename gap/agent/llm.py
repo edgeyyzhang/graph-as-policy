@@ -64,7 +64,7 @@ DEFAULT_MODELS: dict[str, str] = {
 }
 
 #: Models that reject sampling parameters (``temperature`` 400s on them).
-_NO_SAMPLING_MARKERS: tuple[str, ...] = ("opus-4-7", "opus-4-8", "fable")
+_NO_SAMPLING_MARKERS: tuple[str, ...] = ("opus-4-7", "opus-4-8", "fable", "sonnet-5")
 
 # Per-event-loop semaphores for rate limiting concurrent LLM requests.
 # Keyed by loop (weakly) because asyncio primitives bind to the loop they

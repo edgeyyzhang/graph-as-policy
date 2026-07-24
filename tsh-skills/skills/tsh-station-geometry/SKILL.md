@@ -8,8 +8,12 @@ description: >
   presentation frame (approach ⊥ baseline, finger-spread along baseline, up =
   world-up; receiver canonical, splay 0). Reproduces the tuned MEET_XYZ /
   GIVER_QUAT / RECV_QUAT and self-configures for a restationed pair. Emits
-  ``meet_xyz``, ``giver_quat``, ``recv_quat`` for tsh-handover. Use as the
-  up-front self-model step before a scripted bimanual exchange on LIBERO-YAM.
+  ``giver_quat``/``recv_quat`` for tsh-handover directly, plus ``target_xyz``/
+  ``target_quat`` aliases of ``meet_xyz``/``giver_quat`` so a mandatory
+  ``tsh-transport-held`` instance can auto-wire immediately after this node as
+  the giver's collision-aware PRESENT leg — ``tsh-handover`` itself no longer
+  has any present-leg logic of its own. Use as the up-front self-model step
+  before a scripted bimanual exchange on LIBERO-YAM.
 compatibility: requires gap>=0.1
 metadata:
   category: calibration
@@ -24,6 +28,12 @@ gap:
     meet_xyz: Vec3          # world-frame handover point
     giver_quat: Quaternion  # giver present orientation, wxyz
     recv_quat: Quaternion   # receiver thread orientation, wxyz (canonical; exchange mirrors)
+    target_xyz: Vec3        # alias of meet_xyz — ONLY so a tsh-transport-held
+                             # present instance can auto-wire right after this
+                             # node (same trick tsh-place-pose uses for the
+                             # place-chain transport_held). Do not reuse for
+                             # anything else.
+    target_quat: Quaternion # alias of giver_quat — see target_xyz above.
   canonical_scripts:
     - station_geometry: scripts/station_geometry.py
   streaming: false
@@ -47,16 +57,24 @@ midpoint). A reachability-refined variant lives in
 
 ## When to use
 
-- As the first (or an up-front, run-once) step before `tsh-handover`, feeding
-  `meet_xyz` / `giver_quat` / `recv_quat` into the exchange.
+- Always, as a mandatory up-front step before any `tsh-handover` — `giver_quat`/
+  `recv_quat` feed the exchange directly, and `meet_xyz` (via the `target_xyz`/
+  `target_quat` aliases) feeds the required `tsh-transport-held` PRESENT
+  instance composed right after this node: `station_geometry → present
+  (tsh-transport-held) → handover`. `tsh-handover` no longer has any way to
+  get the tape to the meet point itself, so this subgraph is not optional
+  once a handover is in the graph.
 - Any scripted bimanual handover on LIBERO-YAM that should self-configure to the
   arm placement rather than hard-code a demo meet pose.
+- **Ordering requirement**: this instance must run AFTER the last consumer of
+  the perception `target_xyz` (i.e. after `tsh-pickup`) — cross-subgraph
+  wiring binds by exact name to the LATEST producer at that point in the DAG,
+  so if this subgraph ran before `tsh-pickup`, its `target_xyz` alias would
+  incorrectly shadow the perceived tape position for the grasp.
 
 ## When NOT to use
 
 - Single-arm tasks (there is no rendezvous to derive).
-- When the caller supplies an explicit handover point (the exchange honours a
-  named `meet_xyz` / `GAP_HANDOVER_XYZ` override) — then this subgraph is moot.
 
 ## Recommended subgraph state flow
 
@@ -78,10 +96,18 @@ sg.set_outputs(
     meet_xyz=Ref("derive_station_geometry.meet_xyz"),
     giver_quat=Ref("derive_station_geometry.giver_quat"),
     recv_quat=Ref("derive_station_geometry.recv_quat"),
+    # Aliases so a tsh-transport-held PRESENT instance can auto-wire right
+    # after this node — see the ordering requirement under "When to use".
+    target_xyz=Ref("derive_station_geometry.meet_xyz"),
+    target_quat=Ref("derive_station_geometry.giver_quat"),
 )
 ```
 
-Downstream, `tsh-handover` wires all three via `Ref("in.<name>")`.
+Downstream, `tsh-handover` wires `giver_quat`/`recv_quat` via `Ref("in.<name>")`
+(it no longer takes `meet_xyz` at all). `tsh-transport-held`, composed right
+after this node as the mandatory PRESENT leg, wires its `target_xyz`/
+`target_quat` inputs from this node's aliases the same way `tsh-place-pose`'s
+aliases feed the place-chain instance.
 
 ## Required end states
 
@@ -94,4 +120,6 @@ Downstream, `tsh-handover` wires all three via `Ref("in.<name>")`.
 
 - `scripts/_station_geometry.py` — the derivation (`derive_meet_xyz`,
   `derive_presentation_quats`, and a reachability-refined `derive_station_geometry`).
-- `tsh-handover` — the consumer of `meet_xyz` / `giver_quat` / `recv_quat`.
+- `tsh-handover` — consumer of `giver_quat` / `recv_quat` directly.
+- `tsh-transport-held` — consumer of the `target_xyz`/`target_quat` aliases,
+  composed between this node and `tsh-handover` as the mandatory present leg.

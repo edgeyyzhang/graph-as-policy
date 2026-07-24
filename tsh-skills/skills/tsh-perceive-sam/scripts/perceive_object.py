@@ -4,7 +4,7 @@ The appendix-style perception contract: the subgraph is parameterized by a
 literal ``object_query`` (the DINO noun phrase — ``"yellow tape"``, ``"gray
 tape"``, ``"red tape spool"``) and emits unprefixed geometry fields the
 subgraph's ``set_outputs`` renames to its own prefix (``target_*``,
-``dest_*``, ...). Nothing task-specific lives here — the same node perceives
+``container_*``, ...). Nothing task-specific lives here — the same node perceives
 the tape, the duct, or a colour-sorted stack; ring-specific derivations
 (hole/rim radii) live in the separate ``tsh-ring-geometry`` post-processor.
 

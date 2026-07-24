@@ -1,16 +1,20 @@
-"""Bimanual insertion handover: giver presents the ring face-on, receiver inserts.
+"""Bimanual insertion handover: receiver threads the ring, giver releases.
 
-Both grippers point +X (gripper-z = +X), so the giver presents the tape "o"
-face-on along world X and the receiver threads a finger into the same hole. A
-naive straight -X receiver approach drives it THROUGH the giver's arm, so the
+Both grippers point +X (gripper-z = +X). The giver is assumed to already be
+presenting the tape "o" face-on at the meet point — a preceding
+``tsh-transport-held`` instance (fed by ``tsh-station-geometry``'s
+``target_xyz``/``target_quat`` aliases) carries it there first, composing the
+measured ``tape_in_giver`` offset into its own tool_offset plan. This node
+picks up from there: the receiver threads a finger into the same hole. A naive
+straight -X receiver approach drives it THROUGH the giver's arm, so the
 receiver pre-positions on its own -Y side (its wrist passes beside the giver's),
 aligns while still behind the tape, and inserts purely along +X onto the open
 rim (one finger in the hole, one outside -> wall pinch).
 
-The tape is the giver's end effector: the pickup measured the tape centre in the
-giver TCP frame (``tape_in_giver``, rigid under the grip), and that offset is
-composed into the planner's tcp_offset (``plan_tool_move``), so the present move
-literally plans "tape centre to ``meet_xyz``" — no ground truth, no back-solve.
+The tape is tracked as the giver's end effector throughout: the pickup
+measured the tape centre in the giver TCP frame (``tape_in_giver``, rigid
+under the grip), and ``_hole()`` below re-derives its live world position from
+the giver's FK + that offset — no ground truth, no back-solve.
 
 Arm layout (LIBERO-YAM): canonical is arm0 (left, base y~+0.31) giver, arm1
 (right, base y~-0.31) receiver. The geometry is authored for that handedness;
@@ -21,7 +25,6 @@ base, so no per-side constants are duplicated.
 
 from __future__ import annotations
 
-import os
 from typing import TypedDict
 
 import numpy as np
@@ -33,8 +36,6 @@ from ._motion import curobo_linear_move, plan_tool_move
 from .constants import (
     EXCHANGE_RETRACT_D,
     GIVER_RELEASE_FRACTION,
-    PLAN_POSITION_THRESHOLD,
-    PLAN_ROTATION_THRESHOLD,
     RECV_ANGLE_SWEEP_DEG,
     RECV_CLOSE_SETTLE_STEPS,
     RECV_GRASP_ANGLE_DEG,
@@ -62,6 +63,11 @@ class Output(TypedDict):
     giver_arm: int      # echo of the giving arm (checkpoint anchor)
     receiver_arm: int   # echo of the receiving arm (checkpoint anchor; the
                         # holder after this subgraph)
+    place_arm: int      # alias of receiver_arm — rebinds the cross-subgraph
+                        # ``place_arm`` name (tsh-route's on the direct route)
+                        # to the receiver, so place_pose/transport_held/place
+                        # auto-wire their arm_id to whoever holds the tape now,
+                        # by exact name, with no per-route special-casing.
 
 
 # Reflection across the world Y=0 plane. The exchange geometry below is authored
@@ -125,40 +131,28 @@ def run(ctx: NodeContext, *,
         receiver_arm: int = 1,
         tape_in_giver: list,
         rim_radius: float,
-        meet_xyz: tuple,
         giver_quat: tuple,
-        recv_quat: tuple,
-        skip_present: bool = False) -> Output:
-    """Transfer the tape from giver to receiver at ``meet_xyz``.
+        recv_quat: tuple) -> Output:
+    """Transfer the tape from giver to receiver.
+
+    The giver is assumed to already be presenting the tape at the meet point —
+    a preceding ``tsh-transport-held`` instance (fed by ``tsh-station-geometry``'s
+    ``target_xyz``/``target_quat`` aliases) carries it there first. This node
+    starts directly at the receiver thread.
 
     tape_in_giver: tape centre in the giver TCP frame, measured by the pickup —
                    the giver's tool offset for the whole exchange.
-    skip_present:  True when a preceding ``transport_held`` node (the shared
-                   held-object transport, possibly with the tape cloud attached
-                   as a collision body) already presented the tape at
-                   ``meet_xyz`` — the exchange then starts at the receiver
-                   thread. The live tape pose is re-queried from the giver's FK
-                   either way, so an imperfect present only shifts the thread
-                   target, never breaks it.
     rim_radius:    perceived outer rim radius (m), relayed from tsh-pickup (the
                    same value it used for the giver's grasp). Stable run-to-run
                    (~1mm spread), unlike hole_radius (~17mm spread) — so the
                    receiver's thread offset derives from this, not hole_radius.
-    meet_xyz:      world-frame handover location (where the tape centre is
-                   presented). REQUIRED — supplied by tsh-station-geometry (no
-                   tuned fallback); ``GAP_HANDOVER_XYZ="x,y,z"`` overrides at runtime.
     giver_quat / recv_quat: presentation orientations (wxyz). REQUIRED — supplied
                    base-geometry-derived by tsh-station-geometry (no tuned
                    fallback). ``recv_quat`` is canonical (as if the receiver sits
-                   on -Y); ``_rim_grasp`` mirrors it for a +Y receiver.
+                   on -Y); ``_rim_grasp`` mirrors it for a +Y receiver. `giver_quat`
+                   is used below for the giver's retract move, not a present leg.
     """
     recv_grasp_dy = rim_radius + RECV_GRASP_DY_MARGIN
-    ### Flexible set of inputs for the agent
-    if isinstance(meet_xyz, dict):
-        meet_xyz = (meet_xyz["x"], meet_xyz["y"], meet_xyz["z"])
-    override = os.environ.get("GAP_HANDOVER_XYZ")
-    if override:
-        meet_xyz = tuple(float(v) for v in override.split(","))
     tig = np.asarray(
         [tape_in_giver["x"], tape_in_giver["y"], tape_in_giver["z"]]
         if isinstance(tape_in_giver, dict) else tape_in_giver, dtype=float)
@@ -189,17 +183,10 @@ def run(ctx: NodeContext, *,
         w = p + R.apply(tig) ## rotates tape into world orientaiton, add to giver IK
         return float(w[0]), float(w[1]), float(w[2])
 
-    # 1. Giver presents the tape "o" face-on at the meeting point: the TAPE is
-    #    the end effector (tool_offset=tig), so cuRobo plans the tape centre to
-    #    meet_xyz directly — repeatable regardless of how the ring settled on the
-    #    finger. Skipped when a transport_held node already presented.
-    if not skip_present:
-        plan_tool_move(ctx, giver_arm, meet_xyz, giver_quat, tool_offset=tig,
-                       position_threshold=PLAN_POSITION_THRESHOLD,
-                       rotation_threshold=PLAN_ROTATION_THRESHOLD)
-
-    # 2. Receiver opens and pre-positions on its OWN Y side, level with the hole
-    #    and backed off in -X, so its finger can sweep into the hole face along +X.
+    # 1. The giver is already presenting the tape at the meet point (a preceding
+    #    tsh-transport-held instance carried it there). Receiver opens and
+    #    pre-positions on its OWN Y side, level with the hole and backed off
+    #    in -X, so its finger can sweep into the hole face along +X.
     #    Sweep the grasp angle around the ring circumference and take the first
     #    clock position that can BOTH pre-position AND reach the inserted pose —
     #    different angles thread the same hole from different clock positions, so
@@ -283,5 +270,6 @@ def run(ctx: NodeContext, *,
     return {"handed_over": True, "receiver_offset": receiver_offset,
             "held_offset": receiver_offset,
             "giver_tcp": giver_tcp, "receiver_tcp": receiver_tcp,
-            "giver_arm": int(giver_arm), "receiver_arm": int(receiver_arm)}
+            "giver_arm": int(giver_arm), "receiver_arm": int(receiver_arm),
+            "place_arm": int(receiver_arm)}
 

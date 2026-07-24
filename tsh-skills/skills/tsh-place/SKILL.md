@@ -1,14 +1,15 @@
 ---
 name: tsh-place
 description: >
-  Lay the held tape flat on the perceived destination top face and release. The
-  holder grips the tape off-centre (ring grasp or rim thread), so the tape is
-  treated as the holder's end effector via the measured held_offset: every place
-  target is a TAPE-centre pose, composed into the plan. Yaw-sweep the gripper
-  about the tape's vertical axis for a reachable pose, approach the hover with
-  the tape attached as a cuRobo collision body, set down flush (destination top +
-  perceived tape half-thickness), release, and retract straight up. Serves both
-  the direct and handed-over routes on LIBERO-YAM. place_arm comes from
+  Release the held tape at a pre-computed pose and retract. The holder grips
+  the tape off-centre (ring grasp or rim thread), so the tape is treated as
+  the holder's end effector via the measured held_offset, composed once here
+  to get the actual release TCP. WHERE/WHICH-orientation come from
+  tsh-place-pose (the yaw-reachability probe); a preceding tsh-transport-held
+  node has already carried the arm to the collision-aware hover above
+  place_xyz. This skill only does the straight-down set-down and straight-up
+  retract (curobo_linear_move) — never a free transport. Serves both the
+  direct and handed-over routes on LIBERO-YAM. place_arm comes from
   tsh-route; when the task pins the arm, bind a literal int inside the
   subgraph and omit that input.
 compatibility: requires gap>=0.1
@@ -21,37 +22,32 @@ gap:
     - libero-yam.execute_trajectory
     - curobo.plan_to_pose
     - curobo.plan_directed_linear
-    - curobo.plan_with_grasped_object
     - robot.open_gripper
-    - robot.get_ee_pose
   exit_conditions:
-    placed: Tape laid on the destination and released; place_tcp bound in the outputs.
-    failed: No reachable place yaw, or a place leg had no plan (raise routes to abort).
+    placed: Tape released at the target and retracted; place_tcp bound in the outputs.
+    failed: A set-down/retract leg had no plan (raise routes to abort).
   required_inputs:
-    held_offset: Vec3              # the LATEST holder's tool offset — pickup's tape_in_giver on the
-                                    # direct route, or the exchange's receiver_offset after a handover
-                                    # (latest-producer cross-subgraph binding; both FK-measured, no GT)
-    dest_xyz: Vec3                 # from tsh-perceive (destination top-face centre; e.g. duct)
-    target_half_z: float           # the PLACED object's half thickness — tsh-perceive's <name>_half_z
-                                    # (target_ prefix); rebind to the script's tape_half_z kwarg.
-                                    # REQUIRED, no tuned fallback
-    target_cloud: PointCloud       # the placed object's cloud (attached collision body) — tsh-perceive's
-                                    # <name>_cloud (target_ prefix); rebind to the script's tape_cloud
-                                    # kwarg. REQUIRED, no tuned fallback
-    place_arm: int                 # placing arm from tsh-route (0=left, 1=right); rebind to the
-                                    # script's arm_id kwarg. Task pins the arm? Pass arm_id a
-                                    # LITERAL in the node inputs and OMIT this subgraph input.
+    held_offset: Vec3               # the LATEST holder's tool offset — pickup's tape_in_giver on the
+                                     # direct route, or the exchange's receiver_offset after a handover
+                                     # (latest-producer cross-subgraph binding; both FK-measured, no GT)
+    place_xyz: Vec3                 # the tape's final rest centre — from tsh-place-pose
+    place_quat: Quaternion          # reachable presentation orientation, wxyz — from tsh-place-pose
+    place_arm: int                  # placing arm from tsh-route (0=left, 1=right); rebind to the
+                                     # script's arm_id kwarg. Task pins the arm? Pass arm_id a
+                                     # LITERAL in the node inputs and OMIT this subgraph input.
   produces_outputs:
     placed: bool
-    place_tcp: Se3Pose             # world TCP pose matching the RESTING tape
-    place_arm: int                 # echo of the placing arm (checkpoint anchor)
+    place_tcp: Se3Pose              # world TCP pose matching the RESTING tape
+    place_arm: int                  # echo of the placing arm (checkpoint anchor)
   hard_rules:
     - >
       Every place target is a TAPE-centre pose; compose `held_offset` into
-      the plan (`tool_offset`) — do NOT plan the bare TCP to the destination.
+      the plan — do NOT plan the bare TCP to the destination.
     - >
-      Rest height is DERIVED: destination top face + perceived `tape_half_z` (or
-      derived from `tape_cloud`). Do not hard-code a place Z.
+      This skill does NOT compute the reachable pose or do the hover
+      approach — those are `tsh-place-pose` and `tsh-transport-held`. By the
+      time this node runs, the arm must already be at the hover above
+      `place_xyz`/`place_quat`.
   canonical_scripts:
     - place: scripts/place.py
   streaming: false
@@ -63,62 +59,73 @@ The holder does not hold the tape centred (a ring grasp or a rim thread leaves
 the tape centre several cm off the TCP), so place treats the tape as the holder's
 end effector via `held_offset` — FK-measured, no GT — which is the pickup's grip
 on the direct route or the receiver's grip after a handover (the cross-subgraph
-name rebinds to whichever ran last). The target is the tape centre = perceived
-destination top-face centre + the tape half-thickness (so it rests flush). The
-tape is round, so a yaw sweep pivots the TCP about the tape centre until the
-hover is reachable — the ring's own symmetry is the reach margin. The approach is
-planned with the tape attached as a cuRobo collision body so the face-on →
-gripper-down reorient can't clip the arm.
+name rebinds to whichever ran last). `place_xyz`/`place_quat` are the reachable
+rest pose `tsh-place-pose` already probed; this node composes `held_offset`
+against them once to get the release TCP, then descends, releases, and
+retracts straight up.
 
-The place *location* is read UP FRONT by `tsh-perceive` (`perceive_dest`), while
-the destination view is clean — at place time the held tape + gripper occlude it.
+The reachable pose and the collision-aware hover approach are factored out
+into `tsh-place-pose` and `tsh-transport-held` so this skill is just the
+final legs — a straight-line descent and retract, never a free transport.
 
 ## When to use
 
-- The terminal stage on BOTH routes: directly after `verify_grasp` on the
-  `direct` route (`dispatch` → `place`), or after `tsh-handover` on the
+- The terminal stage on BOTH routes, always preceded by `tsh-place-pose` then
+  `tsh-transport-held` in the same subgraph chain: directly after
+  `verify_grasp` on the `direct` route (`dispatch` → `place_pose` →
+  `transport_held` → `place`), or after `tsh-handover` on the
   `needs_handover` route. `held_offset` + `place_arm` come from whichever
-  holder ran last, so the same subgraph serves both.
+  holder ran last, so the same chain serves both.
 
 ## When NOT to use
 
 - Objects that aren't laid flat on a surface, or learned/policy placement.
+- Standalone — this skill never computes its own target pose or does its own
+  approach; it always needs `tsh-place-pose` + `tsh-transport-held` ahead of it.
 
 ## Recommended subgraph state flow
 
-1 state:
+This is THREE separate top-level subgraphs (one per skill), not three nodes
+inside one subgraph — each already has its own fixed input/output contract
+(see each skill's SKILL.md), connected by ordinary conditional edges and
+resolved by the usual cross-subgraph exact-name auto-wire:
 
 ```text
-place
+place_pose_sg → transport_held_sg → place_sg
 ```
 
-1. **`place`** — `type: script`, `scripts/<sg>/place.py`. Inputs:
-   `held_offset=Ref("in.held_offset")`, `dest_xyz=Ref("in.dest_xyz")`,
-   `tape_half_z=Ref("in.target_half_z")`, `tape_cloud=Ref("in.target_cloud")`,
-   `arm_id=Ref("in.place_arm")` (route-decided placing arm — or a literal
-   `arm_id=1` with the `place_arm` subgraph input omitted, when the task pins
-   the arm).
-   Returns `{placed, place_tcp, place_arm}`.
+1. **`place_pose_sg`** (`tsh-place-pose`) — subgraph inputs `held_offset`,
+   `container_xyz`, `target_half_z`, `place_arm` (all auto-wired from upstream by
+   exact name). Produces `place_xyz`, `hover_xyz`, `place_quat`, plus
+   `target_xyz`/`target_quat` (aliases of `hover_xyz`/`place_quat`, added
+   specifically so the next subgraph can auto-wire).
+2. **`transport_held_sg`** (`tsh-transport-held`) — subgraph inputs
+   `held_offset`, `target_xyz`, `target_quat` auto-wire from
+   `place_pose_sg`'s alias outputs (it is the LATEST producer of those two
+   names at this point in the DAG, so it correctly wins over any earlier
+   `target_xyz` producer like a perceive instance). `held_cloud`
+   intentionally NOT wired for now (see `tsh-transport-held` hard_rules).
+3. **`place_sg`** (`tsh-place`) — subgraph inputs `held_offset`, `place_xyz`,
+   `place_quat`, `place_arm` auto-wire from `place_pose_sg`'s (unaliased,
+   unambiguous) outputs. Produces `placed`, `place_tcp`, `place_arm`.
 
-Bind the outputs (`place_tcp` feeds a return leg that re-acquires the tape):
-
-```python
-sg.set_outputs(
-    place_tcp=Ref("place.place_tcp"),
-    place_arm=Ref("place.place_arm"),
-)
-```
+No explicit `set_outputs` glue is needed between these three — each skill's
+own subgraph body already declares the outputs above; the top level just
+needs conditional edges chaining `place_pose_sg → transport_held_sg →
+place_sg` in that order.
 
 ## Required end states
 
 | End state | Meaning |
 |---|---|
 | `placed` | Tape laid and released; route to `done` (or a return leg). |
-| `failed` | No reachable yaw / plan failed; route to `abort`. |
+| `failed` | No reachable yaw (`place_pose`) / plan failed (`transport_held` or `place`); route to `abort`. |
 
 ## See also
 
-- `tsh-perceive` — supplies `dest_xyz`, `tape_half_z`, `tape_cloud`.
+- `tsh-place-pose` — computes `place_xyz`/`hover_xyz`/`place_quat` (the yaw-reachability probe).
+- `tsh-transport-held` — carries the arm to the collision-aware hover before this node runs.
+- `tsh-perceive-cv` — supplies `container_xyz`, `target_half_z` (consumed by `tsh-place-pose` now, not here).
 - `tsh-pickup` — supplies `held_offset` on the direct route.
 - `tsh-handover` — supplies `held_offset` (the receiver's grip) after a handover.
 - `tsh-route` — decides `place_arm` and whether a handover precedes this.

@@ -2,18 +2,20 @@
 """Author the routed bimanual tape-handover workflow with ``gap.builder``.
 
 The appendix-style decomposition — generic single-purpose subgraphs, a
-reachability-routed handover, verification gates with recovery loop edges,
-and a next-item loop — instead of one monolithic handover chain:
+reachability-routed handover, and a next-item loop — instead of one
+monolithic handover chain:
 
     gripper_geometry → station_geometry → perceive_dest → perceive_target
-      → ring_geometry → route ──direct/needs_handover──▶ pickup → verify_grasp
+      → ring_geometry → route ──direct/needs_handover──▶ pickup
       → [dispatch] ──direct──▶ place
                    └─handover─▶ present → handover → place
-      → verify_place → [next_item] → done
+      → [next_item] → done
+
+``tsh-verify-grasp`` / ``tsh-verify-place`` (and their retry-loop recovery
+edges back to ``perceive_target``) are parked in ``tsh-skills/_parked_skills``
+— not wired into this workflow for now.
 
 Recovery edges (the agent-testing surface):
-  verify_grasp.retry  → perceive_target   (re-perceive + re-grasp, bounded)
-  verify_place.retry  → perceive_target   (re-perceive wherever it landed)
   next_item.next      → perceive_dest     (multi-item loop; TSH runs once)
 
 A handover is a ROUTED strategy, not a fixed stage: ``route`` probes each
@@ -54,10 +56,10 @@ SG_SCRIPTS: dict[str, tuple[str, list[str]]] = {
                          ["gripper_geometry.py", "_gripper_geometry.py", "constants.py"]),
     "station_geometry": ("tsh-station-geometry",
                          ["station_geometry.py", "_station_geometry.py"]),
-    "perceive_dest":    ("tsh-perceive",
+    "perceive_dest":    ("tsh-perceive-cv",
                          ["perceive_object_cv.py", "_perceive_cv.py",
                           "_perceive.py", "constants.py"]),
-    "perceive_target":  ("tsh-perceive",
+    "perceive_target":  ("tsh-perceive-cv",
                          ["perceive_object_cv.py", "_perceive_cv.py",
                           "_perceive.py", "constants.py"]),
     "ring_geometry":    ("tsh-ring-geometry",
@@ -66,16 +68,12 @@ SG_SCRIPTS: dict[str, tuple[str, list[str]]] = {
                          ["route.py", "_ring.py", "_motion.py", "constants.py"]),
     "pickup":           ("tsh-pickup",
                          ["pickup.py", "_ring.py", "_motion.py", "constants.py"]),
-    "verify_grasp":     ("tsh-verify-grasp", ["verify_grasp.py"]),
     "present":          ("tsh-transport-held",
                          ["transport_held.py", "_held.py", "_motion.py"]),
     "handover":         ("tsh-handover",
                          ["bimanual_exchange.py", "_motion.py", "constants.py"]),
     "place":            ("tsh-place",
                          ["place.py", "_held.py", "_motion.py", "constants.py"]),
-    "verify_place":     ("tsh-verify-place",
-                         ["verify_place.py", "_perceive_cv.py", "_perceive.py",
-                          "constants.py"]),
 }
 
 # Canonical pick-and-place stage tags (consumed by the refine loop's
@@ -123,7 +121,7 @@ def _perceive_subgraph(name: str, query: str, prefix: str, *,
                        center_field: str) -> Subgraph:
     """One generic perceive-object instance (appendix perception pattern):
     the query is a literal, the outputs are name-prefixed."""
-    sg = Subgraph(name=name, skill="tsh-perceive")
+    sg = Subgraph(name=name, skill="tsh-perceive-cv")
     sg.add_node("observe", type="tool", tool="robot.get_observation")
     sg.add_node("perceive", type="script",
                 script=f"scripts/{name}/perceive_object_cv.py",
@@ -141,30 +139,6 @@ def _perceive_subgraph(name: str, query: str, prefix: str, *,
         f"{prefix}_half_z": Ref("perceive.half_z"),
     })
     sg.set_on_error("not_found")
-    return sg
-
-
-def _verdict_subgraph(name: str, skill: str, script: str, check_inputs: dict,
-                      inputs: dict[str, str], verdicts: dict[str, str],
-                      outputs: dict[str, Ref]) -> Subgraph:
-    """A verification gate: observe → check, routed on the check's
-    ``verdict`` field to one noop exit per verdict (recovery is ROUTED,
-    never raised)."""
-    sg = Subgraph(name=name, skill=skill)
-    for in_name, type_name in inputs.items():
-        sg.add_input(in_name, type_name=type_name)
-    sg.add_node("observe", type="tool", tool="robot.get_observation")
-    sg.add_node("check", type="script", script=script,
-                inputs={**check_inputs, "cameras": Ref("observe.cameras")})
-    for exit_name in verdicts.values():
-        sg.add_exit(exit_name)
-    sg.add_edge("START", "observe")
-    sg.add_edge("observe", "check")
-    sg.add_conditional_edges("check", dict(verdicts), router_field="verdict")
-    for exit_name in verdicts.values():
-        sg.add_edge(exit_name, "END")
-    sg.set_outputs(**outputs)
-    sg.set_on_error("failed")
     return sg
 
 
@@ -283,16 +257,6 @@ def build_workflow() -> Workflow:
     sg.set_on_error("failed")
     wf.add_subgraph(sg)
 
-    # -- verify the grasp (routed recovery) ---------------------------------
-    wf.add_subgraph(_verdict_subgraph(
-        "verify_grasp", "tsh-verify-grasp",
-        "scripts/verify_grasp/verify_grasp.py",
-        {"arm_id": Ref("in.pick_arm"), "object_query": TARGET_QUERY},
-        inputs={"pick_arm": "int"},
-        verdicts={"holding": "holding", "retry": "retry", "give_up": "give_up"},
-        outputs={"verdict": Ref("check.verdict"),
-                 "holding": Ref("check.holding")}))
-
     # -- handover branch: present (shared held-transport), then exchange ----
     sg = Subgraph(name="present", skill="tsh-transport-held")
     for n, t in [("giver_arm", "int"), ("held_offset", "Vec3"),
@@ -318,8 +282,7 @@ def build_workflow() -> Workflow:
     sg = Subgraph(name="handover", skill="tsh-handover")
     for n, t in [("giver_arm", "int"), ("receiver_arm", "int"),
                  ("tape_in_giver", "Vec3"), ("rim_radius", "float"),
-                 ("meet_xyz", "Vec3"), ("giver_quat", "Quaternion"),
-                 ("recv_quat", "Quaternion")]:
+                 ("giver_quat", "Quaternion"), ("recv_quat", "Quaternion")]:
         sg.add_input(n, type_name=t)
     sg.add_node("exchange", type="script",
                 script="scripts/handover/bimanual_exchange.py",
@@ -327,10 +290,8 @@ def build_workflow() -> Workflow:
                         "receiver_arm": Ref("in.receiver_arm"),
                         "tape_in_giver": Ref("in.tape_in_giver"),
                         "rim_radius": Ref("in.rim_radius"),
-                        "meet_xyz": Ref("in.meet_xyz"),
                         "giver_quat": Ref("in.giver_quat"),
-                        "recv_quat": Ref("in.recv_quat"),
-                        "skip_present": True})
+                        "recv_quat": Ref("in.recv_quat")})
     sg.add_exit("handed_over")
     for s, d in [("START", "exchange"), ("exchange", "handed_over"),
                  ("handed_over", "END")]:
@@ -366,19 +327,6 @@ def build_workflow() -> Workflow:
     sg.set_on_error("failed")
     wf.add_subgraph(sg)
 
-    # -- verify the place (routed recovery) ---------------------------------
-    wf.add_subgraph(_verdict_subgraph(
-        "verify_place", "tsh-verify-place",
-        "scripts/verify_place/verify_place.py",
-        {"object_query": TARGET_QUERY, "dest_xyz": Ref("in.dest_xyz"),
-         "half_z": Ref("in.target_half_z")},
-        inputs={"dest_xyz": "Vec3", "target_half_z": "float"},
-        verdicts={"placed": "placed", "retry": "retry", "give_up": "give_up"},
-        outputs={"verdict": Ref("check.verdict"),
-                 "placed": Ref("check.placed"),
-                 "xy_error_m": Ref("check.xy_error_m"),
-                 "z_error_m": Ref("check.z_error_m")}))
-
     # -- top level -----------------------------------------------------------
     for name in SG_SCRIPTS:
         wf.add_node(name, type="subgraph", ref=name)
@@ -402,15 +350,10 @@ def build_workflow() -> Workflow:
         # decides whether an exchange happens.
         "route": {"direct": "pickup", "needs_handover": "pickup",
                   "unreachable": "abort"},
-        "pickup": {"grasped": "verify_grasp", "failed": "abort"},
-        # Recovery loop edges: a failed verify re-enters at perception.
-        "verify_grasp": {"holding": "dispatch", "retry": "perceive_target",
-                         "give_up": "abort", "failed": "abort"},
+        "pickup": {"grasped": "dispatch", "failed": "abort"},
         "present": {"transported": "handover", "failed": "abort"},
         "handover": {"handed_over": "place", "failed": "abort"},
-        "place": {"placed": "verify_place", "failed": "abort"},
-        "verify_place": {"placed": "next_item", "retry": "perceive_target",
-                         "give_up": "abort", "failed": "abort"},
+        "place": {"placed": "next_item", "failed": "abort"},
     }
     for src, mapping in top_edges.items():
         wf.add_conditional_edges(src, mapping, router_field="exit")

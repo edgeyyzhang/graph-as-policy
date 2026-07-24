@@ -1,20 +1,16 @@
-"""Shared RGB-D object-localization core for the perceive_* handover steps.
+"""Shared robust top-face estimator for the CV perceive path.
 
-perceive_tape and perceive_duct run the SAME pipeline — DINO detect -> SAM box
-segment -> depth back-projection -> robust top face — and differ only in what they
-derive from the result (tape: grasp point at centroid height + the cloud; duct:
-the top-face centre). This is that shared core, split out so the two can't drift
-apart. No ground-truth pose, no object dimensions, and no scene-specific
-constants are assumed.
+``_perceive_cv.py`` segments by colour+height and hands its pixel mask to
+:func:`top_face_from_mask` here — the SAME back-projection + robust top-face
+math the DINO+SAM variant (``tsh-perceive-sam``) uses, so the two front-ends
+can't drift apart on the geometry they emit. No ground-truth pose, no object
+dimensions, and no scene-specific constants are assumed.
 """
 
 from __future__ import annotations
 
-import os
-
 import numpy as np
 
-from gap import NodeContext
 from gap_core.types import CameraFrame, pose_to_matrix
 
 from .constants import (
@@ -23,27 +19,15 @@ from .constants import (
     PERCEIVE_SPRAY_ABOVE_MEDIAN,
     PERCEIVE_TOP_PCTILE,
     PERCEIVE_TOP_SLAB,
-    RING_HOLE_PCTILE,
-    RING_RIM_PCTILE,
 )
 
 
-def perceive_top_face(ctx: NodeContext, cameras: list[CameraFrame], key: str = "",
-                      top_slab: float = PERCEIVE_TOP_SLAB, *,
-                      query: str | None = None,
-                      raise_if_missing: bool = True):
-    """Localize an object from RGB-D. Returns ``(x, y, top_z, pts)``.
+def top_face_from_mask(cam: CameraFrame, mask, top_slab: float = PERCEIVE_TOP_SLAB, *,
+                       label: str = "", raise_if_missing: bool = True,
+                       floor_trim: bool = True):
+    """Back-project a pixel ``mask`` and finish on the robust top face.
 
-    The DINO query is either passed directly (``query="yellow tape"`` — the
-    generic ``perceive_object`` path, no body key needed) or derived from a
-    body key (e.g. ``yellow_tape_1`` -> ``"yellow tape"``, ``duct_tape_1`` ->
-    ``"duct tape"`` — the legacy ``perceive_tape``/``perceive_duct`` path) ->
-    SAM box segmentation -> depth back-projection to a world cloud (the
-    geometry.mask_to_world_points math, inlined so we don't depend on that
-    out-of-process bundle).
-
-    ``raise_if_missing=False`` returns ``None`` instead of raising when DINO
-    finds no match — the clean-all-items loop exit (perception_any pattern).
+    Returns ``(x, y, top_z, pts)`` (or ``None`` with ``raise_if_missing=False``).
 
       * x, y  — top-face centre: the mean of the top ``top_slab`` slab. The top
                 face of these round objects is symmetric, so it has far less
@@ -54,55 +38,10 @@ def perceive_top_face(ctx: NodeContext, cameras: list[CameraFrame], key: str = "
                 cm high; the 98th percentile ignores them with no hand-tuned band.
       * pts   — the full world-frame cloud (N,3), table/floor removed.
 
-    Uses the ``agentview`` external camera; angle is irrelevant to RGB-D
-    back-projection. ``cam["pose"]`` is the OpenCV camera-to-world the connector
-    emits; depth is metric metres.
-    """
-    if query is None:
-        query = key.rsplit("_", 1)[0].replace("_", " ")
-        # The grey/white duct scores low for a bare "duct tape" query, and the
-        # bright yellow tape ring outscores it — so DINO's top box lands on the
-        # WRONG object and place is sent to the giver's side of the table
-        # (unreachable). Anchor the duct query on its colour to lift the real
-        # duct above the score noise. (Env-overridable for tuning; default is
-        # the validated query.)
-        if "duct" in key.lower():
-            query = os.environ.get("GAP_DUCT_QUERY", "gray tape")
-    # Exterior RGB-D view for perception, selected in-script from the shared
-    # observation (the wrist cameras are not wired as a fallback here), so the
-    # graph never has to name a camera.
-    cam = next((c for c in cameras if c["name"] == "agentview"), None)
-    if cam is None:
-        raise RuntimeError(
-            f"perceive: no 'agentview' camera in {[c.get('name') for c in cameras]}")
-    # Query DINO in the RGB frame to get a 2D bounding box around the object.
-    dets = ctx.tool("grounding-dino.detect", image=cam["rgb"], query=query)["detections"]
-    if not dets:
-        if not raise_if_missing:
-            return None
-        raise RuntimeError(f"perceive: DINO found no '{query}' in agentview")
-    box = max(dets, key=lambda d: d["score"])["box"]
-    seg = ctx.tool("sam3.segment_box", image=cam["rgb"], box=box)
-    # Highest-confidence mask isolates the pixels belonging to the object's face.
-    mask = np.asarray(seg["masks"][0])
-    return top_face_from_mask(cam, mask, top_slab, label=query,
-                              raise_if_missing=raise_if_missing)
-
-
-def top_face_from_mask(cam, mask, top_slab: float = PERCEIVE_TOP_SLAB, *,
-                       label: str = "", raise_if_missing: bool = True,
-                       floor_trim: bool = True):
-    """Back-project a pixel ``mask`` and finish on the robust top face.
-
-    The segmentation-agnostic second half of :func:`perceive_top_face` —
-    the CV segmenter (``_perceive_cv``) feeds its masks through the SAME
-    estimators, so the two paths cannot drift apart downstream. Returns
-    ``(x, y, top_z, pts)`` (or ``None`` with ``raise_if_missing=False``).
-
     ``floor_trim`` drops the bottom ``PERCEIVE_FLOOR_PCTILE`` of the cloud —
-    needed for SAM masks (which leak table pixels), but a mask that is
-    already height-filtered (the CV path) passes ``False``: the trim would
-    chop real low side points and bias ``half_z`` short.
+    needed for masks that leak table pixels, but a mask that is already
+    height-filtered (the CV segmenter) passes ``False``: the trim would chop
+    real low side points and bias ``half_z`` short.
     """
     # Use the camera info to back-project those pixels into the world frame.
     c2w = pose_to_matrix(cam["pose"])
@@ -145,32 +84,10 @@ def top_face_from_mask(cam, mask, top_slab: float = PERCEIVE_TOP_SLAB, *,
 def estimate_half_thickness(pts, top_z):
     """Half-height of a flat object from its cloud: ``(top_z − robust bottom) / 2``.
 
-    ``top_z`` is the robust top face from :func:`perceive_top_face`; the bottom is
-    the ``PERCEIVE_BOTTOM_PCTILE`` of the (already floor-trimmed) cloud — for an
-    object resting on the table that is its base. Robust to the top-face outliers
-    the percentiles already reject. Returns metres (``>= 0``).
+    ``top_z`` is the robust top face from :func:`top_face_from_mask`; the bottom
+    is the ``PERCEIVE_BOTTOM_PCTILE`` of the (already floor-trimmed) cloud — for
+    an object resting on the table that is its base. Robust to the top-face
+    outliers the percentiles already reject. Returns metres (``>= 0``).
     """
     bottom_z = float(np.percentile(pts[:, 2], PERCEIVE_BOTTOM_PCTILE))
     return max((float(top_z) - bottom_z) / 2.0, 0.0)
-
-
-def estimate_ring_radii(pts, center_xy, top_z=None, top_slab=PERCEIVE_TOP_SLAB):
-    """Estimate hole and rim radii from a ring-shaped point cloud.
-
-    Returns ``(hole_radius, rim_radius)`` in metres. Uses the 2nd and 98th
-    percentiles of the radial distance distribution for robustness against
-    depth noise (points leaking into the hole) and edge outliers.
-
-    When ``top_z`` is given, the radii are measured on the TOP-FACE SLAB only
-    (``z > top_z - top_slab``). This is essential from an angled view: pixels
-    inside the hole back-project through it onto the table (a low-z blob near the
-    centre), which collapses the full-cloud hole radius to a few mm and trips the
-    sanity band into the tuned fallback. The flat top annulus has no such points,
-    so both the hole and rim edges read true.
-    """
-    if top_z is not None:
-        pts = pts[pts[:, 2] > top_z - top_slab]
-    dists = np.linalg.norm(pts[:, :2] - np.asarray(center_xy), axis=1)
-    hole_r = float(np.percentile(dists, RING_HOLE_PCTILE))
-    rim_r = float(np.percentile(dists, RING_RIM_PCTILE))
-    return hole_r, rim_r
