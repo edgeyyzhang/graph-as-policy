@@ -96,4 +96,4 @@ loop, pass `raise_if_missing=False` and route on `perceive.found`.
 - `scripts/_perceive.py` — the DINO+SAM front-end + shared top-face core.
 - `tsh-perceive-cv` — the DEFAULT sibling: classical colour+height CV.
 - `tsh-calculate-grasp-ring` — ring radii + grasp on the emitted cloud.
-- `tsh-route`, `tsh-pickup`, `tsh-place` — the consumers.
+- `tsh-route-arms-bimanual`, `tsh-pickup`, `tsh-place` — the consumers.

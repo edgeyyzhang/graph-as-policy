@@ -2,8 +2,8 @@
 
 Both grippers point +X (gripper-z = +X). The giver is assumed to already be
 presenting the tape "o" face-on at the meet point — a preceding
-``tsh-transport-held`` instance (fed by ``tsh-station-geometry``'s
-``target_xyz``/``target_quat`` aliases) carries it there first, composing the
+``tsh-transport-held`` instance (fed by ``tsh-route-arms-bimanual``'s
+station-geometry node's ``target_xyz``/``target_quat`` aliases) carries it there first, composing the
 measured ``tape_in_giver`` offset into its own tool_offset plan. This node
 picks up from there: the receiver threads a finger into the same hole. A naive
 straight -X receiver approach drives it THROUGH the giver's arm, so the
@@ -65,10 +65,15 @@ class Output(TypedDict):
     receiver_arm: int   # echo of the receiving arm (checkpoint anchor; the
                         # holder after this subgraph)
     place_arm: int      # alias of receiver_arm — rebinds the cross-subgraph
-                        # ``place_arm`` name (tsh-route's on the direct route)
+                        # ``place_arm`` name (tsh-route-arms-bimanual's on the direct route)
                         # to the receiver, so place_pose/transport_held/place
                         # auto-wire their arm_id to whoever holds the tape now,
                         # by exact name, with no per-route special-casing.
+    holding_arm: int    # alias of receiver_arm — the frame ``held_offset`` above
+                        # is expressed in. The two are ONE datum and always ship
+                        # together; the exchange is exactly where the holder
+                        # changes, so this is where the pair is re-anchored from
+                        # the giver (dispatch's holding_arm) to the receiver.
 
 
 # Reflection across the world Y=0 plane. The exchange geometry below is authored
@@ -88,7 +93,7 @@ def _rim_grasp(hx, hy, hz, angle_deg, mirror=False, *, quat, recv_grasp_dy):
     the world Y-Z plane. The base grasp (angle 0) is the -Y rim point: TCP offset
     ``(0, -recv_grasp_dy, +RECV_GRASP_DZ)`` from the hole centre with orientation
     ``quat`` (the required canonical receiver quat, supplied base-geometry-derived
-    by tsh-station-geometry). ``recv_grasp_dy`` is DERIVED per-call from the
+    by tsh-route-arms-bimanual's station-geometry node). ``recv_grasp_dy`` is DERIVED per-call from the
     perceived ``rim_radius`` (stable run-to-run, unlike ``hole_radius``) plus a
     small fixed margin — see ``run()``. Revolving applies a RIGID rotation of
     the whole grasp frame about the world-X axis through the hole centre — offset
@@ -136,8 +141,8 @@ def run(ctx: NodeContext, *,
     """Transfer the tape from giver to receiver.
 
     The giver is assumed to already be presenting the tape at the meet point —
-    a preceding ``tsh-transport-held`` instance (fed by ``tsh-station-geometry``'s
-    ``target_xyz``/``target_quat`` aliases) carries it there first. This node
+    a preceding ``tsh-transport-held`` instance (fed by ``tsh-route-arms-bimanual``'s
+    station-geometry node's ``target_xyz``/``target_quat`` aliases) carries it there first. This node
     starts directly at the receiver thread.
 
     tape_in_giver: tape centre in the giver TCP frame, measured by the pickup —
@@ -147,7 +152,7 @@ def run(ctx: NodeContext, *,
                    (~1mm spread), unlike hole_radius (~17mm spread) — so the
                    receiver's thread offset derives from this, not hole_radius.
     giver_quat / recv_quat: presentation orientations (wxyz). REQUIRED — supplied
-                   base-geometry-derived by tsh-station-geometry (no tuned
+                   base-geometry-derived by tsh-route-arms-bimanual's station-geometry node (no tuned
                    fallback). ``recv_quat`` is canonical (as if the receiver sits
                    on -Y); ``_rim_grasp`` mirrors it for a +Y receiver. `giver_quat`
                    is used below for the giver's retract move, not a present leg.
@@ -163,14 +168,14 @@ def run(ctx: NodeContext, *,
     # regardless of side; for a reversed pair (receiver on +Y) the receiver
     # threads from its own +Y side (grasp frame reflected across Y=0). Side is
     # read from the base and drives the ``_rim_grasp`` mirror below. The meet
-    # point is taken verbatim — tsh-station-geometry already computes it for the
+    # point is taken verbatim — tsh-route-arms-bimanual's station-geometry node already computes it for the
     # actual base configuration.
     recv_on_plus_y = float(
         ctx.tool("libero-yam.arm_base_pose", arm_id=receiver_arm)["position"][1]) > 0.0
 
     # The giver presents with ``giver_quat``; the receiver threads with the
     # canonical ``recv_quat`` (``_rim_grasp`` mirrors it for a +Y receiver), both
-    # supplied base-geometry-derived by tsh-station-geometry.
+    # supplied base-geometry-derived by tsh-route-arms-bimanual's station-geometry node.
     recv_base_quat = recv_quat
 
     def _hole():
@@ -269,5 +274,5 @@ def run(ctx: NodeContext, *,
             "held_offset": receiver_offset_vec3,
             "giver_tcp": giver_tcp, "receiver_tcp": receiver_tcp,
             "giver_arm": int(giver_arm), "receiver_arm": int(receiver_arm),
-            "place_arm": int(receiver_arm)}
+            "place_arm": int(receiver_arm), "holding_arm": int(receiver_arm)}
 

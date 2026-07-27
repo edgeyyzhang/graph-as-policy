@@ -8,7 +8,7 @@ description: >
   candidate yaws until the first reachable one is found (the round tape lays flat
   identically at any yaw, so the sweep only trades reach). Feeds tsh-transport-held
   (the hover approach) and tsh-place (the descend/release) so both consume the
-  same probed pose. place_arm comes from tsh-route; when the task pins the arm,
+  same probed pose. place_arm comes from tsh-route-arms-bimanual; when the task pins the arm,
   bind a literal and omit the input.
 compatibility: requires gap>=0.1
 metadata:

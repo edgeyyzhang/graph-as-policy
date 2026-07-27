@@ -7,7 +7,7 @@ description: >
   the jaws gently, and lifts, every leg planned by the canonical curobo bundle
   and streamed onto the sim. Before closing it anchors the tape centre in the
   giver TCP frame and emits it as the rigid tape_in_giver offset the exchange
-  tracks by FK. pick_arm comes from tsh-route; when the task pins the arm
+  tracks by FK. pick_arm comes from tsh-route-arms-bimanual; when the task pins the arm
   instead, bind arm_id literally and omit the input.
 compatibility: requires gap>=0.1
 metadata:
@@ -45,8 +45,8 @@ gap:
       The grasp legs are named `pick_*` (not the bare `hover_xyz`/`seat_xyz`/...)
       because `tsh-place-pose` also produces a plain `hover_xyz` — the `pick_`
       prefix avoids colliding with it under the latest-producer cross-subgraph
-      rule. `tsh-route` relays the chosen arm's legs under these exact names;
-      without `tsh-route`, wire a `tsh-calculate-grasp-ring` instance and rename
+      rule. `tsh-route-arms-bimanual` relays the chosen arm's legs under these exact names;
+      without `tsh-route-arms-bimanual`, wire a `tsh-calculate-grasp-ring` instance and rename
       its outputs to match.
     - >
       Measure `tape_in_giver` at the seat, BEFORE `robot.close_gripper` — the
@@ -74,7 +74,7 @@ ground truth.
 
 ## When to use
 
-- After `tsh-calculate-grasp-ring` and `tsh-route`, to acquire the tape before
+- After `tsh-calculate-grasp-ring` and `tsh-route-arms-bimanual`, to acquire the tape before
   `tsh-handover`.
 
 ## When NOT to use
@@ -114,8 +114,8 @@ sg.set_outputs(
 
 ## See also
 
-- `tsh-route` — relays the chosen arm's grasp legs as `pick_*`.
-- `tsh-calculate-grasp-ring` — the underlying producer of the grasp legs (via `tsh-route`, or directly when there is no route).
+- `tsh-route-arms-bimanual` — relays the chosen arm's grasp legs as `pick_*`.
+- `tsh-calculate-grasp-ring` — the underlying producer of the grasp legs (via `tsh-route-arms-bimanual`, or directly when there is no route).
 - `tsh-perceive-cv` — supplies `target_xyz` (rebound to `tape_xyz`).
 - `tsh-dispatch-route` — relays `giver_held_offset` forward as the shared `held_offset`.
 - `tsh-handover` — consumes `tape_in_giver` directly (the giver's grip, unambiguous regardless of route).

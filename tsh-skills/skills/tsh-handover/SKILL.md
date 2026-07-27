@@ -7,8 +7,9 @@ description: >
   angle, threads a finger through the hole and closes, measures the tape centre
   in the receiver TCP frame (receiver_offset) before the giver releases, then the
   giver releases and retracts clear. Presentation orientations come from
-  tsh-station-geometry. giver_arm/receiver_arm come from tsh-route; when the task
-  pins them, bind literal ints and omit the inputs.
+  tsh-route-arms-bimanual's station-geometry node. giver_arm/receiver_arm come
+  from tsh-route-arms-bimanual; when the task pins them, bind literal ints and
+  omit the inputs.
 compatibility: requires gap>=0.1
 metadata:
   category: motion
@@ -41,7 +42,15 @@ gap:
     giver_arm: int
     receiver_arm: int
     place_arm: int
+    holding_arm: int
   hard_rules:
+    - >
+      held_offset and holding_arm are ONE datum and are always emitted together:
+      held_offset is the tape centre in the HOLDER's TCP frame, so it is
+      meaningless without the arm whose frame it is in. This node is where the
+      holder changes, so it re-anchors BOTH from the giver to the receiver.
+      A downstream node that takes the offset but selects its own arm plans the
+      held tape onto the wrong gripper.
     - >
       recv_quat is CANONICAL (as if the receiver sits on -Y); the script mirrors
       it for a +Y receiver. Pass the canonical quat, not a pre-mirrored one.
@@ -114,7 +123,9 @@ sg.set_outputs(
 
 ## See also
 
-- `tsh-route` — decides `needs_handover` and the giver/receiver arms.
-- `tsh-station-geometry` / `tsh-transport-held` — the required present chain.
+- `tsh-route-arms-bimanual` — decides `needs_handover` and the giver/receiver
+  arms, and derives the station geometry (meet point + presentation quats)
+  consumed here.
+- `tsh-transport-held` — the required present chain (carries the tape to the meet point).
 - `tsh-pickup` — supplies `tape_in_giver` + `rim_radius`.
 - `tsh-place` — consumes `held_offset` (the receiver's grip) after the exchange.

@@ -100,4 +100,4 @@ loop, pass `raise_if_missing=False` and route on `perceive.found`.
 - `scripts/_perceive.py` — the shared back-projection + top-face core.
 - `tsh-perceive-sam` — the DINO+SAM sibling for targets with no nameable colour.
 - `tsh-calculate-grasp-ring` — ring radii + grasp on the emitted cloud.
-- `tsh-route`, `tsh-pickup`, `tsh-place` — the consumers.
+- `tsh-route-arms-bimanual`, `tsh-pickup`, `tsh-place` — the consumers.

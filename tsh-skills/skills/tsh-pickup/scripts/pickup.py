@@ -1,7 +1,7 @@
 """Ring-grasp the tape from above: one finger in the hole, one outside the rim.
 
 Pickup motion step: the grasp poses come from ``tsh-calculate-grasp-ring`` (the
-single producer of the ring-grasp geometry, which ``tsh-route`` also probes) —
+single producer of the ring-grasp geometry, which ``tsh-route-arms-bimanual`` also probes) —
 this step drives the picking arm through the three legs (hover, seat, lift),
 each planned by the canonical curobo bundle and streamed onto the sim
 (``libero-yam.execute_trajectory``), so the motion is smooth and jerk-limited.

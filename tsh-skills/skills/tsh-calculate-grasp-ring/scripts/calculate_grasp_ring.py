@@ -9,16 +9,17 @@ revolves ``GRASP_RING_ANGLE_DEG`` clockwise about the vertical hole axis, plus
 an extra 90° CW for a −Y-side arm so its fingers sit on the mirrored arc (side
 read from the arm base, not tuned).
 
-This node is the SINGLE producer of that geometry: ``tsh-route`` probes these
-exact poses (``execute=False``) to decide which arm picks, and ``tsh-pickup``
-executes them — so the route's feasibility answer and the grasp can never
-disagree. It only DECIDES the poses; it never plans or moves. It raises when
-the radii fall outside the sanity band (degenerate cloud, no tuned fallback).
+This node is the SINGLE producer of that geometry: ``tsh-route-arms-bimanual``
+probes these exact poses (``execute=False``) to decide which arm picks, and
+``tsh-pickup`` executes them — so the route's feasibility answer and the grasp
+can never disagree. It only DECIDES the poses; it never plans or moves. It
+raises when the radii fall outside the sanity band (degenerate cloud, no tuned
+fallback).
 
 Emits the three grasp legs as ready-to-plan world poses, the predicted
 held-tape offset (tape centre in the TCP frame at the seat — what
 ``tape_in_giver`` will later measure), and the radii themselves (relayed to
-tsh-route's receiver probe and tsh-handover's thread offset).
+tsh-route-arms-bimanual's receiver probe and tsh-handover's thread offset).
 """
 
 from __future__ import annotations
@@ -90,8 +91,8 @@ def run(ctx: NodeContext, *, target_xyz: list, target_cloud, target_half_z: floa
                    (``top_z = center_z + half_z``) for the radii slab cut.
     arm_id:        the arm these poses are for (either side works — the geometry
                    mirrors from the arm base). Instantiate once per arm needed.
-    fingertip_axial / finger_half_gap: FK-derived gripper offsets from
-                   tsh-gripper-geometry (the fingertip trails the TCP by
+    fingertip_axial / finger_half_gap: FK-derived gripper offsets from this
+                   subgraph's own derive_gripper_geometry node (the fingertip trails the TCP by
                    ``fingertip_axial`` along the approach axis).
     """
     x, y, z = _as3(target_xyz)

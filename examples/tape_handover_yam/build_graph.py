@@ -5,8 +5,8 @@ The appendix-style decomposition — generic single-purpose subgraphs, a
 reachability-routed handover, and a next-item loop — instead of one
 monolithic handover chain:
 
-    gripper_geometry → station_geometry → perceive_dest → perceive_target
-      → ring_geometry → route ──direct/needs_handover──▶ pickup
+    perceive_dest → perceive_target → ring_geometry
+      → route (─needs_handover─▶ derive_station_geometry internally) ──direct/needs_handover──▶ pickup
       → [dispatch] ──direct──▶ place
                    └─handover─▶ present → handover → place
       → [next_item] → done
@@ -52,10 +52,6 @@ DEST_QUERY = "gray tape"       # colour-anchored query for the duct (place dest)
 # Canonical scripts each subgraph materializes into <out>/scripts/<sg>/,
 # copied from its skill's scripts dir: {sg_node: (skill_dir, [files])}.
 SG_SCRIPTS: dict[str, tuple[str, list[str]]] = {
-    "gripper_geometry": ("tsh-gripper-geometry",
-                         ["gripper_geometry.py", "_gripper_geometry.py", "constants.py"]),
-    "station_geometry": ("tsh-station-geometry",
-                         ["station_geometry.py", "_station_geometry.py"]),
     "perceive_dest":    ("tsh-perceive-cv",
                          ["perceive_object_cv.py", "_perceive_cv.py",
                           "_perceive.py", "constants.py"]),
@@ -64,8 +60,9 @@ SG_SCRIPTS: dict[str, tuple[str, list[str]]] = {
                           "_perceive.py", "constants.py"]),
     "ring_geometry":    ("tsh-ring-geometry",
                          ["ring_geometry.py", "_ring.py", "constants.py"]),
-    "route":            ("tsh-route",
-                         ["route.py", "_ring.py", "_motion.py", "constants.py"]),
+    "route":            ("tsh-route-arms-bimanual",
+                         ["route.py", "_motion.py", "constants.py",
+                          "station_geometry.py", "_station_geometry.py"]),
     "pickup":           ("tsh-pickup",
                          ["pickup.py", "_ring.py", "_motion.py", "constants.py"]),
     "present":          ("tsh-transport-held",
@@ -150,30 +147,6 @@ def build_workflow() -> Workflow:
                     "out of the picking arm's reach, verify each stage, "
                     "recover by re-perceiving.")
 
-    # -- self-model (run-once calibration) ---------------------------------
-    sg = Subgraph(name="gripper_geometry", skill="tsh-gripper-geometry")
-    sg.add_node("derive", type="script",
-                script="scripts/gripper_geometry/gripper_geometry.py")
-    sg.add_exit("derived")
-    for s, d in [("START", "derive"), ("derive", "derived"), ("derived", "END")]:
-        sg.add_edge(s, d)
-    sg.set_outputs(fingertip_axial=Ref("derive.fingertip_axial"),
-                   finger_half_gap=Ref("derive.finger_half_gap"))
-    sg.set_on_error("failed")
-    wf.add_subgraph(sg)
-
-    sg = Subgraph(name="station_geometry", skill="tsh-station-geometry")
-    sg.add_node("derive", type="script",
-                script="scripts/station_geometry/station_geometry.py")
-    sg.add_exit("derived")
-    for s, d in [("START", "derive"), ("derive", "derived"), ("derived", "END")]:
-        sg.add_edge(s, d)
-    sg.set_outputs(meet_xyz=Ref("derive.meet_xyz"),
-                   giver_quat=Ref("derive.giver_quat"),
-                   recv_quat=Ref("derive.recv_quat"))
-    sg.set_on_error("failed")
-    wf.add_subgraph(sg)
-
     # -- perception (generic, one instance per object; dest FIRST — its
     #    view is clean before anything is held over it) ---------------------
     wf.add_subgraph(_perceive_subgraph(
@@ -201,8 +174,9 @@ def build_workflow() -> Workflow:
     sg.set_on_error("degenerate")
     wf.add_subgraph(sg)
 
-    # -- route: is a handover needed at all? -------------------------------
-    sg = Subgraph(name="route", skill="tsh-route")
+    # -- route: is a handover needed at all? (station geometry is derived
+    #    only on the needs_handover branch — it's meaningless otherwise) -----
+    sg = Subgraph(name="route", skill="tsh-route-arms-bimanual")
     for n, t in [("target_xyz", "Vec3"), ("dest_xyz", "Vec3"),
                  ("target_half_z", "float"), ("hole_radius", "float"),
                  ("rim_radius", "float"), ("fingertip_axial", "float"),
@@ -216,19 +190,27 @@ def build_workflow() -> Workflow:
                         "rim_radius": Ref("in.rim_radius"),
                         "fingertip_axial": Ref("in.fingertip_axial"),
                         "finger_half_gap": Ref("in.finger_half_gap")})
+    sg.add_node("derive_station_geometry", type="script",
+                script="scripts/route/station_geometry.py",
+                inputs={"giver_arm": Ref("route.giver_arm"),
+                        "receiver_arm": Ref("route.receiver_arm")})
     sg.add_exit("direct")
     sg.add_exit("needs_handover")
     sg.add_edge("START", "route")
     sg.add_conditional_edges(
-        "route", {"direct": "direct", "handover": "needs_handover"},
+        "route", {"direct": "direct", "handover": "derive_station_geometry"},
         router_field="route")
     sg.add_edge("direct", "END")
+    sg.add_edge("derive_station_geometry", "needs_handover")
     sg.add_edge("needs_handover", "END")
     sg.set_outputs(route=Ref("route.route"),
                    pick_arm=Ref("route.pick_arm"),
                    place_arm=Ref("route.place_arm"),
                    giver_arm=Ref("route.giver_arm"),
-                   receiver_arm=Ref("route.receiver_arm"))
+                   receiver_arm=Ref("route.receiver_arm"),
+                   meet_xyz=Ref("derive_station_geometry.meet_xyz"),
+                   giver_quat=Ref("derive_station_geometry.giver_quat"),
+                   recv_quat=Ref("derive_station_geometry.recv_quat"))
     sg.set_on_error("unreachable")
     wf.add_subgraph(sg)
 
@@ -339,10 +321,8 @@ def build_workflow() -> Workflow:
                 recovery=[{"tool": "robot.open_gripper", "inputs": {"arm_id": 0}},
                           {"tool": "robot.open_gripper", "inputs": {"arm_id": 1}}])
 
-    wf.add_edge("START", "gripper_geometry")
+    wf.add_edge("START", "perceive_dest")
     top_edges = {
-        "gripper_geometry": {"derived": "station_geometry", "failed": "abort"},
-        "station_geometry": {"derived": "perceive_dest", "failed": "abort"},
         "perceive_dest": {"perceived": "perceive_target", "not_found": "abort"},
         "perceive_target": {"perceived": "ring_geometry", "not_found": "abort"},
         "ring_geometry": {"derived": "route", "degenerate": "abort"},

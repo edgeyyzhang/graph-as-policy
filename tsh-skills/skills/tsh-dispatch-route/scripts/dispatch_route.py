@@ -1,6 +1,6 @@
 """Re-assert the probed route AFTER the grasp, so the graph can branch on it.
 
-``tsh-route`` decides ``direct`` vs ``needs_handover`` BEFORE the grasp, because
+``tsh-route-arms-bimanual`` decides ``direct`` vs ``needs_handover`` BEFORE the grasp, because
 ``tsh-pickup`` needs its ``pick_arm``. But the branch it implies happens AFTER
 the grasp (both routes pick first, then diverge). This node carries the
 decision across the pickup: it re-reads the already-computed ``route`` field
@@ -16,7 +16,16 @@ silently placing the wrong holder. On the ``needs_handover`` route,
 ``tsh-handover`` provides its own ``held_offset`` later, which correctly wins
 at runtime since it executes after this node.
 
-No reachability work happens here — the probing was all done by ``tsh-route``.
+``holding_arm`` rides along with it, and must: ``held_offset`` is the object
+centre in the HOLDER's TCP frame, so the offset alone is underspecified — it
+means nothing without the arm whose frame it is expressed in. Every producer of
+``held_offset`` emits the matching arm beside it (``tsh-pickup`` pairs
+``giver_held_offset`` with ``pick_arm``; ``tsh-handover`` pairs its
+``held_offset`` with ``receiver_arm``), so consumers declare ``holding_arm``
+as a required input and can never be wired to the wrong arm — or to none.
+Here the giver is still the holder (the exchange, if any, happens later).
+
+No reachability work happens here — the probing was all done by ``tsh-route-arms-bimanual``.
 This is pure control flow.
 """
 
@@ -31,17 +40,23 @@ from gap_core.types import Vec3
 class Output(TypedDict):
     route: str  # "direct" | "needs_handover" — the conditional-edge router field
     held_offset: Vec3  # relay of giver_held_offset — the shared place chain's input
+    holding_arm: int   # the arm whose TCP frame held_offset is in (still the giver)
 
 
-def run(ctx: NodeContext, *, route: str, giver_held_offset: Vec3) -> Output:
+def run(ctx: NodeContext, *, route: str, giver_held_offset: Vec3,
+        pick_arm: int) -> Output:
     """Echo the probed route as this subgraph's routing field.
 
-    route: the ``route`` output of ``tsh-route`` (auto-wired by exact name).
+    route: the ``route`` output of ``tsh-route-arms-bimanual`` (auto-wired by exact name).
     giver_held_offset: ``tsh-pickup``'s grip offset, relayed as ``held_offset``.
+    pick_arm: ``tsh-pickup``'s grasping arm — relayed as ``holding_arm``, the
+              frame ``held_offset`` is expressed in. Nothing has changed hands
+              yet at this node, so the picker is still the holder.
     """
     if route not in ("direct", "needs_handover"):
         raise RuntimeError(
             f"dispatch-route: unknown route {route!r} — expected the "
-            f"'direct' or 'needs_handover' value tsh-route emits")
-    print(f"[dispatch-route] {route}", flush=True)
-    return {"route": route, "held_offset": giver_held_offset}
+            f"'direct' or 'needs_handover' value tsh-route-arms-bimanual emits")
+    print(f"[dispatch-route] {route} (holding_arm={pick_arm})", flush=True)
+    return {"route": route, "held_offset": giver_held_offset,
+            "holding_arm": int(pick_arm)}

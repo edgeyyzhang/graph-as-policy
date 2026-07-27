@@ -8,7 +8,7 @@ description: >
   tsh-transport-held node has already carried the arm to the hover above
   place_xyz. This skill only does the straight-down set-down and straight-up
   retract (curobo_linear_move), never a free transport. place_arm comes from
-  tsh-route; when the task pins the arm, bind a literal and omit the input.
+  tsh-route-arms-bimanual; when the task pins the arm, bind a literal and omit the input.
 compatibility: requires gap>=0.1
 metadata:
   category: motion
@@ -87,4 +87,4 @@ place
 - `tsh-place-pose` — computes `place_xyz`/`place_quat`.
 - `tsh-transport-held` — carries the arm to the hover before this node.
 - `tsh-dispatch-route` / `tsh-handover` — supply `held_offset` (the giver's grip relayed, or the receiver's after an exchange).
-- `tsh-route` — decides `place_arm`.
+- `tsh-route-arms-bimanual` — decides `place_arm`.
