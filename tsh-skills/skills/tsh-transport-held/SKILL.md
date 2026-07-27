@@ -5,16 +5,15 @@ description: >
   transport. The measured rigid held_offset (object centre in the holder's TCP
   frame) is composed into the planner's tcp_offset, so the target is an
   OBJECT-centre pose, never a bare TCP pose. Serves the handover's giver PRESENT
-  leg and the place hover approach, and any standalone "hold the object at X"
-  step. The holding arm always arrives as the holding_arm input, paired with
-  held_offset by whichever node last changed hands (tsh-dispatch-route relays
-  the giver's; tsh-handover re-anchors both to the receiver) — it is data that
-  ships with the offset, never an arm chosen per-instance. The target does vary
-  by role: the PLACE instance declares target_xyz/target_quat (tsh-place-pose's
-  aliases); the PRESENT instance declares meet_xyz/giver_quat
-  (tsh-route-arms-bimanual's station-geometry node's own output names, NOT a
-  generic target_xyz alias — that would collide with perception's own
-  target_xyz), rebinding both to the script's target_xyz/target_quat kwargs.
+  leg, the place hover approach, and any standalone "hold the object at X" step.
+  The holding arm always arrives as the holding_arm input, paired with
+  held_offset by whoever last changed hands (tsh-dispatch-route, then
+  tsh-handover) — data that ships with the offset, never chosen per-instance.
+  The target does vary by role: the PLACE instance declares
+  target_xyz/target_quat (tsh-place-pose's aliases); the PRESENT instance
+  declares meet_xyz/giver_quat (tsh-route-arms-bimanual's station-geometry
+  node's own names, NOT a generic target_xyz alias — it would collide with
+  perception's own target_xyz), rebound to the script's target kwargs.
 compatibility: requires gap>=0.1
 metadata:
   category: motion
