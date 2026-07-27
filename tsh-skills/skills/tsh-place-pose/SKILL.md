@@ -30,8 +30,8 @@ gap:
     place_xyz: Vec3
     hover_xyz: Vec3
     place_quat: Quaternion
-    target_xyz: Vec3
-    target_quat: Quaternion
+    hold_target_xyz: Vec3
+    hold_target_quat: Quaternion
   hard_rules:
     - >
       This node never executes a trajectory — it only probes reachability
@@ -76,7 +76,7 @@ place_pose
 1. **`place_pose`** — `type: script`, `scripts/<sg>/place_pose.py`. Inputs:
    `held_offset=Ref("in.held_offset")`, `container_xyz=Ref("in.container_xyz")`,
    `tape_half_z=Ref("in.target_half_z")`, `arm_id=Ref("in.place_arm")` (or a
-   literal). Returns `{place_xyz, hover_xyz, place_quat, target_xyz, target_quat}`.
+   literal). Returns `{place_xyz, hover_xyz, place_quat, hold_target_xyz, hold_target_quat}`.
 
 ## Required end states
 

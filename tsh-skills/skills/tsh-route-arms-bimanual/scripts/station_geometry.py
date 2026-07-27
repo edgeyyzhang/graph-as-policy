@@ -27,6 +27,14 @@ class Output(TypedDict):
     meet_xyz: Vec3        # world-frame handover point
     giver_quat: Quaternion  # giver present orientation, wxyz
     recv_quat: Quaternion   # receiver thread orientation, wxyz (canonical; exchange mirrors)
+    hold_target_xyz: Vec3   # alias of meet_xyz — the canonical "where the held
+                            # object's centre goes" name tsh-transport-held requires,
+                            # so the PRESENT leg auto-wires by exact name like the
+                            # place legs do (tsh-place-pose emits the same pair).
+                            # Deliberately NOT target_xyz, which would collide with
+                            # perception's own target_xyz and silently carry the
+                            # tape back to its pickup spot instead of the meet point.
+    hold_target_quat: Quaternion  # alias of giver_quat — same contract
 
 
 def _vec3(v) -> Vec3:
@@ -45,4 +53,5 @@ def run(ctx: NodeContext, *, giver_arm: int = 0, receiver_arm: int = 1) -> Outpu
     print(f"[station_geometry] meet={[round(v, 4) for v in meet]} "
           f"giver_quat={[round(v, 4) for v in giver_quat]}", flush=True)
     return {"meet_xyz": _vec3(meet),
-            "giver_quat": _quat(giver_quat), "recv_quat": _quat(recv_quat)}
+            "giver_quat": _quat(giver_quat), "recv_quat": _quat(recv_quat),
+            "hold_target_xyz": _vec3(meet), "hold_target_quat": _quat(giver_quat)}

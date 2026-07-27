@@ -48,9 +48,13 @@ class Output(TypedDict):
     place_xyz: Vec3       # world OBJECT-centre rest pose (tape flush on the destination)
     hover_xyz: Vec3       # place_xyz raised by PLACE_Z_APPROACH — the approach target
     place_quat: Quaternion  # reachable presentation orientation (wxyz), first yaw that plans
-    target_xyz: Vec3      # alias of hover_xyz — matches tsh-transport-held's generic
-                       # target_xyz input so cross-subgraph auto-wire can bind it
-    target_quat: Quaternion  # alias of place_quat — matches tsh-transport-held's target_quat
+    hold_target_xyz: Vec3   # alias of hover_xyz — the canonical "where the held
+                            # object's centre goes" name tsh-transport-held requires.
+                            # Deliberately NOT target_xyz: that collides with
+                            # perception's own target_xyz (the object's location)
+                            # under the latest-producer rule, which silently sends
+                            # the transport to the wrong pose.
+    hold_target_quat: Quaternion  # alias of place_quat — same contract
 
 
 def run(ctx: NodeContext, *, held_offset: Vec3, container_xyz: Vec3, tape_half_z: float,
@@ -92,5 +96,5 @@ def run(ctx: NodeContext, *, held_offset: Vec3, container_xyz: Vec3, tape_half_z
             hover_xyz = _vec3(desired_tape_centre + hover_dz)
             place_quat = _quat(pq)
             return {"place_xyz": place_xyz, "hover_xyz": hover_xyz, "place_quat": place_quat,
-                    "target_xyz": hover_xyz, "target_quat": place_quat}
+                    "hold_target_xyz": hover_xyz, "hold_target_quat": place_quat}
     raise RuntimeError("place-pose: no reachable yaw found sweeping the tape rotation")

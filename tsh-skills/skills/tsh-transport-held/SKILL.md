@@ -6,14 +6,13 @@ description: >
   frame) is composed into the planner's tcp_offset, so the target is an
   OBJECT-centre pose, never a bare TCP pose. Serves the handover's giver PRESENT
   leg, the place hover approach, and any standalone "hold the object at X" step.
-  The holding arm always arrives as the holding_arm input, paired with
-  held_offset by whoever last changed hands (tsh-dispatch-route, then
-  tsh-handover) — data that ships with the offset, never chosen per-instance.
-  The target does vary by role: the PLACE instance declares
-  target_xyz/target_quat (tsh-place-pose's aliases); the PRESENT instance
-  declares meet_xyz/giver_quat (tsh-route-arms-bimanual's station-geometry
-  node's own names, NOT a generic target_xyz alias — it would collide with
-  perception's own target_xyz), rebound to the script's target kwargs.
+  Every input is identical on every instance — there is no per-instance
+  renaming. holding_arm ships with held_offset from whoever last changed hands
+  (tsh-dispatch-route, then tsh-handover), and hold_target_xyz/hold_target_quat
+  carry the destination from tsh-place-pose (place legs) or from
+  tsh-route-arms-bimanual's station-geometry node (present leg). Never bind a
+  bare target_xyz/target_quat: that is perception's name for the picked
+  object's location, and it would silently transport to the wrong pose.
 compatibility: requires gap>=0.1
 metadata:
   category: motion
@@ -31,8 +30,8 @@ gap:
   required_inputs:
     held_offset: Vec3
     holding_arm: int
-    target_xyz: Vec3
-    target_quat: Quaternion
+    hold_target_xyz: Vec3
+    hold_target_quat: Quaternion
   produces_outputs:
     transported: bool
     held_tcp: Se3Pose
@@ -49,12 +48,13 @@ gap:
       never pick an arm name per-instance — the holder is data that arrives
       with the offset, not a wiring choice.
     - >
-      Likewise target_xyz/target_quat: the place instance wires them from
-      tsh-place-pose's target_xyz/target_quat aliases; the PRESENT instance
-      wires them from tsh-route-arms-bimanual's station-geometry node's meet_xyz/giver_quat instead —
-      declare a meet_xyz/giver_quat subgraph input on the present instance,
-      never a bare target_xyz (it would collide with perception's own
-      target_xyz under the latest-producer rule).
+      hold_target_xyz/hold_target_quat are the destination on EVERY instance —
+      both roles, no per-instance renaming. tsh-place-pose emits them for the
+      place legs and tsh-route-arms-bimanual's station-geometry node emits them
+      (from the meet pose) for the present leg, so the latest producer on the
+      path supplies the right one. Never declare a bare target_xyz/target_quat
+      input: that name is perception's (the picked object's location), and
+      binding to it silently transports the held object to the wrong pose.
     - >
       Do not wire held_cloud for now — leave it unset so the move takes the plain
       tool-offset plan (the attached-collision-body path is untested here).
@@ -74,14 +74,15 @@ different targets — one implementation, so they can't drift apart.
 ## When to use
 
 - The collision-aware hover approach in the place chain (between `tsh-place-pose`
-  and `tsh-place`), consuming `target_xyz`/`target_quat` (from `tsh-place-pose`'s
-  aliases).
+  and `tsh-place`), whose `hold_target_*` comes from `tsh-place-pose`.
 - The giver PRESENT leg of a handover (between `tsh-route-arms-bimanual`'s
-  station-geometry node and `tsh-handover`), consuming `meet_xyz`/`giver_quat`
-  (from that node directly, rebound to the script's target_xyz/target_quat).
+  station-geometry node and `tsh-handover`), whose `hold_target_*` comes from
+  that node (the meet pose).
 
-Both consume `held_offset`/`holding_arm` identically — that pair is what makes
-one implementation serve both roles.
+Both roles declare the *same four inputs* — `held_offset`, `holding_arm`,
+`hold_target_xyz`, `hold_target_quat`. Only the upstream producer differs, and
+the latest-producer rule resolves that automatically. That uniformity is what
+lets one implementation serve both roles without per-instance wiring choices.
 - Any standalone held-object move (hold above a stack, present to a camera).
 
 ## When NOT to use
@@ -97,22 +98,22 @@ transport_held
 ```
 
 1. **`transport_held`** — `type: script`, `scripts/<sg>/transport_held.py`.
-   Inputs: `held_offset=Ref("in.held_offset")` and
-   `arm_id=Ref("in.holding_arm")` — identical on every instance. Only the move
-   target differs by role:
-   - place instance: `target_xyz=Ref("in.target_xyz")`,
-     `target_quat=Ref("in.target_quat")` (from `tsh-place-pose`'s aliases).
-   - present instance: `target_xyz=Ref("in.meet_xyz")`,
-     `target_quat=Ref("in.giver_quat")` (declare `meet_xyz`/`giver_quat` as
-     THIS subgraph's own inputs, from `tsh-route-arms-bimanual's station-geometry node` directly).
+   Inputs, **identical on every instance** (the script's kwargs keep their own
+   names; only the Refs matter):
+   `held_offset=Ref("in.held_offset")`, `arm_id=Ref("in.holding_arm")`,
+   `target_xyz=Ref("in.hold_target_xyz")`,
+   `target_quat=Ref("in.hold_target_quat")`.
 
-   Leave `held_cloud` unset. Returns `{transported, held_tcp}`.
+   There is nothing to choose per role — the upstream producer of
+   `hold_target_*` differs (station-geometry for the present leg,
+   tsh-place-pose for the place legs) and the latest-producer rule binds the
+   right one. Leave `held_cloud` unset. Returns `{transported, held_tcp}`.
 
 ## See also
 
 - `scripts/_held.py` — the shared held-object motion core.
 - `tsh-route-arms-bimanual` — its station-geometry node supplies
-  `meet_xyz`/`giver_quat` for the present instance.
-- `tsh-place-pose` — supplies `target_xyz`/`target_quat` aliases for the place instance.
+  `hold_target_xyz`/`hold_target_quat` (the meet pose) for the present instance.
+- `tsh-place-pose` — supplies `hold_target_xyz`/`hold_target_quat` for the place instances.
 - `tsh-dispatch-route` — supplies `held_offset`/`holding_arm` (the giver's) after the grasp.
 - `tsh-handover` — re-anchors `held_offset`/`holding_arm` to the receiver after an exchange.

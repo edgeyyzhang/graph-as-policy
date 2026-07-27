@@ -54,6 +54,8 @@ gap:
     meet_xyz: Vec3
     giver_quat: Quaternion
     recv_quat: Quaternion
+    hold_target_xyz: Vec3
+    hold_target_quat: Quaternion
   hard_rules:
     - >
       Consume the grasp legs from one tsh-calculate-grasp-ring instance per arm
@@ -71,11 +73,14 @@ gap:
       tsh-handover consume them, and both are only reachable via
       needs_handover.
     - >
-      Do NOT add a target_xyz/target_quat alias of meet_xyz/giver_quat — that
-      generic name collides with the perception role prefix (tsh-perceive-*
-      also produces target_xyz, for the picked object). Have the
-      tsh-transport-held PRESENT instance declare meet_xyz/giver_quat as its
-      own inputs instead.
+      The station-geometry node also emits hold_target_xyz/hold_target_quat
+      (aliases of meet_xyz/giver_quat) — the canonical destination pair
+      tsh-transport-held requires, which tsh-place-pose emits too, so the
+      PRESENT leg auto-wires by exact name exactly like the place legs. Never
+      alias these to a bare target_xyz/target_quat: that generic name collides
+      with the perception role prefix (tsh-perceive-* also produces target_xyz,
+      for the picked object), and under the latest-producer rule the giver would
+      silently carry the tape back to its pickup spot instead of the meet point.
     - >
       The route output only takes effect if a downstream node branches on it
       after the grasp; on its own this skill decides but does not enforce.

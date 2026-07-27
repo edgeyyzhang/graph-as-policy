@@ -30,11 +30,11 @@ gap:
     target_cloud: PointCloud
     target_half_z: float
   produces_outputs:
-    hover_xyz: Vec3
-    seat_xyz: Vec3
-    lift_xyz: Vec3
-    grasp_quat: Quaternion
-    held_offset: Vec3
+    "<arm0|arm1>_hover_xyz": Vec3
+    "<arm0|arm1>_seat_xyz": Vec3
+    "<arm0|arm1>_lift_xyz": Vec3
+    "<arm0|arm1>_grasp_quat": Quaternion
+    "<arm0|arm1>_held_offset": Vec3
     hole_radius: float
     rim_radius: float
   hard_rules:
@@ -42,6 +42,16 @@ gap:
       arm_id is a LITERAL (0 or 1) baked into the node's inputs, never wired via
       Ref("in.arm_id") — no upstream skill produces a bare arm_id output, so a
       subgraph input by that name never auto-wires.
+    - >
+      The grasp-leg outputs carry an arm0_/arm1_ PREFIX matching this instance's
+      literal arm_id — arm_id=0 emits arm0_hover_xyz, arm_id=1 emits
+      arm1_hover_xyz, and so on for seat/lift/grasp_quat/held_offset. The script
+      returns unprefixed keys; the prefix is applied in set_outputs. Both
+      instances' legs are consumed SIMULTANEOUSLY by tsh-route-arms-bimanual
+      (it compares the arms to pick one), so unprefixed outputs would collide
+      under the latest-producer rule and route would probe one arm's poses
+      twice. hole_radius/rim_radius stay UNPREFIXED — they describe the ring,
+      not the arm, and are identical from either instance.
     - >
       derive_gripper_geometry runs unconditionally, once per instance (i.e.
       once per arm_id) — unlike tsh-route-arms-bimanual's station-geometry
@@ -113,9 +123,21 @@ derive_gripper_geometry → calculate_grasp_ring
    `target_half_z=Ref("in.target_half_z")`, `arm_id=0` (a literal — one instance
    per arm, e.g. `arm_id=0` and `arm_id=1`),
    `fingertip_axial=Ref("derive_gripper_geometry.fingertip_axial")`,
-   `finger_half_gap=Ref("derive_gripper_geometry.finger_half_gap")`. Returns
-   `{hover_xyz, seat_xyz, lift_xyz, grasp_quat, held_offset, hole_radius,
-   rim_radius}`.
+   `finger_half_gap=Ref("derive_gripper_geometry.finger_half_gap")`. The script
+   returns unprefixed `{hover_xyz, seat_xyz, lift_xyz, grasp_quat, held_offset,
+   hole_radius, rim_radius}`; `set_outputs` applies this instance's arm prefix:
+
+```python
+sg.set_outputs(**{                       # instance with arm_id=0
+    "arm0_hover_xyz":   Ref("calculate_grasp_ring.hover_xyz"),
+    "arm0_seat_xyz":    Ref("calculate_grasp_ring.seat_xyz"),
+    "arm0_lift_xyz":    Ref("calculate_grasp_ring.lift_xyz"),
+    "arm0_grasp_quat":  Ref("calculate_grasp_ring.grasp_quat"),
+    "arm0_held_offset": Ref("calculate_grasp_ring.held_offset"),
+    "hole_radius":      Ref("calculate_grasp_ring.hole_radius"),
+    "rim_radius":       Ref("calculate_grasp_ring.rim_radius"),
+})
+```
 
 Wire `derive_gripper_geometry → calculate_grasp_ring → derived → END` linearly,
 with `on_error: "failed"` from the gripper step and `on_error: "degenerate"`
