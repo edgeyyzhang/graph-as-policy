@@ -23,8 +23,7 @@ gap:
     - libero-yam.arm_base_pose
   exit_conditions:
     derived: Gripper offsets derived, radii measured, and grasp poses computed, bound in the subgraph outputs.
-    failed: Arm model could not be located/loaded for the gripper self-model (raise routes to on_error).
-    degenerate: Radii outside the sanity band (raise routes to on_error).
+    failed: Gripper self-model unavailable (arm model not loadable) OR radii outside the sanity band — both raise, both route to the single on_error.
   required_inputs:
     target_xyz: Vec3
     target_cloud: PointCloud
@@ -139,19 +138,18 @@ sg.set_outputs(**{                       # instance with arm_id=0
 })
 ```
 
-Wire `derive_gripper_geometry → calculate_grasp_ring → derived → END` linearly,
-with `on_error: "failed"` from the gripper step and `on_error: "degenerate"`
-from the ring step (both raise; route either through the subgraph's single
-`on_error` if the workflow doesn't need to tell them apart, or split into two
-named exits if it does).
+Wire it linearly — `START → derive_gripper_geometry → calculate_grasp_ring →
+derived → END` — with `set_on_error("failed")`. Both scripts signal failure by
+RAISING, and a subgraph has exactly ONE `on_error` symbol, so both modes land
+on `failed`. There is no second failure exit to add, no exit router, and no
+guarded wrapper script: do not author one.
 
 ## Required end states
 
 | End state | Meaning |
 |---|---|
 | `derived` | Gripper offsets derived, radii + grasp poses bound in the outputs. |
-| `failed` | Arm model unavailable for the gripper self-model (raise → abort). |
-| `degenerate` | Radii outside the sanity band (raise → abort / re-perceive). |
+| `failed` | Gripper self-model unavailable, or radii outside the sanity band (either raise → abort). |
 
 ## See also
 
