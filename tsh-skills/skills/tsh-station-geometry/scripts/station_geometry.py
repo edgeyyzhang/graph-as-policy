@@ -18,14 +18,23 @@ from __future__ import annotations
 from typing import TypedDict
 
 from gap import NodeContext
+from gap_core.types import Quaternion, Vec3
 
 from ._station_geometry import derive_meet_xyz, derive_presentation_quats
 
 
 class Output(TypedDict):
-    meet_xyz: list    # world-frame handover point
-    giver_quat: list  # giver present orientation, wxyz
-    recv_quat: list   # receiver thread orientation, wxyz (canonical; exchange mirrors)
+    meet_xyz: Vec3        # world-frame handover point
+    giver_quat: Quaternion  # giver present orientation, wxyz
+    recv_quat: Quaternion   # receiver thread orientation, wxyz (canonical; exchange mirrors)
+
+
+def _vec3(v) -> Vec3:
+    return {"x": float(v[0]), "y": float(v[1]), "z": float(v[2])}
+
+
+def _quat(q) -> Quaternion:
+    return {"w": float(q[0]), "x": float(q[1]), "y": float(q[2]), "z": float(q[3])}
 
 
 def run(ctx: NodeContext, *, giver_arm: int = 0, receiver_arm: int = 1) -> Output:
@@ -35,5 +44,5 @@ def run(ctx: NodeContext, *, giver_arm: int = 0, receiver_arm: int = 1) -> Outpu
     meet = derive_meet_xyz(ctx, giver_arm=giver_arm, receiver_arm=receiver_arm)
     print(f"[station_geometry] meet={[round(v, 4) for v in meet]} "
           f"giver_quat={[round(v, 4) for v in giver_quat]}", flush=True)
-    return {"meet_xyz": list(meet),
-            "giver_quat": list(giver_quat), "recv_quat": list(recv_quat)}
+    return {"meet_xyz": _vec3(meet),
+            "giver_quat": _quat(giver_quat), "recv_quat": _quat(recv_quat)}

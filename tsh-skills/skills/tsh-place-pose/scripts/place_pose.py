@@ -21,16 +21,22 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from gap import NodeContext
+from gap_core.types import Quaternion, Vec3
 
 from ._motion import plan_tool_move
 from .constants import DOWN_QUAT, PLACE_OFFSET, PLACE_YAW_SWEEP_DEG, PLACE_Z_APPROACH
 
 
-def _as_vec3(v) -> np.ndarray:
-    """Accept a Vec3 dict {x,y,z} (subgraph type coercion) or a sequence."""
-    if isinstance(v, dict):
-        return np.asarray([v["x"], v["y"], v["z"]], dtype=float)
-    return np.asarray(list(v), dtype=float)
+def _as_vec3(v: Vec3) -> np.ndarray:
+    return np.asarray([v["x"], v["y"], v["z"]], dtype=float)
+
+
+def _vec3(v) -> Vec3:
+    return {"x": float(v[0]), "y": float(v[1]), "z": float(v[2])}
+
+
+def _quat(q) -> Quaternion:
+    return {"w": float(q[0]), "x": float(q[1]), "y": float(q[2]), "z": float(q[3])}
 
 
 def _q_to_R(quat_wxyz) -> Rotation:
@@ -39,15 +45,15 @@ def _q_to_R(quat_wxyz) -> Rotation:
 
 
 class Output(TypedDict):
-    place_xyz: list   # world OBJECT-centre rest pose (tape flush on the destination)
-    hover_xyz: list    # place_xyz raised by PLACE_Z_APPROACH — the approach target
-    place_quat: list   # reachable presentation orientation (wxyz), first yaw that plans
-    target_xyz: list   # alias of hover_xyz — matches tsh-transport-held's generic
+    place_xyz: Vec3       # world OBJECT-centre rest pose (tape flush on the destination)
+    hover_xyz: Vec3       # place_xyz raised by PLACE_Z_APPROACH — the approach target
+    place_quat: Quaternion  # reachable presentation orientation (wxyz), first yaw that plans
+    target_xyz: Vec3      # alias of hover_xyz — matches tsh-transport-held's generic
                        # target_xyz input so cross-subgraph auto-wire can bind it
-    target_quat: list  # alias of place_quat — matches tsh-transport-held's target_quat
+    target_quat: Quaternion  # alias of place_quat — matches tsh-transport-held's target_quat
 
 
-def run(ctx: NodeContext, *, held_offset: list, container_xyz: list, tape_half_z: float,
+def run(ctx: NodeContext, *, held_offset: Vec3, container_xyz: Vec3, tape_half_z: float,
         arm_id: int = 1) -> Output:
     """Probe the first reachable yaw for laying the held tape flat on container_xyz.
 
@@ -82,9 +88,9 @@ def run(ctx: NodeContext, *, held_offset: list, container_xyz: list, tape_half_z
         pq = (qw, qx, qy, qz)
         if plan_tool_move(ctx, arm_id, desired_tape_centre + hover_dz, pq,
                           tool_offset=list(offset_local), execute=False) is not None:
-            place_xyz = [float(v) for v in desired_tape_centre]
-            hover_xyz = [float(v) for v in desired_tape_centre + hover_dz]
-            place_quat = [float(v) for v in pq]
+            place_xyz = _vec3(desired_tape_centre)
+            hover_xyz = _vec3(desired_tape_centre + hover_dz)
+            place_quat = _quat(pq)
             return {"place_xyz": place_xyz, "hover_xyz": hover_xyz, "place_quat": place_quat,
                     "target_xyz": hover_xyz, "target_quat": place_quat}
     raise RuntimeError("place-pose: no reachable yaw found sweeping the tape rotation")

@@ -50,7 +50,7 @@ def _yam_assets() -> Path:
 
     return Path(libero_yam.__file__).resolve().parent / "assets"
 
-
+## Simply load the yaml file (no collision spheres as of yet)
 def _yam_robot_cfg(with_collision_spheres: bool = True):
     """Build a cuRobo-0.8 ``RobotCfg`` from LIBERO-YAM's own ``yam.yml``.
 
@@ -112,6 +112,7 @@ def _yam_robot_cfg(with_collision_spheres: bool = True):
 class LiberoYamCuRoboIK:
     """IK backend (connector contract) over cuRobo v0.8, built from the YAM URDF."""
 
+    # store environment
     def __init__(self, env: Any, *, num_seeds: int = 64) -> None:
         self._env = env  # LiberoYamEnv
         self._num_seeds = int(num_seeds)
@@ -124,6 +125,7 @@ class LiberoYamCuRoboIK:
     def trajectory_needs_joint_reverse(self) -> bool:
         return False  # cuRobo reports natural joint1..6 order (sim-native)
 
+    ## create curobo IK solver  
     def _solver(self):
         if self._ik is None:
             from curobo.inverse_kinematics import InverseKinematics, InverseKinematicsCfg
@@ -148,8 +150,10 @@ class LiberoYamCuRoboIK:
         from libero_yam.sim.kinematics import arm_base_world_pose
 
         ik = self._solver()
+        # get robot base
         base_pos, _ = arm_base_world_pose(self._env._control, arm_id)
         p, q = pose["position"], pose["rotation"]
+        # convert world to robot coordinates
         quat_wxyz = np.array([q["w"], q["x"], q["y"], q["z"]], dtype=np.float64)
 
         # world TCP -> arm-base frame -> link_6 (subtract the TCP offset).
@@ -157,6 +161,7 @@ class LiberoYamCuRoboIK:
         R = Rotation.from_quat([q["x"], q["y"], q["z"], q["w"]]).as_matrix()
         link6 = rel - R @ np.asarray(YAM_TCP_OFFSET, dtype=np.float64)
 
+        # build curobo pose
         goal = Pose(
             position=torch.tensor([link6], device="cuda", dtype=torch.float32),
             quaternion=torch.tensor([quat_wxyz], device="cuda", dtype=torch.float32),
@@ -232,6 +237,7 @@ class LiberoYamCuRoboIK:
             self._planner_link = self._planner.tool_frames[0]
         return self._planner
 
+    # load obstacles into cuRobo so we know not to collide with them
     def _load_world(self, planner, obstacles, base_pos):
         """Push world-frame cuboid ``obstacles`` into ``planner`` (base frame).
 
@@ -257,6 +263,7 @@ class LiberoYamCuRoboIK:
         planner.clear_scene_cache()
         planner.update_world(SceneCfg(cuboid=cuboids))
 
+    ## TODO: revert collision sphere for fingers to default
     def _other_arm_obstacles(self, planning_arm_id):
         """World-frame cuboids covering the OTHER arm at its current config.
 
@@ -307,6 +314,8 @@ class LiberoYamCuRoboIK:
                         "dims": (2 * float(r), 2 * float(r), 2 * float(r))})
         return out
 
+    # plans complete collision free trajectory. Goal pose -> transform coordinates
+    # -> load obstacles -> optional other arm -> motion planner -> trajectory
     def plan_to_pose(self, pose, *, arm_id=0, obstacles=None, avoid_other_arm=False,
                      seed_joints=None, max_attempts=4):
         """Collision-aware joint trajectory to a world-frame TCP ``pose``.
@@ -377,6 +386,7 @@ class LiberoYamSimConnector(SimConnector):
         as robot contacts and ``Body.is_grasped()`` would always be False in
         checkpoint predicates. Same lazy-build shape as the base method.
         """
+        # names every arm/gripper body
         if self._world_adapter is None:
             from gap.connector.world_adapter import LiberoWorldAdapter
 
@@ -432,6 +442,7 @@ class LiberoYamSimConnector(SimConnector):
         return super().close_gripper(
             settle_steps=max(1, settle_steps - ramp), arm_id=arm_id)
 
+    # register all of the tools so GaP can actually use the
     def _register_extra_tools(self, reg: ToolRegistry) -> None:
         super()._register_extra_tools(reg)
         reg.register_callable(

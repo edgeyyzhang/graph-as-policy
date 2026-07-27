@@ -35,15 +35,13 @@ def q_to_R(quat_wxyz) -> Rotation:
 
 
 def as_vec3(v) -> np.ndarray:
-    """Accept a Vec3 dict {x,y,z} (subgraph type coercion) or a sequence."""
-    if isinstance(v, dict):
-        return np.asarray([v["x"], v["y"], v["z"]], dtype=float)
-    return np.asarray(list(v), dtype=float)
+    """A Vec3 dict {x,y,z} as a numpy array."""
+    return np.asarray([v["x"], v["y"], v["z"]], dtype=float)
 
 
 def as_wxyz(q) -> tuple:
-    """Accept a Quaternion dict {w,x,y,z} or a wxyz sequence; return wxyz tuple."""
-    return (q["w"], q["x"], q["y"], q["z"]) if isinstance(q, dict) else tuple(q)
+    """A Quaternion dict {w,x,y,z} as a wxyz tuple."""
+    return (q["w"], q["x"], q["y"], q["z"])
 
 
 def held_center_world(ctx: NodeContext, arm_id: int, held_offset) -> np.ndarray:

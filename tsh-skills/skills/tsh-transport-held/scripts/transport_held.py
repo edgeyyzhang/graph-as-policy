@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import TypedDict
 
 from gap import NodeContext
+from gap_core.types import Se3Pose, Vec3, Quaternion, make_pose
 
 from ._held import (
     approach_with_attached,
@@ -30,11 +31,11 @@ from .constants import PLAN_POSITION_THRESHOLD, PLAN_ROTATION_THRESHOLD
 
 class Output(TypedDict):
     transported: bool
-    held_tcp: list  # world TCP pose after the move, [x,y,z,qw,qx,qy,qz]
+    held_tcp: Se3Pose  # world TCP pose after the move
 
 
-def run(ctx: NodeContext, *, arm_id: int, held_offset: list,
-        target_xyz: list, target_quat: list,
+def run(ctx: NodeContext, *, arm_id: int, held_offset: Vec3,
+        target_xyz: Vec3, target_quat: Quaternion,
         held_cloud=None,
         position_threshold: float = PLAN_POSITION_THRESHOLD,
         rotation_threshold: float = PLAN_ROTATION_THRESHOLD) -> Output:
@@ -63,6 +64,4 @@ def run(ctx: NodeContext, *, arm_id: int, held_offset: list,
         plan_held_move(ctx, arm_id, held_offset, target, quat, **thresholds)
 
     ee = ctx.tool("robot.get_ee_pose", arm_id=arm_id)["pose"]
-    p, r = ee["position"], ee["rotation"]
-    return {"transported": True,
-            "held_tcp": [p["x"], p["y"], p["z"], r["w"], r["x"], r["y"], r["z"]]}
+    return {"transported": True, "held_tcp": ee}

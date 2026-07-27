@@ -31,6 +31,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from gap import NodeContext
+from gap_core.types import Quaternion, Se3Pose, Vec3, make_pose
 
 from ._motion import curobo_linear_move, plan_tool_move
 from .constants import (
@@ -49,17 +50,17 @@ from .constants import (
 ## This is used for the return
 class Output(TypedDict):
     handed_over: bool
-    receiver_offset: list  # tape centre in the receiver TCP frame (m), measured at
+    receiver_offset: Vec3  # tape centre in the receiver TCP frame (m), measured at
                            # the grab instant via the giver's rigid grip + FK (no
                            # GT). Consumed by place to land the tape centre on target.
-    held_offset: list   # alias of receiver_offset — rebinds the cross-subgraph
+    held_offset: Vec3   # alias of receiver_offset — rebinds the cross-subgraph
                         # ``held_offset`` name (the pickup bound it to the giver's
                         # grip) to the RECEIVER's grip, so a downstream place
                         # consumes the latest holder's offset either route.
-    giver_tcp: list     # world giver TCP pose at the present, [x,y,z,qw,qx,qy,qz].
-                        # A return leg replays these two proven-feasible, proven-
+    giver_tcp: Se3Pose  # world giver TCP pose at the present. A return leg
+                        # replays these two proven-feasible, proven-
                         # collision-free poses with the arm roles swapped.
-    receiver_tcp: list  # world receiver TCP pose at the grab, same layout.
+    receiver_tcp: Se3Pose  # world receiver TCP pose at the grab.
     giver_arm: int      # echo of the giving arm (checkpoint anchor)
     receiver_arm: int   # echo of the receiving arm (checkpoint anchor; the
                         # holder after this subgraph)
@@ -120,19 +121,18 @@ def _ee(ctx: NodeContext, arm_id: int):
     return p, Rotation.from_quat([r["x"], r["y"], r["z"], r["w"]])
 
 
-def _as_wxyz(q):
-    """Accept a Quaternion dict {w,x,y,z} (subgraph type coercion) or a wxyz
-    sequence; return a plain wxyz tuple."""
-    return (q["w"], q["x"], q["y"], q["z"]) if isinstance(q, dict) else tuple(q)
+def _as_wxyz(q) -> tuple:
+    """A Quaternion dict {w,x,y,z} as a plain wxyz tuple."""
+    return (q["w"], q["x"], q["y"], q["z"])
 
 
 def run(ctx: NodeContext, *,
         giver_arm: int = 0,
         receiver_arm: int = 1,
-        tape_in_giver: list,
+        tape_in_giver: Vec3,
         rim_radius: float,
-        giver_quat: tuple,
-        recv_quat: tuple) -> Output:
+        giver_quat: Quaternion,
+        recv_quat: Quaternion) -> Output:
     """Transfer the tape from giver to receiver.
 
     The giver is assumed to already be presenting the tape at the meet point —
@@ -154,10 +154,7 @@ def run(ctx: NodeContext, *,
     """
     recv_grasp_dy = rim_radius + RECV_GRASP_DY_MARGIN
     tig = np.asarray(
-        [tape_in_giver["x"], tape_in_giver["y"], tape_in_giver["z"]]
-        if isinstance(tape_in_giver, dict) else tape_in_giver, dtype=float)
-    # Presentation quats may arrive as a Quaternion dict {w,x,y,z} (subgraph type
-    # coercion) or as a wxyz sequence; normalize to a wxyz tuple.
+        [tape_in_giver["x"], tape_in_giver["y"], tape_in_giver["z"]], dtype=float)
     giver_quat = _as_wxyz(giver_quat)
     recv_quat = _as_wxyz(recv_quat)
 
@@ -257,9 +254,8 @@ def run(ctx: NodeContext, *,
     #    in Y (−Y canonically, +Y when mirrored — always away from the centre).
     gp, gR = _ee(ctx, giver_arm)
     gqx, gqy, gqz, gqw = gR.as_quat()
-    giver_tcp = [float(v) for v in (*gp, gqw, gqx, gqy, gqz)]
-    receiver_tcp = [float(v) for v in
-                    (tx + RECV_INSERT_OVERSHOOT, ty, tz, *recv_quat)]
+    giver_tcp = make_pose(gp, (gqw, gqx, gqy, gqz))
+    receiver_tcp = make_pose((tx + RECV_INSERT_OVERSHOOT, ty, tz), recv_quat)
     plan_tool_move(ctx, giver_arm,
                    [gp[0] - EXCHANGE_RETRACT_D, gp[1], gp[2]], giver_quat)
     ctx.tool("robot.open_gripper", arm_id=giver_arm)
@@ -267,8 +263,10 @@ def run(ctx: NodeContext, *,
     plan_tool_move(ctx, receiver_arm,
                    [tx + RECV_PRE_BACK, ty + recv_retract, tz], recv_quat)
 
-    return {"handed_over": True, "receiver_offset": receiver_offset,
-            "held_offset": receiver_offset,
+    receiver_offset_vec3 = {"x": float(receiver_offset[0]), "y": float(receiver_offset[1]),
+                            "z": float(receiver_offset[2])}
+    return {"handed_over": True, "receiver_offset": receiver_offset_vec3,
+            "held_offset": receiver_offset_vec3,
             "giver_tcp": giver_tcp, "receiver_tcp": receiver_tcp,
             "giver_arm": int(giver_arm), "receiver_arm": int(receiver_arm),
             "place_arm": int(receiver_arm)}

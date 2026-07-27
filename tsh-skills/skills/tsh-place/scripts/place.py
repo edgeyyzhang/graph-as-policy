@@ -22,6 +22,7 @@ from typing import TypedDict
 import numpy as np
 
 from gap import NodeContext
+from gap_core.types import Se3Pose, Vec3, Quaternion, make_pose
 
 from ._held import as_vec3, as_wxyz, q_to_R
 from ._motion import curobo_linear_move
@@ -30,14 +31,14 @@ from .constants import PLACE_DROP_CLEARANCE, PLACE_Z_APPROACH
 
 class Output(TypedDict):
     placed: bool
-    place_tcp: list  # world TCP pose whose grip matches the RESTING tape,
-                     # [x,y,z,qw,qx,qy,qz] (the release pose minus the drop
-                     # clearance). A return leg re-closes exactly here to
-                     # re-acquire the tape with the same measured grip.
+    place_tcp: Se3Pose  # world TCP pose whose grip matches the RESTING tape
+                        # (the release pose minus the drop clearance). A
+                        # return leg re-closes exactly here to re-acquire the
+                        # tape with the same measured grip.
     place_arm: int   # echo of the placing arm (checkpoint anchor)
 
 
-def run(ctx: NodeContext, *, held_offset: list, place_xyz: list, place_quat: list,
+def run(ctx: NodeContext, *, held_offset: Vec3, place_xyz: Vec3, place_quat: Quaternion,
         arm_id: int = 1) -> Output:
     """Release the held tape at ``place_xyz``/``place_quat``, then retract up.
 
@@ -70,5 +71,5 @@ def run(ctx: NodeContext, *, held_offset: list, place_xyz: list, place_quat: lis
                        direction=(0.0, 0.0, 1.0))
 
     return {"placed": True,
-            "place_tcp": [float(v) for v in (*tcp_place, *place_quat)],
+            "place_tcp": make_pose(tcp_place, place_quat),
             "place_arm": int(arm_id)}

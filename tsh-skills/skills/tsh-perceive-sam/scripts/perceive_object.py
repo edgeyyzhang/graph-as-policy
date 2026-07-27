@@ -25,7 +25,7 @@ from typing import TypedDict
 import numpy as np
 
 from gap import NodeContext
-from gap_core.types import PointCloud
+from gap_core.types import PointCloud, Vec3
 
 from ._perceive import estimate_half_thickness, perceive_top_face
 
@@ -33,8 +33,8 @@ from ._perceive import estimate_half_thickness, perceive_top_face
 class Output(TypedDict):
     found: bool
     cloud: PointCloud | None  # world-frame cloud (table/floor removed)
-    top_xyz: list | None      # [x, y, top_z] — top-face centre (place targets rest here)
-    center_xyz: list | None   # [x, y, top_z - half_z] — body-centroid height (grasp point)
+    top_xyz: Vec3 | None      # top-face centre (place targets rest here)
+    center_xyz: Vec3 | None   # body-centroid height (grasp point)
     half_z: float | None      # derived half-thickness (m), (top - bottom) / 2
 
 
@@ -62,6 +62,6 @@ def run(ctx: NodeContext, *, object_query: str, cameras: list,
           f"half_z={half_z*1000:.1f}mm ({len(pts)} pts)", flush=True)
     return {"found": True,
             "cloud": {"points": pts.astype(np.float32)},
-            "top_xyz": [float(x), float(y), float(top_z)],
-            "center_xyz": [float(x), float(y), float(top_z - half_z)],
+            "top_xyz": {"x": float(x), "y": float(y), "z": float(top_z)},
+            "center_xyz": {"x": float(x), "y": float(y), "z": float(top_z - half_z)},
             "half_z": float(half_z)}

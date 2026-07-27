@@ -3,21 +3,21 @@
 A handover is not a fixed pipeline stage — it exists only because the place
 destination is outside the picking arm's workspace. This node makes that
 decision explicit and cheap: it probes reachability with the canonical curobo
-bundle (``execute=False`` — plans only, never touches the sim) using the
-EXACT grasp poses the pickup will execute (shared ``_ring.ring_grasp_poses``)
-and the place hover's yaw sweep with the PREDICTED held-tape offset, then
-routes:
+bundle (``execute=False`` — plans only, never touches the sim) using the EXACT
+grasp poses ``tsh-pickup`` will execute — supplied by one
+``tsh-calculate-grasp-ring`` instance PER ARM (route consumes the poses as
+data; it derives no grasp geometry itself) — and the place hover's yaw sweep
+with the predicted held-tape offset, then routes:
 
-  * ``direct``   — one arm can both grasp the tape AND reach the place hover:
-                   pick_arm = place_arm, no exchange.
-  * ``handover`` — the tape is only graspable by one arm and the destination
-                   only reachable by the other: pick, exchange at the meet
-                   point, place.
-  * (raise)      — no arm can grasp, or nothing can place: ``on_error``.
+  * ``direct``         — one arm can both grasp the tape AND reach the place
+                          hover: pick_arm = place_arm, no exchange.
+  * ``needs_handover``  — the tape is only graspable by one arm and the
+                          destination only reachable by the other: pick,
+                          exchange at the meet point, place.
+  * (raise)            — no arm can grasp, or nothing can place: ``on_error``.
 
-This is the "reachability probe first" practice promoted into the graph —
-kinematic dead zones are found in milliseconds of planning instead of
-minutes of sim, and the agent gets a real branch to reason about.
+Because the probe replays the SAME poses the grasp skill produced, the route's
+feasibility answer can never disagree with the grasp actually run.
 """
 
 from __future__ import annotations
@@ -28,9 +28,9 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from gap import NodeContext
+from gap_core.types import Quaternion, Vec3
 
 from ._motion import plan_tool_move
-from ._ring import ring_grasp_poses
 from .constants import (
     DOWN_QUAT,
     PLACE_YAW_SWEEP_DEG,
@@ -41,17 +41,33 @@ from .constants import (
 
 
 class Output(TypedDict):
-    route: str        # "direct" | "handover" — the conditional-edge field
+    route: str        # "direct" | "needs_handover" — the conditional-edge field
     pick_arm: int     # arm that grasps the tape
     place_arm: int    # arm that places it (== pick_arm on the direct route)
     giver_arm: int    # aliases for the handover skill's input names
     receiver_arm: int
+    # The CHOSEN arm's grasp legs, relayed so tsh-pickup consumes them directly
+    # (no separate per-arm grasp instance for the pickup side).
+    pick_hover_xyz: Vec3
+    pick_seat_xyz: Vec3
+    pick_lift_xyz: Vec3
+    pick_grasp_quat: Quaternion
 
 
-def _as3(v):
-    if isinstance(v, dict):
-        return [float(v["x"]), float(v["y"]), float(v["z"])]
-    return [float(x) for x in v]
+def _as3(v) -> list:
+    return [float(v["x"]), float(v["y"]), float(v["z"])]
+
+
+def _as_wxyz(q) -> list:
+    return [float(q["w"]), float(q["x"]), float(q["y"]), float(q["z"])]
+
+
+def _vec3(v: list) -> Vec3:
+    return {"x": float(v[0]), "y": float(v[1]), "z": float(v[2])}
+
+
+def _quat(q: list) -> Quaternion:
+    return {"w": float(q[0]), "x": float(q[1]), "y": float(q[2]), "z": float(q[3])}
 
 
 def _place_hover_reachable(ctx: NodeContext, arm_id: int, container_xyz, half_z,
@@ -80,34 +96,43 @@ def _place_hover_reachable(ctx: NodeContext, arm_id: int, container_xyz, half_z,
 
 
 def run(ctx: NodeContext, *, target_xyz: list, container_xyz: list, half_z: float,
-        hole_radius: float, rim_radius: float,
-        fingertip_axial: float, finger_half_gap: float) -> Output:
+        rim_radius: float,
+        arm0_hover_xyz: list, arm0_seat_xyz: list, arm0_lift_xyz: list,
+        arm0_grasp_quat: list, arm0_held_offset: list,
+        arm1_hover_xyz: list, arm1_seat_xyz: list, arm1_lift_xyz: list,
+        arm1_grasp_quat: list, arm1_held_offset: list) -> Output:
     """Probe grasp + place reachability per arm and pick the route.
 
-    target_xyz: tape grasp point (body-centroid height), from perception.
-    container_xyz:   destination top-face centre, from perception.
-    half_z:     perceived tape half-thickness (place rest height).
-    hole_radius / rim_radius: perceived ring geometry (tsh-ring-geometry).
-    fingertip_axial / finger_half_gap: FK-derived gripper offsets
-        (tsh-gripper-geometry) — the probe builds the pickup's exact poses.
+    target_xyz:    tape grasp point (body-centroid height), from perception —
+                   used only to prefer the picking arm nearer the tape.
+    container_xyz: destination top-face centre, from perception.
+    half_z:        perceived tape half-thickness (place rest height).
+    rim_radius:    perceived rim radius (from tsh-calculate-grasp-ring) — the
+                   predicted receiver thread offset for the place probe.
+    arm{0,1}_hover_xyz / _seat_xyz / _lift_xyz / _grasp_quat / _held_offset: the
+                   grasp legs + predicted held offset for each arm, each from its
+                   OWN tsh-calculate-grasp-ring instance (arm_id = 0 and = 1). The
+                   probe replays these EXACT poses (hover + seat), so it can't
+                   disagree with the grasp pickup runs; the chosen arm's legs are
+                   relayed to tsh-pickup as the pick_* outputs.
     """
     target = _as3(target_xyz)
     arms = (0, 1)
+    legs = {
+        0: (_as3(arm0_hover_xyz), _as3(arm0_seat_xyz), _as3(arm0_lift_xyz),
+            _as_wxyz(arm0_grasp_quat), _as3(arm0_held_offset)),
+        1: (_as3(arm1_hover_xyz), _as3(arm1_seat_xyz), _as3(arm1_lift_xyz),
+            _as_wxyz(arm1_grasp_quat), _as3(arm1_held_offset)),
+    }
 
     grasp_ok: dict[int, bool] = {}
-    grasp_geom: dict[int, dict] = {}
+    held: dict[int, list] = {}
     for a in arms:
-        g = ring_grasp_poses(ctx, a, target,
-                             hole_radius=hole_radius, rim_radius=rim_radius,
-                             fingertip_axial=fingertip_axial,
-                             finger_half_gap=finger_half_gap)
-        grasp_geom[a] = g
-        gx, gy = g["grasp_xy"]
-        ok = plan_tool_move(ctx, a, [gx, gy, g["hover_z"]], g["grasp_quat"],
-                            execute=False) is not None
+        hov, seat, _lift, quat, hoff = legs[a]
+        held[a] = hoff
+        ok = plan_tool_move(ctx, a, hov, quat, execute=False) is not None
         if ok:
-            ok = plan_tool_move(ctx, a, [gx, gy, g["seat_z"]], g["grasp_quat"],
-                                execute=False) is not None
+            ok = plan_tool_move(ctx, a, seat, quat, execute=False) is not None
         grasp_ok[a] = ok
 
     if not any(grasp_ok.values()):
@@ -115,14 +140,14 @@ def run(ctx: NodeContext, *, target_xyz: list, container_xyz: list, half_z: floa
             f"route: no arm can reach the grasp at "
             f"{[round(v, 3) for v in target]} — kinematic dead zone")
 
-    # Place probe per arm. The held offset differs by how the arm would come
-    # to hold the tape: its own ring grasp (direct) or the receiver's rim
-    # thread (after a handover). The yaw sweep pivots about the tape centre,
-    # so the probe is dominated by destination reach, not offset direction.
+    # Place probe per arm. The held offset differs by how the arm would come to
+    # hold the tape: its own ring grasp (direct) or the receiver's rim thread
+    # (after a handover). The yaw sweep pivots about the tape centre, so the
+    # probe is dominated by destination reach, not offset direction.
     recv_offset = [0.0, rim_radius + RECV_GRASP_DY_MARGIN, -RECV_GRASP_DZ]
     place_ok: dict[int, bool] = {}
     for a in arms:
-        off = grasp_geom[a]["held_offset"] if grasp_ok[a] else recv_offset
+        off = held[a] if grasp_ok[a] else recv_offset
         place_ok[a] = _place_hover_reachable(ctx, a, container_xyz, half_z, off)
 
     # Prefer the grasp-capable arm nearer the tape (less reach = more margin).
@@ -132,19 +157,25 @@ def run(ctx: NodeContext, *, target_xyz: list, container_xyz: list, half_z: floa
 
     pickers = sorted((a for a in arms if grasp_ok[a]), key=_base_dist)
 
+    def _pick_legs(a: int) -> dict:
+        """The picking arm's grasp legs, relayed for tsh-pickup to execute."""
+        hov, seat, lift, quat, _hoff = legs[a]
+        return {"pick_hover_xyz": _vec3(hov), "pick_seat_xyz": _vec3(seat),
+                "pick_lift_xyz": _vec3(lift), "pick_grasp_quat": _quat(quat)}
+
     for a in pickers:  # direct if any picker can also place
         if place_ok[a]:
             print(f"[route] direct: arm {a} grasps and places "
                   f"(grasp_ok={grasp_ok}, place_ok={place_ok})", flush=True)
             return {"route": "direct", "pick_arm": a, "place_arm": a,
-                    "giver_arm": a, "receiver_arm": 1 - a}
-    for a in pickers:  # handover if the other arm can place
+                    "giver_arm": a, "receiver_arm": 1 - a, **_pick_legs(a)}
+    for a in pickers:  # needs_handover if the other arm can place
         other = 1 - a
         if place_ok[other]:
-            print(f"[route] handover: arm {a} picks, arm {other} places "
+            print(f"[route] needs_handover: arm {a} picks, arm {other} places "
                   f"(grasp_ok={grasp_ok}, place_ok={place_ok})", flush=True)
-            return {"route": "handover", "pick_arm": a, "place_arm": other,
-                    "giver_arm": a, "receiver_arm": other}
+            return {"route": "needs_handover", "pick_arm": a, "place_arm": other,
+                    "giver_arm": a, "receiver_arm": other, **_pick_legs(a)}
 
     raise RuntimeError(
         f"route: grasp reachable (arms {pickers}) but no arm can reach the "

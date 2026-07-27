@@ -168,8 +168,9 @@ def _handle(args: argparse.Namespace) -> int:
     if args.sim:
         import gap.connector
 
+        sim_suite = args.sim.split("/", 1)[0]
         connector = gap.connector.sim(
-            "libero", task=args.sim, record_video=record_video,
+            sim_suite, task=args.sim, record_video=record_video,
         )
         if record_video:
             # Capture only arms itself on reset(); execute() runs on the

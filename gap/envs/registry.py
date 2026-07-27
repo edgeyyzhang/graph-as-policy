@@ -134,6 +134,13 @@ _LIBERO_FACTORY = "gap.envs.libero_env:make_env"
 # benchmark registry (see gap.envs.loader.load_libero_task).
 register_env("libero", _LIBERO_FACTORY, prefix=True)
 
+# Bimanual YAM (LIBERO-YAM) suites — registered as a longer prefix than
+# "libero" above, so e.g. "libero_yam_tabletop" wins the longest-match in
+# resolve() and routes here instead of the generic LIBERO-PRO factory.
+register_env(
+    "libero_yam", "gap.envs.libero_yam_env:make_env", prefix=True
+)
+
 # Variational-Automation-Benchmark (vab) suites — self-contained YAML task
 # dirs under third_party/Variational-Automation-Benchmark/tasks/<name>/.
 for _suite in (
