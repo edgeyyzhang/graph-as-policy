@@ -12,8 +12,8 @@ description: >
   arm-base poses — station geometry is only meaningful when an exchange is
   actually going to happen, so it is wired as a conditional second node rather
   than a separate always-run skill. Runs before tsh-pickup (pickup needs its
-  pick_arm); a downstream dispatch acts on the ``route`` decision after the
-  grasp.
+  pick_arm), so wire each exit to its OWN tsh-pickup instance — direct into the
+  place chain, needs_handover into the present/exchange chain. Only one runs.
 compatibility: requires gap>=0.1
 metadata:
   category: planning
@@ -82,8 +82,12 @@ gap:
       for the picked object), and under the latest-producer rule the giver would
       silently carry the tape back to its pickup spot instead of the meet point.
     - >
-      The route output only takes effect if a downstream node branches on it
-      after the grasp; on its own this skill decides but does not enforce.
+      Wire the two exits to SEPARATE tsh-pickup instances — direct to the one
+      feeding the place chain, needs_handover to the one feeding the
+      present/exchange chain. Do NOT collapse both exits into a single shared
+      pickup: pickup exits only grasped/failed, so the route decision would be
+      erased at the join and the graph could no longer branch on it. Only one
+      pickup ever executes, exactly as only one place chain does.
   canonical_scripts:
     - route: scripts/route.py
     - station_geometry: scripts/station_geometry.py

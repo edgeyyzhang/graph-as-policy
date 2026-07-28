@@ -8,7 +8,7 @@ description: >
   leg, the place hover approach, and any standalone "hold the object at X" step.
   Every input is identical on every instance — there is no per-instance
   renaming. holding_arm ships with held_offset from whoever last changed hands
-  (tsh-dispatch-route, then tsh-handover), and hold_target_xyz/hold_target_quat
+  (tsh-pickup, then tsh-handover), and hold_target_xyz/hold_target_quat
   carry the destination from tsh-place-pose (place legs) or from
   tsh-route-arms-bimanual's station-geometry node (present leg). Never bind a
   bare target_xyz/target_quat: that is perception's name for the picked
@@ -43,7 +43,7 @@ gap:
       The script's arm_id kwarg is ALWAYS Ref("in.holding_arm") — on every
       instance, both roles. held_offset and holding_arm are one datum (the
       object centre and the TCP frame it is expressed in), so every producer
-      emits them together: tsh-dispatch-route relays the giver's, tsh-handover
+      emits them together: tsh-pickup emits the picker's, tsh-handover
       re-anchors them to the receiver. Never declare a bare arm_id input, and
       never pick an arm name per-instance — the holder is data that arrives
       with the offset, not a wiring choice.
@@ -115,5 +115,5 @@ transport_held
 - `tsh-route-arms-bimanual` — its station-geometry node supplies
   `hold_target_xyz`/`hold_target_quat` (the meet pose) for the present instance.
 - `tsh-place-pose` — supplies `hold_target_xyz`/`hold_target_quat` for the place instances.
-- `tsh-dispatch-route` — supplies `held_offset`/`holding_arm` (the giver's) after the grasp.
+- `tsh-pickup` — supplies `held_offset`/`holding_arm` (the picker's) after the grasp.
 - `tsh-handover` — re-anchors `held_offset`/`holding_arm` to the receiver after an exchange.

@@ -73,7 +73,7 @@ class Output(TypedDict):
                         # is expressed in. The two are ONE datum and always ship
                         # together; the exchange is exactly where the holder
                         # changes, so this is where the pair is re-anchored from
-                        # the giver (dispatch's holding_arm) to the receiver.
+                        # the giver (pickup's holding_arm) to the receiver.
 
 
 # Reflection across the world Y=0 plane. The exchange geometry below is authored
