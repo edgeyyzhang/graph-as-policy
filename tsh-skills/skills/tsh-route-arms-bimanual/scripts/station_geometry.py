@@ -11,6 +11,15 @@ restationed pair. tsh-handover consumes ``meet_xyz``, ``giver_quat``, ``recv_qua
 Pure geometry (arm bases only) — no reachability probe, since the geometric meet
 was validated reachable across the grid. A reachability-refined variant lives in
 ``_station_geometry.derive_station_geometry`` for a station that needs it.
+
+This node runs UNCONDITIONALLY, on both routes, and relays ``route`` so the
+subgraph branches on that field here instead. Gating it behind the
+needs_handover exit would save ~0ms (it is arithmetic on two arm-base poses)
+while making meet_xyz/giver_quat/recv_quat/hold_target_* bound on only one
+path — a mismatch W8 cannot see, because the names have declared producers and
+whether they are BOUND is a runtime property. Downstream then dies with
+"input 'hold_target_xyz' has no upstream producer" after a clean validation.
+Running it always is what makes those outputs safe to consume anywhere.
 """
 
 from __future__ import annotations
@@ -24,6 +33,11 @@ from ._station_geometry import derive_meet_xyz, derive_presentation_quats
 
 
 class Output(TypedDict):
+    route: str            # echo of the routing decision — this node runs on EVERY
+                          # path, so the subgraph branches on this field HERE
+                          # rather than gating this node behind an exit. Keeping
+                          # it unconditional is what makes the outputs below
+                          # bound on every path (see module docstring).
     meet_xyz: Vec3        # world-frame handover point
     giver_quat: Quaternion  # giver present orientation, wxyz
     recv_quat: Quaternion   # receiver thread orientation, wxyz (canonical; exchange mirrors)
@@ -45,13 +59,20 @@ def _quat(q) -> Quaternion:
     return {"w": float(q[0]), "x": float(q[1]), "y": float(q[2]), "z": float(q[3])}
 
 
-def run(ctx: NodeContext, *, giver_arm: int = 0, receiver_arm: int = 1) -> Output:
-    """Derive the meet point + presentation quats from the arm bases (no GT)."""
+def run(ctx: NodeContext, *, route: str, giver_arm: int = 0,
+        receiver_arm: int = 1) -> Output:
+    """Derive the meet point + presentation quats from the arm bases (no GT).
+
+    route: the routing decision from ``route.py``, echoed straight back out —
+           this node sits on every path, so the subgraph's branch reads it from
+           here rather than gating this node behind an exit.
+    """
     giver_quat, recv_quat = derive_presentation_quats(
         ctx, giver_arm=giver_arm, receiver_arm=receiver_arm)
     meet = derive_meet_xyz(ctx, giver_arm=giver_arm, receiver_arm=receiver_arm)
     print(f"[station_geometry] meet={[round(v, 4) for v in meet]} "
           f"giver_quat={[round(v, 4) for v in giver_quat]}", flush=True)
-    return {"meet_xyz": _vec3(meet),
+    return {"route": route,
+            "meet_xyz": _vec3(meet),
             "giver_quat": _quat(giver_quat), "recv_quat": _quat(recv_quat),
             "hold_target_xyz": _vec3(meet), "hold_target_quat": _quat(giver_quat)}

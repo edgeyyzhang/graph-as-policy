@@ -4,7 +4,7 @@ description: >
   Decide the transport route: which arm grasps, and whether a bimanual handover
   is needed. Probes reachability with the canonical curobo bundle (plans only,
   execute=False) using the grasp poses tsh-pickup will execute — consumed from a
-  tsh-calculate-grasp-ring instance per arm — and the place hover's yaw sweep
+  single tsh-calculate-grasp-ring node — and the place hover's yaw sweep
   with the predicted held-tape offset. Exits ``direct`` (one arm grasps AND
   places) or ``needs_handover`` (different arms), or raises when nothing is
   reachable. It also owns the handover station geometry (meet point +
@@ -56,19 +56,26 @@ gap:
     hold_target_quat: Quaternion
   hard_rules:
     - >
-      Consume the grasp legs from one tsh-calculate-grasp-ring instance per arm
-      (the arm0_* and arm1_* inputs) — never re-derive grasp poses here. Route
+      Consume the grasp legs from the single tsh-calculate-grasp-ring node
+      (its arm0_* and arm1_* outputs) — never re-derive grasp poses here. Route
       replays those exact poses, so its feasibility answer matches the grasp
       pickup runs, and relays the CHOSEN arm's legs as the pick_* outputs so
       tsh-pickup executes them (no separate grasp instance on the pickup side).
     - >
       execute=False everywhere — this subgraph plans, it never moves.
     - >
-      meet_xyz / giver_quat / recv_quat (and their hold_target_* aliases)
-      describe the handover rendezvous — the meet point and the giver/receiver
-      presentation orientations. Their only consumers are tsh-handover and the
-      tsh-transport-held instance that presents the tape there; nothing on a
-      single-arm path reads them.
+      station_geometry runs UNCONDITIONALLY — never gate it behind the
+      needs_handover exit, and never instantiate it per branch. It is ~0ms of
+      arithmetic on two arm-base poses, and running it on every path is what
+      keeps meet_xyz / giver_quat / recv_quat / hold_target_* BOUND on every
+      path. Gating it validates clean (the names have declared producers) and
+      then dies at runtime with "input 'hold_target_xyz' has no upstream
+      producer" — bound-ness is a runtime property W8 cannot check.
+    - >
+      The subgraph branches on station_geometry's relayed `route` field
+      (router_field="route"), NOT on route.py's exit — that is what lets
+      station_geometry sit on every path while the subgraph still exposes two
+      exits. Keep the node chain linear: START -> route -> station_geometry.
     - >
       The station-geometry node also emits hold_target_xyz/hold_target_quat
       (aliases of meet_xyz/giver_quat) — the canonical destination pair
@@ -98,7 +105,7 @@ skill rather than a separate one because it is derived from the same
 arm-base geometry the routing decision already reads.
 
 For each arm it plans (without executing) the pickup's hover + seat poses (from
-that arm's `tsh-calculate-grasp-ring` instance) and the place hover's yaw sweep
+`tsh-calculate-grasp-ring`) and the place hover's yaw sweep
 with the predicted held-tape offset, then routes `direct` (one arm does both) or
 `needs_handover` (pick and place need different arms). It also derives the meet
 point + giver/receiver presentation quats from the two arm-base poses
@@ -116,20 +123,30 @@ point + giver/receiver presentation quats from the two arm-base poses
   (wire a `tsh-station-geometry`-equivalent step directly, or bind the meet
   pose as a literal).
 
-## The two scripts
+## Recommended subgraph state flow
 
-- **`route.py`** — the reachability probe. Inputs: the scene values
-  (`target_xyz`, `container_xyz`, `target_half_z`, `rim_radius`) and the per-arm
-  grasp legs (`arm0_*` / `arm1_*`). Returns `{route, pick_arm, place_arm,
-  giver_arm, receiver_arm, pick_hover_xyz, pick_seat_xyz, pick_lift_xyz,
-  pick_grasp_quat}` — the last four are the CHOSEN arm's grasp legs, relayed
-  for `tsh-pickup` to execute directly. Its `route` field is the routing value.
-- **`station_geometry.py`** — the handover station geometry. Inputs:
-  `giver_arm`, `receiver_arm` (both produced by `route.py`). Returns
-  `{meet_xyz, giver_quat, recv_quat, hold_target_xyz, hold_target_quat}` — the
-  meet point and presentation orientations the exchange needs.
+Strictly linear, then branch at the end. Both scripts run on every path.
 
-`on_error: "unreachable"`.
+```text
+START → route → station_geometry ──(route=="direct")────────▶ direct → END
+                                 └─(route=="needs_handover")▶ needs_handover → END
+```
+
+1. **`route`** — `type: script`, file `scripts/<sg>/route.py`. Inputs: the scene
+   values (`target_xyz`, `container_xyz`, `target_half_z`, `rim_radius`) and the
+   per-arm grasp legs (`arm0_*` / `arm1_*`). Returns `{route, pick_arm,
+   place_arm, giver_arm, receiver_arm, pick_hover_xyz, pick_seat_xyz,
+   pick_lift_xyz, pick_grasp_quat}` — the last four are the CHOSEN arm's grasp
+   legs, relayed for `tsh-pickup` to execute directly.
+2. **`station_geometry`** — `type: script`, file
+   `scripts/<sg>/station_geometry.py`. Inputs: `route=Ref("route.route")`,
+   `giver_arm=Ref("route.giver_arm")`, `receiver_arm=Ref("route.receiver_arm")`.
+   Returns `{route, meet_xyz, giver_quat, recv_quat, hold_target_xyz,
+   hold_target_quat}`.
+
+Then `add_conditional_edges("station_geometry", {"direct": "direct",
+"needs_handover": "needs_handover"}, router_field="route")`, two noop exits, and
+`set_on_error("unreachable")`. Bind every output above in `set_outputs`.
 
 ## Required end states
 
@@ -141,7 +158,7 @@ point + giver/receiver presentation quats from the two arm-base poses
 
 ## See also
 
-- `tsh-calculate-grasp-ring` — supplies the per-arm grasp legs route probes.
+- `tsh-calculate-grasp-ring` — one node supplying both arms' grasp legs.
 - `tsh-pickup`, `tsh-handover`, `tsh-place` — consumers of the arm ids.
 - `tsh-handover` — consumer of `giver_quat` / `recv_quat`.
 - `tsh-transport-held` — its PRESENT instance consumes `meet_xyz` / `giver_quat` directly.
