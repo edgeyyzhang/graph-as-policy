@@ -86,5 +86,5 @@ place
 
 - `tsh-place-pose` — computes `place_xyz`/`place_quat`.
 - `tsh-transport-held` — carries the arm to the hover before this node.
-- `tsh-pickup` / `tsh-handover` — supply the `held_offset`/`holding_arm` pair (the picker's grip, or the receiver's after an exchange).
+- `tsh-dispatch-route` / `tsh-handover` — supply `held_offset` (the giver's grip relayed, or the receiver's after an exchange).
 - `tsh-route-arms-bimanual` — decides `place_arm`.

@@ -8,16 +8,15 @@ each planned by the canonical curobo bundle and streamed onto the sim
 
 Before closing — while the fingers are seated on the perceived grasp point —
 the tape centre is expressed in the picking arm's TCP frame and emitted as
-``held_offset`` (a.k.a. ``tape_in_giver``). The grip is rigid, so that
+``giver_held_offset`` (a.k.a. ``tape_in_giver``). The grip is rigid, so that
 offset lets every downstream held-tape move (present, place) track and plan
-the tape by forward kinematics with no ground truth.
-
-It ships with ``holding_arm``, the arm whose TCP frame it is expressed in.
-That pairing is what makes the bare name safe here: a place chain wired
-straight to this node cannot end up applying the giver's grip to the
-receiver's arm, because the arm arrives with the offset. On the handover
-route ``tsh-handover`` re-anchors both to the receiver and, running later,
-wins under the latest-producer rule.
+the tape by forward kinematics with no ground truth. Deliberately NOT named
+``held_offset`` — that name is reserved for whichever holder is CURRENT at a
+given point in the graph (this pickup's grip, or the receiver's after a
+handover); exposing it under the giver-specific name here, instead, means a
+consumer positioned too early (before the route decision is dispatched) has
+no producer to wire at all, rather than silently getting the wrong holder's
+offset.
 """
 
 from __future__ import annotations
@@ -40,17 +39,14 @@ from .constants import (
 ## save for the return leg
 class Output(TypedDict):
     grasped: bool
-    held_offset: Vec3  # tape centre in the picking arm's TCP frame (m); rigid
-                       # under the grip, so held-tape moves track it by FK.
-                       # Anchored to the pickup perception at the seated
-                       # pre-close pose. Always emitted WITH holding_arm below
-                       # — the offset is expressed in that arm's frame and is
-                       # meaningless without it. On the handover route
-                       # tsh-handover re-anchors both to the receiver, and the
-                       # latest producer on the path wins.
-    holding_arm: int   # the arm whose TCP frame held_offset is in (the picker,
-                       # until an exchange hands the tape over).
-    tape_in_giver: Vec3  # alias of held_offset (tsh-handover's input name)
+    giver_held_offset: Vec3  # tape centre in the picking arm's TCP frame (m);
+                       # rigid under the grip, so held-tape moves track it by
+                       # FK. Anchored to the pickup perception at the seated
+                       # pre-close pose. tsh-dispatch-route relays this
+                       # forward as the canonical held_offset on the direct
+                       # exit; the handover rebinds held_offset to the
+                       # receiver's measured offset on the other route.
+    tape_in_giver: Vec3  # alias of giver_held_offset (tsh-handover's input name)
     grasp_tcp: Se3Pose  # world TCP pose at close. A return leg replays this
                         # pose to put the tape back where it was picked.
     pick_arm: int      # echo of the arm that holds the tape (checkpoint anchor)
@@ -103,8 +99,7 @@ def run(ctx: NodeContext, *, tape_xyz: list, arm_id: int = 0,
     plan_tool_move(ctx, arm_id, lift_xyz, grasp_quat)
 
     held_offset_vec3 = _vec3(held_offset)
-    return {"grasped": True, "held_offset": held_offset_vec3,
-            "holding_arm": int(arm_id),
+    return {"grasped": True, "giver_held_offset": held_offset_vec3,
             "tape_in_giver": held_offset_vec3,
             "grasp_tcp": make_pose(seat_xyz, grasp_quat),
             "pick_arm": int(arm_id)}

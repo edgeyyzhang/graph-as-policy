@@ -22,7 +22,7 @@ gap:
     - robot.close_gripper
     - robot.get_ee_pose
   exit_conditions:
-    grasped: Tape ring held; held_offset + holding_arm + grasp_tcp bound in the outputs.
+    grasped: Tape ring held; giver_held_offset + grasp_tcp bound in the outputs.
     failed: A grasp leg had no cuRobo plan (raise routes to abort).
   required_inputs:
     target_xyz: Vec3
@@ -33,8 +33,7 @@ gap:
     pick_arm: int
   produces_outputs:
     grasped: bool
-    held_offset: Vec3
-    holding_arm: int
+    giver_held_offset: Vec3
     tape_in_giver: Vec3
     grasp_tcp: Se3Pose
     pick_arm: int
@@ -53,12 +52,11 @@ gap:
       Measure `tape_in_giver` at the seat, BEFORE `robot.close_gripper` — the
       rigid offset anchors on the perceived grasp point, not a shifted grip.
     - >
-      held_offset and holding_arm are ONE datum and are always emitted together:
-      held_offset is the tape centre in the HOLDER's TCP frame, so it means
-      nothing without the arm whose frame it is in. The place chain wires to
-      whichever node last changed hands — this one on the direct route,
-      tsh-handover after an exchange — and gets a matched pair either way, so
-      it can never place with one arm's grip on the other arm.
+      This node deliberately does NOT produce a bare `held_offset` — that name
+      is reserved for whichever holder is current at a given graph point.
+      `tsh-dispatch-route` relays `giver_held_offset` forward as `held_offset`
+      on the direct exit; `tsh-handover` provides it after an exchange. Do not
+      wire the shared place chain to this node directly.
   canonical_scripts:
     - pickup: scripts/pickup.py
   streaming: false
@@ -96,12 +94,11 @@ pickup
    `seat_xyz=Ref("in.pick_seat_xyz")`, `lift_xyz=Ref("in.pick_lift_xyz")`,
    `grasp_quat=Ref("in.pick_grasp_quat")`, plus `arm_id=Ref("in.pick_arm")` (or a
    literal `arm_id=0` with `pick_arm` omitted when the task pins the arm).
-   Returns `{grasped, held_offset, holding_arm, tape_in_giver, grasp_tcp, pick_arm}`.
+   Returns `{grasped, giver_held_offset, tape_in_giver, grasp_tcp, pick_arm}`.
 
 ```python
 sg.set_outputs(
-    held_offset=Ref("pickup.held_offset"),
-    holding_arm=Ref("pickup.holding_arm"),
+    giver_held_offset=Ref("pickup.giver_held_offset"),
     tape_in_giver=Ref("pickup.tape_in_giver"),
     grasp_tcp=Ref("pickup.grasp_tcp"),
     pick_arm=Ref("pickup.pick_arm"),
@@ -120,5 +117,5 @@ sg.set_outputs(
 - `tsh-route-arms-bimanual` — relays the chosen arm's grasp legs as `pick_*`.
 - `tsh-calculate-grasp-ring` — the underlying producer of the grasp legs (via `tsh-route-arms-bimanual`, or directly when there is no route).
 - `tsh-perceive-cv` — supplies `target_xyz` (rebound to `tape_xyz`).
-- `tsh-handover` — re-anchors `held_offset`/`holding_arm` to the receiver after an exchange.
+- `tsh-dispatch-route` — relays `giver_held_offset` forward as the shared `held_offset`.
 - `tsh-handover` — consumes `tape_in_giver` directly (the giver's grip, unambiguous regardless of route).
