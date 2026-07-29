@@ -48,13 +48,21 @@ from .constants import (
 
 
 class Output(TypedDict):
-    hover_xyz: Vec3       # approach hover over the wall midpoint
-    seat_xyz: Vec3        # descended seat (near finger in the hole)
-    lift_xyz: Vec3        # post-grasp lift, relative to grasp height
-    grasp_quat: Quaternion  # shared TCP orientation for all three legs
-    held_offset: Vec3     # predicted tape centre in the TCP frame at the seat
-    hole_radius: float    # inner hole radius (m)
-    rim_radius: float     # outer rim radius (m)
+    # Both arms in one pass: tsh-route-arms-bimanual needs BOTH arms' legs to
+    # decide which arm can grasp, so emitting them from a single node keeps the
+    # names plain (W8-checkable) instead of a per-instance <arm0|arm1>_ prefix.
+    arm0_hover_xyz: Vec3      # approach hover over the wall midpoint
+    arm0_seat_xyz: Vec3       # descended seat (near finger in the hole)
+    arm0_lift_xyz: Vec3       # post-grasp lift, relative to grasp height
+    arm0_grasp_quat: Quaternion  # shared TCP orientation for that arm's legs
+    arm0_held_offset: Vec3    # predicted tape centre in the TCP frame at the seat
+    arm1_hover_xyz: Vec3
+    arm1_seat_xyz: Vec3
+    arm1_lift_xyz: Vec3
+    arm1_grasp_quat: Quaternion
+    arm1_held_offset: Vec3
+    hole_radius: float    # inner hole radius (m) — the ring, not the arm
+    rim_radius: float     # outer rim radius (m) — the ring, not the arm
 
 
 def _as3(v) -> list:
@@ -81,19 +89,60 @@ def _radii_ok(hole_r, rim_r) -> bool:
                 and rim_r > hole_r + RING_RIM_MARGIN)
 
 
+def _arm_legs(ctx: NodeContext, arm_id: int, x: float, y: float, z: float,
+              hole_radius: float, rim_radius: float, fingertip_axial: float) -> dict:
+    """The three grasp legs + predicted held offset for ONE arm.
+
+    The grasp revolves ``GRASP_RING_ANGLE_DEG`` clockwise about the vertical hole
+    axis, plus an extra 90° CW when the arm's base sits on −Y so its fingers land
+    on the mirrored arc. That side flip is read from the arm base, so the two
+    arms genuinely differ — same ring, mirrored approach.
+    """
+    ring_dy = (hole_radius + rim_radius) / 2
+    ring_dx = float(fingertip_axial)
+    Rz = Rotation.from_rotvec([0.0, 0.0, -np.radians(GRASP_RING_ANGLE_DEG)])
+    base_y = ctx.tool("libero-yam.arm_base_pose", arm_id=arm_id)["position"][1]
+    if float(base_y) < 0.0:
+        Rz = Rotation.from_rotvec([0.0, 0.0, -np.radians(90.0)]) * Rz
+    off = Rz.apply([ring_dx, ring_dy, 0.0])
+    gx, gy = x + off[0], y + off[1]
+    qw0, qx0, qy0, qz0 = DOWN_QUAT
+    R_grasp = Rz * Rotation.from_quat([qx0, qy0, qz0, qw0])
+    rx, ry, rz, rw = R_grasp.as_quat()
+
+    # Tape centre relative to the TCP at the seat, in the TCP frame: the TCP
+    # sits at centre + off (world), so tape-in-TCP = R^-1 · (-off).
+    held_offset = R_grasp.inv().apply(-off).tolist()
+
+    def _xyz(zval: float) -> Vec3:
+        return {"x": float(gx), "y": float(gy), "z": float(zval)}
+
+    return {
+        "hover_xyz": _xyz(z + GRASP_PRE_DZ),
+        "seat_xyz": _xyz(z + GRASP_HOOK_DZ),
+        "lift_xyz": _xyz(z + GRASP_LIFT_CLEARANCE),
+        "grasp_quat": {"w": float(rw), "x": float(rx), "y": float(ry), "z": float(rz)},
+        "held_offset": {"x": float(held_offset[0]), "y": float(held_offset[1]),
+                        "z": float(held_offset[2])},
+    }
+
+
 def run(ctx: NodeContext, *, target_xyz: list, target_cloud, target_half_z: float,
-        arm_id: int, fingertip_axial: float, finger_half_gap: float) -> Output:
-    """Ring radii + grasp poses for ``arm_id`` at the perceived tape centre.
+        fingertip_axial: float, finger_half_gap: float) -> Output:
+    """Ring radii + grasp poses for BOTH arms at the perceived tape centre.
+
+    Emits arm0_* and arm1_* legs from one node because tsh-route-arms-bimanual
+    consumes both to decide which arm grasps — there is no point at which only
+    one arm's geometry is wanted, and one node keeps the output names plain.
 
     target_xyz:    world grasp point (body-centroid height), from perception.
     target_cloud:  world-frame ring point cloud, from perception.
     target_half_z: perceived half-thickness — locates the top face
                    (``top_z = center_z + half_z``) for the radii slab cut.
-    arm_id:        the arm these poses are for (either side works — the geometry
-                   mirrors from the arm base). Instantiate once per arm needed.
     fingertip_axial / finger_half_gap: FK-derived gripper offsets from this
                    subgraph's own derive_gripper_geometry node (the fingertip trails the TCP by
-                   ``fingertip_axial`` along the approach axis).
+                   ``fingertip_axial`` along the approach axis). finger_half_gap
+                   is not consumed by the current wall-midpoint geometry.
     """
     x, y, z = _as3(target_xyz)
 
@@ -109,34 +158,11 @@ def run(ctx: NodeContext, *, target_xyz: list, target_cloud, target_half_z: floa
             f"rim={rim_radius*1000:.1f}mm outside sanity band — degenerate cloud, "
             "no tuned fallback")
 
-    # Grasp geometry from the radii + gripper offsets.
-    ring_dy = (hole_radius + rim_radius) / 2
-    ring_dx = float(fingertip_axial)
-    Rz = Rotation.from_rotvec([0.0, 0.0, -np.radians(GRASP_RING_ANGLE_DEG)])
-    base_y = ctx.tool("libero-yam.arm_base_pose", arm_id=arm_id)["position"][1]
-    if float(base_y) < 0.0:
-        Rz = Rotation.from_rotvec([0.0, 0.0, -np.radians(90.0)]) * Rz
-    off = Rz.apply([ring_dx, ring_dy, 0.0])
-    gx, gy = x + off[0], y + off[1]
-    qw0, qx0, qy0, qz0 = DOWN_QUAT
-    R_grasp = Rz * Rotation.from_quat([qx0, qy0, qz0, qw0])
-    rx, ry, rz, rw = R_grasp.as_quat()
-    quat: Quaternion = {"w": float(rw), "x": float(rx), "y": float(ry), "z": float(rz)}
-
-    # Tape centre relative to the TCP at the seat, in the TCP frame: the TCP
-    # sits at centre + off (world), so tape-in-TCP = R^-1 · (-off).
-    held_offset = R_grasp.inv().apply(-off).tolist()
-
-    def _xyz(zval: float) -> Vec3:
-        return {"x": float(gx), "y": float(gy), "z": float(zval)}
-
-    return {
-        "hover_xyz": _xyz(z + GRASP_PRE_DZ),
-        "seat_xyz": _xyz(z + GRASP_HOOK_DZ),
-        "lift_xyz": _xyz(z + GRASP_LIFT_CLEARANCE),
-        "grasp_quat": quat,
-        "held_offset": {"x": float(held_offset[0]), "y": float(held_offset[1]),
-                        "z": float(held_offset[2])},
-        "hole_radius": hole_radius,
-        "rim_radius": rim_radius,
-    }
+    # Grasp geometry from the radii + gripper offsets, once per arm. The radii
+    # describe the ring and are shared; only the approach mirrors by arm side.
+    out: dict = {"hole_radius": hole_radius, "rim_radius": rim_radius}
+    for arm_id in (0, 1):
+        for leg, value in _arm_legs(ctx, arm_id, x, y, z,
+                                    hole_radius, rim_radius, fingertip_axial).items():
+            out[f"arm{arm_id}_{leg}"] = value
+    return out

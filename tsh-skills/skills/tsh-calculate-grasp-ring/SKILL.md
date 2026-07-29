@@ -1,7 +1,7 @@
 ---
 name: tsh-calculate-grasp-ring
 description: >
-  Ring radii + grasp poses for one arm. Derives the gripper's own grasp offsets
+  Ring radii + grasp poses for BOTH arms in one node. Derives the gripper's own grasp offsets
   (fingertip axial offset, finger half-gap) from the robot model via forward
   kinematics as an up-front internal step — self-configuring from the URDF, so
   a different gripper needs no re-tuning — then measures the ring's hole/rim
@@ -9,11 +9,11 @@ description: >
   from them: the TCP centres on the wall midpoint, the fingertip trails along
   the approach axis, and the grasp revolves about the vertical hole axis
   (mirrored for a −Y-side arm, read from the arm base). Emits the three grasp
-  legs (hover, seat, lift) as ready-to-plan world poses plus the predicted
-  held-tape offset, so the grasp geometry is computed once and consumed as
-  data (tsh-pickup executes it, tsh-route-arms-bimanual probes it).
-  Parameterized by arm_id. Pure geometry — it never plans or moves, and raises
-  on a degenerate cloud.
+  legs (hover, seat, lift) per arm as ready-to-plan world poses plus the
+  predicted held-tape offset, under plain arm0_/arm1_ names — so the grasp
+  geometry is computed once and consumed as data (tsh-pickup executes the
+  chosen arm's legs, tsh-route-arms-bimanual probes both to choose).
+  Pure geometry — it never plans or moves, and raises on a degenerate cloud.
 compatibility: requires gap>=0.1
 metadata:
   category: geometry
@@ -29,34 +29,26 @@ gap:
     target_cloud: PointCloud
     target_half_z: float
   produces_outputs:
-    "<arm0|arm1>_hover_xyz": Vec3
-    "<arm0|arm1>_seat_xyz": Vec3
-    "<arm0|arm1>_lift_xyz": Vec3
-    "<arm0|arm1>_grasp_quat": Quaternion
-    "<arm0|arm1>_held_offset": Vec3
+    arm0_hover_xyz: Vec3
+    arm0_seat_xyz: Vec3
+    arm0_lift_xyz: Vec3
+    arm0_grasp_quat: Quaternion
+    arm0_held_offset: Vec3
+    arm1_hover_xyz: Vec3
+    arm1_seat_xyz: Vec3
+    arm1_lift_xyz: Vec3
+    arm1_grasp_quat: Quaternion
+    arm1_held_offset: Vec3
     hole_radius: float
     rim_radius: float
   hard_rules:
     - >
-      arm_id is a LITERAL (0 or 1) baked into the node's inputs, never wired via
-      Ref("in.arm_id") — no upstream skill produces a bare arm_id output, so a
-      subgraph input by that name never auto-wires.
-    - >
-      The grasp-leg outputs carry an arm0_/arm1_ PREFIX matching this instance's
-      literal arm_id — arm_id=0 emits arm0_hover_xyz, arm_id=1 emits
-      arm1_hover_xyz, and so on for seat/lift/grasp_quat/held_offset. The script
-      returns unprefixed keys; the prefix is applied in set_outputs. Both
-      instances' legs are consumed SIMULTANEOUSLY by tsh-route-arms-bimanual
-      (it compares the arms to pick one), so unprefixed outputs would collide
-      under the latest-producer rule and route would probe one arm's poses
-      twice. hole_radius/rim_radius stay UNPREFIXED — they describe the ring,
-      not the arm, and are identical from either instance.
-    - >
-      derive_gripper_geometry runs unconditionally, once per instance (i.e.
-      once per arm_id) — unlike tsh-route-arms-bimanual's station-geometry
-      node, the gripper self-model is needed on EVERY grasp, not just some
-      routes, so it is wired as a plain first node rather than behind a
-      conditional exit.
+      ONE instance serves both arms — the script loops arm 0 and arm 1 and
+      returns arm0_*/arm1_* keys directly. Do not instantiate this skill per
+      arm: tsh-route-arms-bimanual consumes both arms' legs simultaneously to
+      choose between them, so there is no point at which only one arm's
+      geometry is wanted. hole_radius/rim_radius stay unprefixed — they
+      describe the ring, not the arm.
     - >
       Radii are measured on the cloud's TOP-FACE SLAB (top_z = center_z +
       half_z), never the full cloud — from an angled view the camera sees the
@@ -86,7 +78,7 @@ hole/rim radii off the cloud's top-face slab, then derives the grasp from
 them. Computing the pose once here means `tsh-route-arms-bimanual`'s probe and
 `tsh-pickup`'s grasp consume the same geometry as data and can't disagree.
 
-For the given arm it centres the TCP on the ring's wall midpoint
+For each arm it centres the TCP on the ring's wall midpoint
 `(hole_r + rim_r)/2`, trails the fingertip along the approach axis, and revolves
 about the vertical hole axis (plus 90° for a −Y-side arm, read from the base),
 returning the three grasp legs as world poses and the predicted tape-in-TCP
@@ -94,8 +86,8 @@ offset.
 
 ## When to use
 
-- Between perception and the grasp, to produce the ring-grasp geometry for a
-  given arm.
+- Between perception and the grasp, to produce the ring-grasp geometry both
+  arms' probes and the eventual grasp consume.
 
 ## When NOT to use
 
@@ -112,31 +104,14 @@ derive_gripper_geometry → calculate_grasp_ring
 
 1. **`derive_gripper_geometry`** — `type: script`,
    file `scripts/<sg>/gripper_geometry.py`, `inputs: {}`. Returns
-   `{fingertip_axial, finger_half_gap}`. Runs once per subgraph instance (i.e.
-   once per arm_id), unconditionally — every ring grasp needs its own gripper
-   offsets, so unlike station-geometry in `tsh-route-arms-bimanual` this node
-   is never gated behind a conditional exit.
+   `{fingertip_axial, finger_half_gap}`.
 2. **`calculate_grasp_ring`** — `type: script`, file
    `scripts/<sg>/calculate_grasp_ring.py`. Inputs:
    `target_xyz=Ref("in.target_xyz")`, `target_cloud=Ref("in.target_cloud")`,
-   `target_half_z=Ref("in.target_half_z")`, `arm_id=0` (a literal — one instance
-   per arm, e.g. `arm_id=0` and `arm_id=1`),
+   `target_half_z=Ref("in.target_half_z")`,
    `fingertip_axial=Ref("derive_gripper_geometry.fingertip_axial")`,
-   `finger_half_gap=Ref("derive_gripper_geometry.finger_half_gap")`. The script
-   returns unprefixed `{hover_xyz, seat_xyz, lift_xyz, grasp_quat, held_offset,
-   hole_radius, rim_radius}`; `set_outputs` applies this instance's arm prefix:
-
-```python
-sg.set_outputs(**{                       # instance with arm_id=0
-    "arm0_hover_xyz":   Ref("calculate_grasp_ring.hover_xyz"),
-    "arm0_seat_xyz":    Ref("calculate_grasp_ring.seat_xyz"),
-    "arm0_lift_xyz":    Ref("calculate_grasp_ring.lift_xyz"),
-    "arm0_grasp_quat":  Ref("calculate_grasp_ring.grasp_quat"),
-    "arm0_held_offset": Ref("calculate_grasp_ring.held_offset"),
-    "hole_radius":      Ref("calculate_grasp_ring.hole_radius"),
-    "rim_radius":       Ref("calculate_grasp_ring.rim_radius"),
-})
-```
+   `finger_half_gap=Ref("derive_gripper_geometry.finger_half_gap")`. No arm
+   input — it does both. Bind its twelve outputs straight through by name.
 
 Wire it linearly — `START → derive_gripper_geometry → calculate_grasp_ring →
 derived → END` — with `set_on_error("failed")`. Both scripts signal failure by
