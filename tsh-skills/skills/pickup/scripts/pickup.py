@@ -42,7 +42,7 @@ class Output(TypedDict):
     giver_held_offset: Vec3  # tape centre in the picking arm's TCP frame (m);
                        # rigid under the grip, so held-tape moves track it by
                        # FK. Anchored to the pickup perception at the seated
-                       # pre-close pose. dispatch-route relays this
+                       # pre-close pose. bimanual-dispatch-route relays this
                        # forward as the canonical held_offset on the direct
                        # exit; the handover rebinds held_offset to the
                        # receiver's measured offset on the other route.

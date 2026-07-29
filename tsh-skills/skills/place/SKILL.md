@@ -5,7 +5,7 @@ description: >
   tape off-centre (ring grasp or rim thread), so the tape is treated as the
   holder's end effector via the measured held_offset, composed once here to get
   the release TCP. Where/which-orientation come from calculate-place-pose; a preceding
-  transport-held-with-object node has already carried the arm to the hover above
+  transport-with-held-object node has already carried the arm to the hover above
   place_xyz. This skill only does the straight-down set-down and straight-up
   retract (curobo_linear_move), never a free transport. place_arm comes from
   bimanual-route-arms; when the task pins the arm, bind a literal and omit the input.
@@ -38,7 +38,7 @@ gap:
       plan — do NOT plan the bare TCP to the destination.
     - >
       This skill does NOT compute the reachable pose or do the hover approach —
-      those are calculate-place-pose and transport-held-with-object. By the time this node runs
+      those are calculate-place-pose and transport-with-held-object. By the time this node runs
       the arm must already be at the hover above place_xyz/place_quat.
   canonical_scripts:
     - place: scripts/place.py
@@ -57,7 +57,7 @@ reachable rest pose `calculate-place-pose` already probed; this node composes
 ## When to use
 
 - The terminal place node, always preceded by `calculate-place-pose` then
-  `transport-held-with-object`.
+  `transport-with-held-object`.
 
 ## When NOT to use
 
@@ -85,6 +85,6 @@ place
 ## See also
 
 - `calculate-place-pose` — computes `place_xyz`/`place_quat`.
-- `transport-held-with-object` — carries the arm to the hover before this node.
-- `dispatch-route` / `bimanual-handover` — supply `held_offset` (the giver's grip relayed, or the receiver's after an exchange).
+- `transport-with-held-object` — carries the arm to the hover before this node.
+- `bimanual-dispatch-route` / `bimanual-handover` — supply `held_offset` (the giver's grip relayed, or the receiver's after an exchange).
 - `bimanual-route-arms` — decides `place_arm`.

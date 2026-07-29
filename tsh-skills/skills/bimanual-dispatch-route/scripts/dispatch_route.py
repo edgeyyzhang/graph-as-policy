@@ -8,7 +8,7 @@ and exposes it as this subgraph's exit, so the top level maps two exits to two
 chains exactly the way it maps every other subgraph's exits.
 
 It also relays ``giver_held_offset`` forward as the canonical ``held_offset`` —
-the shared place chain (``calculate-place-pose`` / ``transport-held-with-object`` / ``place``)
+the shared place chain (``calculate-place-pose`` / ``transport-with-held-object`` / ``place``)
 needs that name to exist, and ``pickup`` deliberately does not produce it
 directly (see ``pickup``'s hard_rules), so a graph that wires the place
 chain before this node has no producer to bind and fails validation instead of
@@ -55,8 +55,8 @@ def run(ctx: NodeContext, *, route: str, giver_held_offset: Vec3,
     """
     if route not in ("direct", "needs_handover"):
         raise RuntimeError(
-            f"dispatch-route: unknown route {route!r} — expected the "
+            f"bimanual-dispatch-route: unknown route {route!r} — expected the "
             f"'direct' or 'needs_handover' value bimanual-route-arms emits")
-    print(f"[dispatch-route] {route} (holding_arm={pick_arm})", flush=True)
+    print(f"[bimanual-dispatch-route] {route} (holding_arm={pick_arm})", flush=True)
     return {"route": route, "held_offset": giver_held_offset,
             "holding_arm": int(pick_arm)}

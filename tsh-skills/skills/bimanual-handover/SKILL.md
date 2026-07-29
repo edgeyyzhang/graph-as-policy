@@ -3,7 +3,7 @@ name: bimanual-handover
 description: >
   Bimanual insertion handover: the RECEIVER leg only. The giver is assumed to
   already be presenting the tape face-on at the meet point (a preceding
-  transport-held-with-object instance carries it there). This node sweeps a rim clock
+  transport-with-held-object instance carries it there). This node sweeps a rim clock
   angle, threads a finger through the hole and closes, measures the tape centre
   in the receiver TCP frame (receiver_offset) before the giver releases, then the
   giver releases and retracts clear. Presentation orientations come from
@@ -60,7 +60,7 @@ gap:
       tape, not the transient dual-pinch.
     - >
       This skill has no present leg — it needs a preceding tsh-station-geometry →
-      transport-held-with-object (present) chain to bring the tape to the meet point.
+      transport-with-held-object (present) chain to bring the tape to the meet point.
       held_offset and place_arm alias the receiver's grip/arm so the place chain
       auto-wires to whoever holds the tape after the exchange.
   canonical_scripts:
@@ -71,7 +71,7 @@ gap:
 # bimanual-handover
 
 The RECEIVER half of the exchange. The giver's present move is a preceding
-`transport-held-with-object` instance's job (fed by `tsh-station-geometry`). This node
+`transport-with-held-object` instance's job (fed by `tsh-station-geometry`). This node
 picks up from there: the receiver opens, sweeps a rim clock angle for a reachable
 thread (the ring's symmetry is the reach margin), inserts along +X, and closes.
 Before the giver lets go, the tape centre is expressed in the receiver TCP frame
@@ -81,7 +81,7 @@ retracts and the receiver backs off on its own side.
 ## When to use
 
 - On the `needs_handover` route, after `pickup` → `tsh-station-geometry` → a
-  `transport-held-with-object` present instance, to transfer the tape to the receiver.
+  `transport-with-held-object` present instance, to transfer the tape to the receiver.
 
 ## When NOT to use
 
@@ -126,6 +126,6 @@ sg.set_outputs(
 - `bimanual-route-arms` — decides `needs_handover` and the giver/receiver
   arms, and derives the station geometry (meet point + presentation quats)
   consumed here.
-- `transport-held-with-object` — the required present chain (carries the tape to the meet point).
+- `transport-with-held-object` — the required present chain (carries the tape to the meet point).
 - `pickup` — supplies `tape_in_giver` + `rim_radius`.
 - `place` — consumes `held_offset` (the receiver's grip) after the exchange.

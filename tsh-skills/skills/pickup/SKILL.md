@@ -54,7 +54,7 @@ gap:
     - >
       This node deliberately does NOT produce a bare `held_offset` — that name
       is reserved for whichever holder is current at a given graph point.
-      `dispatch-route` relays `giver_held_offset` forward as `held_offset`
+      `bimanual-dispatch-route` relays `giver_held_offset` forward as `held_offset`
       on the direct exit; `bimanual-handover` provides it after an exchange. Do not
       wire the shared place chain to this node directly.
   canonical_scripts:
@@ -117,5 +117,5 @@ sg.set_outputs(
 - `bimanual-route-arms` — relays the chosen arm's grasp legs as `pick_*`.
 - `calculate-grasp-ring` — the underlying producer of the grasp legs (via `bimanual-route-arms`, or directly when there is no route).
 - `perceive-tape-cv` — supplies `target_xyz` (rebound to `tape_xyz`).
-- `dispatch-route` — relays `giver_held_offset` forward as the shared `held_offset`.
+- `bimanual-dispatch-route` — relays `giver_held_offset` forward as the shared `held_offset`.
 - `bimanual-handover` — consumes `tape_in_giver` directly (the giver's grip, unambiguous regardless of route).

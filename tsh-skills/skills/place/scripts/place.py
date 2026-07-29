@@ -9,7 +9,7 @@ via rigid-grip FK, no ground truth), composed once here to get the actual
 release TCP pose.
 
 WHERE/WHICH orientation come from ``calculate-place-pose`` (the yaw-reachability
-probe); a preceding ``transport-held-with-object`` node has already carried the arm
+probe); a preceding ``transport-with-held-object`` node has already carried the arm
 to the collision-aware hover above ``place_xyz``. This script only does the
 straight-down set-down and straight-up retract (``curobo_linear_move``,
 orientation locked) — the final legs, never a free transport.
@@ -48,7 +48,7 @@ def run(ctx: NodeContext, *, held_offset: Vec3, place_xyz: Vec3, place_quat: Qua
                  offset here.
     place_xyz:   the tape's final rest centre — from ``calculate-place-pose``.
     place_quat:  the reachable presentation orientation (wxyz) — from
-                 ``calculate-place-pose``; the preceding ``transport-held-with-object``
+                 ``calculate-place-pose``; the preceding ``transport-with-held-object``
                  node has already carried the arm to the hover above this.
     arm_id:      the holding arm (route-decided).
     """

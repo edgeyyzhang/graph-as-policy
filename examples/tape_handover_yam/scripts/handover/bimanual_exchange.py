@@ -2,7 +2,7 @@
 
 Both grippers point +X (gripper-z = +X). The giver is assumed to already be
 presenting the tape "o" face-on at the meet point — a preceding
-``transport-held-with-object`` instance (fed by ``tsh-station-geometry``'s
+``transport-with-held-object`` instance (fed by ``tsh-station-geometry``'s
 ``target_xyz``/``target_quat`` aliases) carries it there first, composing the
 measured ``tape_in_giver`` offset into its own tool_offset plan. This node
 picks up from there: the receiver threads a finger into the same hole. A naive
@@ -136,7 +136,7 @@ def run(ctx: NodeContext, *,
     """Transfer the tape from giver to receiver.
 
     The giver is assumed to already be presenting the tape at the meet point —
-    a preceding ``transport-held-with-object`` instance (fed by ``tsh-station-geometry``'s
+    a preceding ``transport-with-held-object`` instance (fed by ``tsh-station-geometry``'s
     ``target_xyz``/``target_quat`` aliases) carries it there first. This node
     starts directly at the receiver thread.
 
@@ -184,7 +184,7 @@ def run(ctx: NodeContext, *,
         return float(w[0]), float(w[1]), float(w[2])
 
     # 1. The giver is already presenting the tape at the meet point (a preceding
-    #    transport-held-with-object instance carried it there). Receiver opens and
+    #    transport-with-held-object instance carried it there). Receiver opens and
     #    pre-positions on its OWN Y side, level with the hole and backed off
     #    in -X, so its finger can sweep into the hole face along +X.
     #    Sweep the grasp angle around the ring circumference and take the first

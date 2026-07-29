@@ -10,7 +10,7 @@ description: >
   reachable. It also owns the handover station geometry (meet point +
   giver/receiver presentation orientations, derived from the two arm-base
   poses), which the exchange chain consumes. Runs before pickup (pickup
-  needs its pick_arm); dispatch-route acts on the ``route`` decision after
+  needs its pick_arm); bimanual-dispatch-route acts on the ``route`` decision after
   the grasp, where the two chains actually diverge.
 compatibility: requires gap>=0.1
 metadata:
@@ -79,7 +79,7 @@ gap:
     - >
       The station-geometry node also emits hold_target_xyz/hold_target_quat
       (aliases of meet_xyz/giver_quat) — the canonical destination pair
-      transport-held-with-object requires, which calculate-place-pose emits too, so the
+      transport-with-held-object requires, which calculate-place-pose emits too, so the
       PRESENT leg auto-wires by exact name exactly like the place legs. Never
       alias these to a bare target_xyz/target_quat: that generic name collides
       with the perception role prefix (perceive-tape-* also produces target_xyz,
@@ -161,5 +161,5 @@ Then `add_conditional_edges("station_geometry", {"direct": "direct",
 - `calculate-grasp-ring` — one node supplying both arms' grasp legs.
 - `pickup`, `bimanual-handover`, `place` — consumers of the arm ids.
 - `bimanual-handover` — consumer of `giver_quat` / `recv_quat`.
-- `transport-held-with-object` — its PRESENT instance consumes `meet_xyz` / `giver_quat` directly.
+- `transport-with-held-object` — its PRESENT instance consumes `meet_xyz` / `giver_quat` directly.
 - `scripts/_station_geometry.py` — the station-geometry derivation.

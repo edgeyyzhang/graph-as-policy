@@ -65,7 +65,7 @@ SG_SCRIPTS: dict[str, tuple[str, list[str]]] = {
                           "station_geometry.py", "_station_geometry.py"]),
     "pickup":           ("pickup",
                          ["pickup.py", "_ring.py", "_motion.py", "constants.py"]),
-    "present":          ("transport-held-with-object",
+    "present":          ("transport-with-held-object",
                          ["transport_held.py", "_held.py", "_motion.py"]),
     "handover":         ("bimanual-handover",
                          ["bimanual_exchange.py", "_motion.py", "constants.py"]),
@@ -240,7 +240,7 @@ def build_workflow() -> Workflow:
     wf.add_subgraph(sg)
 
     # -- handover branch: present (shared held-transport), then exchange ----
-    sg = Subgraph(name="present", skill="transport-held-with-object")
+    sg = Subgraph(name="present", skill="transport-with-held-object")
     for n, t in [("giver_arm", "int"), ("held_offset", "Vec3"),
                  ("meet_xyz", "Vec3"), ("giver_quat", "Quaternion"),
                  ("target_cloud", "PointCloud")]:

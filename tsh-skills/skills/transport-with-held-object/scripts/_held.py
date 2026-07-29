@@ -11,7 +11,7 @@ Two consumers share this core so they cannot drift apart:
   * the handover's giver PRESENT leg (tape centre to the meet point), and
   * the place approach (tape centre to the hover above the destination),
 
-plus the standalone ``transport-held-with-object`` skill node for any other
+plus the standalone ``transport-with-held-object`` skill node for any other
 held-object move ("hold the tape above stack N").
 
 ``approach_with_attached`` additionally attaches the object's perceived

@@ -6,7 +6,7 @@ description: >
   where the held object's centre should rest (destination top face + perceived
   half-thickness) and which yaw about the vertical is plannable, sweeping
   candidate yaws until the first reachable one is found (the round tape lays flat
-  identically at any yaw, so the sweep only trades reach). Feeds transport-held-with-object
+  identically at any yaw, so the sweep only trades reach). Feeds transport-with-held-object
   (the hover approach) and place (the descend/release) so both consume the
   same probed pose. place_arm comes from bimanual-route-arms; when the task pins the arm,
   bind a literal and omit the input.
@@ -35,7 +35,7 @@ gap:
   hard_rules:
     - >
       This node never executes a trajectory — it only probes reachability
-      (execute=False). The hover move is transport-held-with-object; the release is
+      (execute=False). The hover move is transport-with-held-object; the release is
       place.
     - >
       Rest height (place_xyz z) is DERIVED: destination top face + perceived
@@ -51,7 +51,7 @@ gap:
 # calculate-place-pose
 
 Factored out of `place` so the reachable-pose search — a pure planning probe,
-no side effects — is its own node: `transport-held-with-object` (hover approach) and
+no side effects — is its own node: `transport-with-held-object` (hover approach) and
 `place` (descend/release) both consume its `place_xyz`/`hover_xyz`/`place_quat`
 instead of re-deriving them. The target is the tape centre = perceived
 destination top-face centre + tape half-thickness (so it rests flush); the tape
@@ -64,7 +64,7 @@ reachable.
 
 ## When NOT to use
 
-- Standalone without `transport-held-with-object` + `place` following — this node only
+- Standalone without `transport-with-held-object` + `place` following — this node only
   computes a pose, it never moves the arm.
 
 ## Recommended subgraph state flow
@@ -88,5 +88,5 @@ place_pose
 ## See also
 
 - `perceive-tape-cv` — supplies `container_xyz`, `target_half_z`.
-- `transport-held-with-object` — consumes `hover_xyz`/`place_quat` for the approach.
+- `transport-with-held-object` — consumes `hover_xyz`/`place_quat` for the approach.
 - `place` — consumes `place_xyz`/`place_quat` for the descend/release.

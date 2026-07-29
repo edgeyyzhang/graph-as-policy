@@ -1,5 +1,5 @@
 ---
-name: transport-held-with-object
+name: transport-with-held-object
 description: >
   Move a HELD object's centre to a world target pose — the shared "tape-as-EE"
   transport. The measured rigid held_offset (object centre in the holder's TCP
@@ -8,7 +8,7 @@ description: >
   leg, the place hover approach, and any standalone "hold the object at X" step.
   Every input is identical on every instance — there is no per-instance
   renaming. holding_arm ships with held_offset from whoever last changed hands
-  (dispatch-route, then bimanual-handover), and hold_target_xyz/hold_target_quat
+  (bimanual-dispatch-route, then bimanual-handover), and hold_target_xyz/hold_target_quat
   carry the destination from calculate-place-pose (place legs) or from
   bimanual-route-arms's station-geometry node (present leg). Never bind a
   bare target_xyz/target_quat: that is perception's name for the picked
@@ -43,7 +43,7 @@ gap:
       The script's arm_id kwarg is ALWAYS Ref("in.holding_arm") — on every
       instance, both roles. held_offset and holding_arm are one datum (the
       object centre and the TCP frame it is expressed in), so every producer
-      emits them together: dispatch-route relays the giver's, bimanual-handover
+      emits them together: bimanual-dispatch-route relays the giver's, bimanual-handover
       re-anchors them to the receiver. Never declare a bare arm_id input, and
       never pick an arm name per-instance — the holder is data that arrives
       with the offset, not a wiring choice.
@@ -63,7 +63,7 @@ gap:
   streaming: false
 ---
 
-# transport-held-with-object
+# transport-with-held-object
 
 The factored-out common core of "move the thing I'm holding somewhere": the
 measured `held_offset` is composed into the planner's tool offset so a "put the
@@ -115,5 +115,5 @@ transport_held
 - `bimanual-route-arms` — its station-geometry node supplies
   `hold_target_xyz`/`hold_target_quat` (the meet pose) for the present instance.
 - `calculate-place-pose` — supplies `hold_target_xyz`/`hold_target_quat` for the place instances.
-- `dispatch-route` — supplies `held_offset`/`holding_arm` (the giver's) after the grasp.
+- `bimanual-dispatch-route` — supplies `held_offset`/`holding_arm` (the giver's) after the grasp.
 - `bimanual-handover` — re-anchors `held_offset`/`holding_arm` to the receiver after an exchange.

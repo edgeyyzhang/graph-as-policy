@@ -42,7 +42,7 @@ class Output(TypedDict):
     giver_quat: Quaternion  # giver present orientation, wxyz
     recv_quat: Quaternion   # receiver thread orientation, wxyz (canonical; exchange mirrors)
     hold_target_xyz: Vec3   # alias of meet_xyz — the canonical "where the held
-                            # object's centre goes" name transport-held-with-object requires,
+                            # object's centre goes" name transport-with-held-object requires,
                             # so the PRESENT leg auto-wires by exact name like the
                             # place legs do (calculate-place-pose emits the same pair).
                             # Deliberately NOT target_xyz, which would collide with

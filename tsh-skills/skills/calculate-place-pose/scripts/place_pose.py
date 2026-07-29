@@ -8,7 +8,7 @@ no execution: this node never moves the arm. The round tape lays flat
 identically at any yaw, so the sweep only trades reach; the first reachable
 yaw wins.
 
-Feeds ``transport-held-with-object`` (the collision-aware hover approach) and
+Feeds ``transport-with-held-object`` (the collision-aware hover approach) and
 ``place`` (the descend/release/retract legs) — factored out so both
 consume the SAME probed, reachable pose instead of each re-deriving it.
 """
@@ -49,7 +49,7 @@ class Output(TypedDict):
     hover_xyz: Vec3       # place_xyz raised by PLACE_Z_APPROACH — the approach target
     place_quat: Quaternion  # reachable presentation orientation (wxyz), first yaw that plans
     hold_target_xyz: Vec3   # alias of hover_xyz — the canonical "where the held
-                            # object's centre goes" name transport-held-with-object requires.
+                            # object's centre goes" name transport-with-held-object requires.
                             # Deliberately NOT target_xyz: that collides with
                             # perception's own target_xyz (the object's location)
                             # under the latest-producer rule, which silently sends

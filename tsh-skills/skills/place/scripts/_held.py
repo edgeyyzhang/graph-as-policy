@@ -7,7 +7,7 @@ composed relative to a target pose to get the actual TCP target
 (``place.py`` does this once, for the final rest pose).
 
 The collision-aware approach itself (attaching the object's perceived cloud
-as a cuRobo collision body) now lives in ``transport-held-with-object``, composed as
+as a cuRobo collision body) now lives in ``transport-with-held-object``, composed as
 a node ahead of this one — see ``calculate-place-pose`` for the reachable-pose probe
 that feeds both.
 """

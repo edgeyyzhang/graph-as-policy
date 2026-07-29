@@ -1,5 +1,5 @@
 ---
-name: dispatch-route
+name: bimanual-dispatch-route
 description: >
   Branch the graph on the route bimanual-route-arms already probed, after the grasp.
   bimanual-route-arms runs before pickup (pickup needs its pick_arm), but the branch
@@ -7,7 +7,7 @@ description: >
   carries that decision across the pickup: it re-reads the ``route`` field and
   exposes it as two exits, ``direct`` and ``needs_handover``. It also relays
   pickup's ``giver_held_offset`` forward as ``held_offset``, the name the
-  shared place chain (calculate-place-pose/transport-held-with-object/place) requires —
+  shared place chain (calculate-place-pose/transport-with-held-object/place) requires —
   pickup does not produce that name directly, so the place chain can only
   be wired downstream of this node (or of bimanual-handover, on the other route) —
   and pairs it with ``holding_arm`` (= pick_arm), the arm whose TCP frame that
@@ -49,7 +49,7 @@ gap:
   streaming: false
 ---
 
-# dispatch-route
+# bimanual-dispatch-route
 
 A control-flow node, not a decision-maker: `bimanual-route-arms` already did the
 reachability probing. This exists because the *decision point* (route, before the
@@ -93,5 +93,5 @@ dispatch ──(route=="direct")────────▶ direct → END
 - `bimanual-route-arms` — the probe that produced `route`.
 - `pickup` — supplies `giver_held_offset` / `pick_arm` (relayed here as
   `held_offset` / `holding_arm`).
-- `transport-held-with-object`, `calculate-place-pose` — the two branch destinations; both
+- `transport-with-held-object`, `calculate-place-pose` — the two branch destinations; both
   consume the `held_offset` + `holding_arm` pair.
