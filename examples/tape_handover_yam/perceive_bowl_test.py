@@ -4,7 +4,7 @@ yellow tape / gray duct tape (see LIBERO-YAM/libero_yam/bddl_files/
 libero_yam_tabletop/two_bowl_perceive.bddl and the flat-color bowl assets
 under LIBERO-YAM/libero_yam/assets/objects/libero/{yellow_bowl,gray_bowl}/).
 
-Runs both tsh-perceive-cv and tsh-perceive-sam against the SAME scene via a
+Runs both perceive-tape-cv and perceive-tape-sam against the SAME scene via a
 minimal observe->perceive graph, copying each skill's CURRENT canonical
 scripts into a temp dir at runtime (never a stale checked-in copy).
 
@@ -32,12 +32,12 @@ BDDL = (HERE.parents[2] / "LIBERO-YAM" / "libero_yam" / "bddl_files"
 SKILLS = [str(OPEN_ROBOT_SKILLS), str(TSH_SKILLS)]
 
 _SKILL_FILES = {
-    "tsh-perceive-cv": ["perceive_object_cv.py", "_perceive.py", "_perceive_cv.py", "constants.py"],
-    "tsh-perceive-sam": ["perceive_object.py", "_perceive.py", "constants.py"],
+    "perceive-tape-cv": ["perceive_object_cv.py", "_perceive.py", "_perceive_cv.py", "constants.py"],
+    "perceive-tape-sam": ["perceive_object.py", "_perceive.py", "constants.py"],
 }
 _ENTRY_SCRIPT = {
-    "tsh-perceive-cv": "scripts/perceive_object_cv.py",
-    "tsh-perceive-sam": "scripts/perceive_object.py",
+    "perceive-tape-cv": "scripts/perceive_object_cv.py",
+    "perceive-tape-sam": "scripts/perceive_object.py",
 }
 
 
@@ -77,8 +77,8 @@ def main() -> None:
     conn = libero_yam(bddl=str(BDDL), cameras=["agentview"])
     conn.reset()
 
-    for skill, query in (("tsh-perceive-cv", "yellow bowl"), ("tsh-perceive-cv", "gray bowl"),
-                         ("tsh-perceive-sam", "yellow bowl"), ("tsh-perceive-sam", "gray bowl")):
+    for skill, query in (("perceive-tape-cv", "yellow bowl"), ("perceive-tape-cv", "gray bowl"),
+                         ("perceive-tape-sam", "yellow bowl"), ("perceive-tape-sam", "gray bowl")):
         graph_dir = _materialize(skill, query)
         t0 = time.perf_counter()
         r = gap.execute(graph_dir, conn, skills=SKILLS)

@@ -2,7 +2,7 @@
 
 ``_perceive_cv.py`` segments by colour+height and hands its pixel mask to
 :func:`top_face_from_mask` here — the SAME back-projection + robust top-face
-math the DINO+SAM variant (``tsh-perceive-sam``) uses, so the two front-ends
+math the DINO+SAM variant (``perceive-tape-sam``) uses, so the two front-ends
 can't drift apart on the geometry they emit. No ground-truth pose, no object
 dimensions, and no scene-specific constants are assumed.
 """

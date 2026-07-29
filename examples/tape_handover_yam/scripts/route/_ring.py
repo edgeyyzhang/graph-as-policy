@@ -2,7 +2,7 @@
 
 Two consumers must agree bit-for-bit on the ring-grasp geometry:
 
-  * ``tsh-pickup`` executes the grasp,
+  * ``pickup`` executes the grasp,
   * ``tsh-route`` probes the SAME poses (``execute=False``) to decide which
     arm picks and whether a handover is needed.
 

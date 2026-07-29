@@ -48,7 +48,7 @@ class Output(TypedDict):
     grasp_tcp: list  # world TCP pose at close, [x,y,z,qw,qx,qy,qz]. A return leg
                      # replays this pose to put the tape back where it was picked.
     rim_radius: float  # passthrough of the perceived rim radius used for this
-                       # grasp — relayed to tsh-handover so the receiver's thread
+                       # grasp — relayed to bimanual-handover so the receiver's thread
                        # offset can derive from the same validated ring geometry.
     pick_arm: int      # echo of the arm that holds the tape (checkpoint anchor)
 
@@ -77,11 +77,11 @@ def run(ctx: NodeContext, *, tape_xyz: list, arm_id: int = 0,
     # ring radii from perception — both REQUIRED; fail loud if either is missing.
     if fingertip_axial is None or finger_half_gap is None:
         raise RuntimeError(
-            "tsh-pickup requires derived gripper offsets (fingertip_axial, "
+            "pickup requires derived gripper offsets (fingertip_axial, "
             "finger_half_gap) from tsh-gripper-geometry — none supplied")
     if hole_radius is None or rim_radius is None:
         raise RuntimeError(
-            "tsh-pickup requires perceived ring geometry (hole_radius, "
+            "pickup requires perceived ring geometry (hole_radius, "
             "rim_radius) from tsh-ring-geometry — none supplied")
 
     # tape_xyz may arrive as a Vec3 dict {x,y,z} (subgraph type coercion) or a seq.

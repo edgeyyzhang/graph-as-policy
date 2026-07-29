@@ -4,7 +4,7 @@ A pure geometry post-processor on the generic ``perceive_object`` output —
 no cameras, no tools, no scene constants. Splitting this out of perception
 keeps the perception skill object-agnostic (it works unchanged for the duct,
 a colour-sorted stack, or any tabletop object); only ring-grasp consumers
-(tsh-pickup, tsh-route) need radii, and only for ring-shaped targets.
+(pickup, tsh-route) need radii, and only for ring-shaped targets.
 
 Raises when the radii fall outside the sanity band (degenerate cloud) — no
 tuned fallback; the failure routes to ``on_error`` where the graph can

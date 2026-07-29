@@ -74,7 +74,7 @@ def run(ctx: NodeContext, *, held_offset: list, dest_xyz: list, arm_id: int = 1,
     """
     if tape_half_z is None:
         raise RuntimeError(
-            "tsh-place requires perceived tape_half_z from the perceive "
+            "place requires perceived tape_half_z from the perceive "
             "subgraph — none supplied (no tuned fallback)")
     offset_local = as_vec3(held_offset)
     seq = as_vec3(dest_xyz)

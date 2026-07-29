@@ -52,24 +52,24 @@ DEST_QUERY = "gray tape"       # colour-anchored query for the duct (place dest)
 # Canonical scripts each subgraph materializes into <out>/scripts/<sg>/,
 # copied from its skill's scripts dir: {sg_node: (skill_dir, [files])}.
 SG_SCRIPTS: dict[str, tuple[str, list[str]]] = {
-    "perceive_dest":    ("tsh-perceive-cv",
+    "perceive_dest":    ("perceive-tape-cv",
                          ["perceive_object_cv.py", "_perceive_cv.py",
                           "_perceive.py", "constants.py"]),
-    "perceive_target":  ("tsh-perceive-cv",
+    "perceive_target":  ("perceive-tape-cv",
                          ["perceive_object_cv.py", "_perceive_cv.py",
                           "_perceive.py", "constants.py"]),
     "ring_geometry":    ("tsh-ring-geometry",
                          ["ring_geometry.py", "_ring.py", "constants.py"]),
-    "route":            ("tsh-route-arms-bimanual",
+    "route":            ("bimanual-route-arms",
                          ["route.py", "_motion.py", "constants.py",
                           "station_geometry.py", "_station_geometry.py"]),
-    "pickup":           ("tsh-pickup",
+    "pickup":           ("pickup",
                          ["pickup.py", "_ring.py", "_motion.py", "constants.py"]),
-    "present":          ("tsh-transport-held",
+    "present":          ("transport-held-with-object",
                          ["transport_held.py", "_held.py", "_motion.py"]),
-    "handover":         ("tsh-handover",
+    "handover":         ("bimanual-handover",
                          ["bimanual_exchange.py", "_motion.py", "constants.py"]),
-    "place":            ("tsh-place",
+    "place":            ("place",
                          ["place.py", "_held.py", "_motion.py", "constants.py"]),
 }
 
@@ -118,7 +118,7 @@ def _perceive_subgraph(name: str, query: str, prefix: str, *,
                        center_field: str) -> Subgraph:
     """One generic perceive-object instance (appendix perception pattern):
     the query is a literal, the outputs are name-prefixed."""
-    sg = Subgraph(name=name, skill="tsh-perceive-cv")
+    sg = Subgraph(name=name, skill="perceive-tape-cv")
     sg.add_node("observe", type="tool", tool="robot.get_observation")
     sg.add_node("perceive", type="script",
                 script=f"scripts/{name}/perceive_object_cv.py",
@@ -176,7 +176,7 @@ def build_workflow() -> Workflow:
 
     # -- route: is a handover needed at all? (station geometry is derived
     #    only on the needs_handover branch — it's meaningless otherwise) -----
-    sg = Subgraph(name="route", skill="tsh-route-arms-bimanual")
+    sg = Subgraph(name="route", skill="bimanual-route-arms")
     for n, t in [("target_xyz", "Vec3"), ("dest_xyz", "Vec3"),
                  ("target_half_z", "float"), ("hole_radius", "float"),
                  ("rim_radius", "float"), ("fingertip_axial", "float"),
@@ -215,7 +215,7 @@ def build_workflow() -> Workflow:
     wf.add_subgraph(sg)
 
     # -- grasp --------------------------------------------------------------
-    sg = Subgraph(name="pickup", skill="tsh-pickup")
+    sg = Subgraph(name="pickup", skill="pickup")
     for n, t in [("target_xyz", "Vec3"), ("hole_radius", "float"),
                  ("rim_radius", "float"), ("fingertip_axial", "float"),
                  ("finger_half_gap", "float"), ("pick_arm", "int")]:
@@ -240,7 +240,7 @@ def build_workflow() -> Workflow:
     wf.add_subgraph(sg)
 
     # -- handover branch: present (shared held-transport), then exchange ----
-    sg = Subgraph(name="present", skill="tsh-transport-held")
+    sg = Subgraph(name="present", skill="transport-held-with-object")
     for n, t in [("giver_arm", "int"), ("held_offset", "Vec3"),
                  ("meet_xyz", "Vec3"), ("giver_quat", "Quaternion"),
                  ("target_cloud", "PointCloud")]:
@@ -261,7 +261,7 @@ def build_workflow() -> Workflow:
     sg.set_on_error("failed")
     wf.add_subgraph(sg)
 
-    sg = Subgraph(name="handover", skill="tsh-handover")
+    sg = Subgraph(name="handover", skill="bimanual-handover")
     for n, t in [("giver_arm", "int"), ("receiver_arm", "int"),
                  ("tape_in_giver", "Vec3"), ("rim_radius", "float"),
                  ("giver_quat", "Quaternion"), ("recv_quat", "Quaternion")]:
@@ -289,7 +289,7 @@ def build_workflow() -> Workflow:
     wf.add_subgraph(sg)
 
     # -- place (either branch; held_offset is the LATEST holder's grip) -----
-    sg = Subgraph(name="place", skill="tsh-place")
+    sg = Subgraph(name="place", skill="place")
     for n, t in [("held_offset", "Vec3"), ("dest_xyz", "Vec3"),
                  ("target_half_z", "float"), ("target_cloud", "PointCloud"),
                  ("place_arm", "int")]:

@@ -6,7 +6,7 @@ midpoint offset forward (+X) and up (+Z) by ~half the base separation, and the
 giver/receiver quaternions are the base-geometry presentation frame (approach ⊥
 baseline, finger-spread along baseline, up = world-up; receiver at splay 0). This
 reproduces the tuned MEET_XYZ / GIVER_QUAT / RECV_QUAT and self-configures for a
-restationed pair. tsh-handover consumes ``meet_xyz``, ``giver_quat``, ``recv_quat``.
+restationed pair. bimanual-handover consumes ``meet_xyz``, ``giver_quat``, ``recv_quat``.
 
 Pure geometry (arm bases only) — no reachability probe, since the geometric meet
 was validated reachable across the grid. A reachability-refined variant lives in
