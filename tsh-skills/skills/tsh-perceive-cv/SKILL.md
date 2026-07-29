@@ -9,7 +9,7 @@ description: >
   whose colour word selects the segmentation band ("yellow tape", "gray tape").
   Emits ROLE-prefixed geometry — target_ (object being picked) or container_
   (place destination) — that downstream skills wire by exact name.
-  raise_if_missing=False returns found=false for clean-all-items loops.
+  Leave raise_if_missing at its default: a miss RAISES and lands on on_error.
 compatibility: requires gap>=0.1
 metadata:
   category: perception
@@ -19,7 +19,7 @@ gap:
     - robot.get_observation
   exit_conditions:
     perceived: Target localized; outputs bound in the subgraph.
-    not_found: No colour+height blob matched (raise routes to on_error; with raise_if_missing=false, route the found=false field instead).
+    not_found: No colour+height blob matched — the script raises and this is the on_error symbol.
   required_inputs: {}
   produces_outputs:
     "<target|container>_found": bool
@@ -28,6 +28,19 @@ gap:
     "<target|container>_top_xyz": Vec3
     "<target|container>_half_z": float
   hard_rules:
+    - >
+      Do NOT pass raise_if_missing=False and branch on the found flag. Leave the
+      default: the script RAISES on a miss and the subgraph's on_error carries
+      it to not_found, so the flow stays observe -> perceive with no conditional
+      edge. Two failure modes come from doing otherwise, and both have bitten:
+      routing on the bool with mapping keys 'true'/'false' never matches,
+      because the executor stringifies a Python bool to 'True'/'False' and the
+      lookup fails at RUNTIME (validation only checks that mapping TARGETS are
+      declared nodes, never that the KEYS match the values the field emits);
+      and adding a require_found guard script that re-raises is an extra node
+      doing what the default already does. raise_if_missing=False exists only
+      for clean-all-items loops that route found=false to `done` — not for
+      single-item tasks, which is every graph here.
     - >
       The output prefix is EXACTLY one of two role words — target (object being
       picked) or container (place destination) — never the task's own noun for
@@ -83,16 +96,17 @@ observe → perceive
    (the query is a colour-anchored literal, not a Ref). Returns `{found, cloud,
    top_xyz, center_xyz, half_z}`.
 
-Rename the outputs to the role prefix in `set_outputs` — `target_*` for the grasp
-instance, `container_*` for the place-destination instance. For a clean-all-items
-loop, pass `raise_if_missing=False` and route on `perceive.found`.
+Two nodes, one edge, no branch: `START → observe → perceive → perceived → END`
+with `set_on_error("not_found")`. Rename the outputs to the role prefix in
+`set_outputs` — `target_*` for the grasp instance, `container_*` for the
+place-destination instance.
 
 ## Required end states
 
 | End state | Meaning |
 |---|---|
 | `perceived` | Target localized; route to the grasp / route chain. |
-| `not_found` | No match; route to `abort` — or `done` in item loops. |
+| `not_found` | No match; the script raised — route to `abort`. |
 
 ## See also
 

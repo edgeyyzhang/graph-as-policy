@@ -9,7 +9,7 @@ description: >
   target. Instantiated per object, parameterized by a literal object query, and
   emits ROLE-prefixed geometry (the same output contract as tsh-perceive-cv):
   target_ (object being picked) or container_ (place destination), wired by exact
-  name. raise_if_missing=False returns found=false for clean-all-items loops.
+  name. Leave raise_if_missing at its default: a miss RAISES onto on_error.
 compatibility: requires gap>=0.1
 metadata:
   category: perception
@@ -21,7 +21,7 @@ gap:
     - sam3.segment_box
   exit_conditions:
     perceived: Target localized; outputs bound in the subgraph.
-    not_found: DINO found no match (raise routes to on_error; with raise_if_missing=false, route the found=false field instead).
+    not_found: DINO found no match — the script raises and this is the on_error symbol.
   required_inputs: {}
   produces_outputs:
     "<target|container>_found": bool
@@ -30,6 +30,15 @@ gap:
     "<target|container>_top_xyz": Vec3
     "<target|container>_half_z": float
   hard_rules:
+    - >
+      Do NOT pass raise_if_missing=False and branch on the found flag. Leave the
+      default: the script RAISES on a miss and on_error carries it to not_found,
+      so the flow stays observe -> perceive with no conditional edge. Branching
+      on the bool fails at RUNTIME — mapping keys 'true'/'false' never match,
+      because the executor stringifies a Python bool to 'True'/'False', and
+      validation checks only that mapping TARGETS are declared nodes, never that
+      the KEYS match what the field emits. raise_if_missing=False exists only for
+      clean-all-items loops routing found=false to `done`.
     - >
       The output prefix is EXACTLY one of two role words — target (object being
       picked) or container (place destination) — never the task's own noun for
@@ -82,7 +91,8 @@ observe → perceive
 
 Rename the outputs to the role prefix in `set_outputs` — `target_*` for the grasp
 instance, `container_*` for the place-destination instance. For a clean-all-items
-loop, pass `raise_if_missing=False` and route on `perceive.found`.
+flow stays linear: `START -> observe -> perceive -> perceived -> END` with
+`set_on_error("not_found")` and no conditional edge.
 
 ## Required end states
 
