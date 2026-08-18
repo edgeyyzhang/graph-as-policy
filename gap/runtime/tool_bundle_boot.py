@@ -28,10 +28,19 @@ logger = logging.getLogger(__name__)
 
 
 def required_rpc_tool_bundles(
-    workflow_dir: str | Path, skill_registry: Any,
+    workflow_dir: str | Path, skill_registry: Any, tool_registry: Any = None,
 ) -> set[str]:
     """Bundle names a workflow references whose serving.protocol is
-    ``stdio-msgpack``."""
+    ``stdio-msgpack``.
+
+    When *tool_registry* is given, a bundle every one of whose referenced
+    tool names is already registered there is not required: the connector
+    provided those tools in-process, and in-process wins. Simulator
+    connectors (RoboSimStudio's ``ConnectorNewton``) register ``geometry.*``
+    and friends directly, and booting the same-named bundle over them was a
+    guaranteed name collision at graph startup — the bundle exists to serve
+    the tools, not to outrank a connector that already has.
+    """
     out: set[str] = set()
     if skill_registry is None:
         return out
@@ -62,10 +71,11 @@ def required_rpc_tool_bundles(
         for tool_name in getattr(info.meta, "allowed_tools", []) or []:
             candidate_tool_names.add(tool_name)
 
+    by_bundle: dict[str, set[str]] = {}
     for tool_name in candidate_tool_names:
-        bundle = tool_name.split(".", 1)[0]
-        if bundle in out:
-            continue
+        by_bundle.setdefault(tool_name.split(".", 1)[0], set()).add(tool_name)
+
+    for bundle, names in by_bundle.items():
         try:
             info = skill_registry.get(bundle)
         except Exception:
@@ -73,8 +83,15 @@ def required_rpc_tool_bundles(
         serving = getattr(info.meta, "serving", None)
         if serving is None:
             continue
-        if getattr(serving, "protocol", None) == "stdio-msgpack":
-            out.add(bundle)
+        if getattr(serving, "protocol", None) != "stdio-msgpack":
+            continue
+        if tool_registry is not None and all(n in tool_registry for n in names):
+            logger.info(
+                "tool bundle %r not booted: %s already provided in-process",
+                bundle, ", ".join(sorted(names)),
+            )
+            continue
+        out.add(bundle)
     return out
 
 
@@ -93,7 +110,7 @@ def boot_tool_bundles(
     in-process). The caller MUST call ``manager.shutdown_all()`` in a
     ``finally`` to terminate the subprocesses.
     """
-    required = required_rpc_tool_bundles(workflow_dir, skill_registry)
+    required = required_rpc_tool_bundles(workflow_dir, skill_registry, tool_registry)
     if not required:
         return None
 

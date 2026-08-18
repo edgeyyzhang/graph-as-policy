@@ -100,6 +100,20 @@ class ToolBundleManager:
 
                 tool_names: list[str] = []
                 for entry in client.catalog:
+                    if entry.name in self._tool_registry:
+                        existing = self._tool_registry.get(entry.name)
+                        if existing.transport != "rpc":
+                            # An in-process registration (a connector's own
+                            # tool) claims this name: in-process wins, and the
+                            # bundle's copy is simply not offered. A simulator
+                            # connector providing geometry.* directly is the
+                            # normal case, not an error.
+                            logger.info(
+                                "[tool-bundle:%s] %r already provided "
+                                "in-process; keeping the existing registration",
+                                name, entry.name,
+                            )
+                            continue
                     try:
                         self._tool_registry.register_rpc(
                             entry.name,
@@ -109,10 +123,9 @@ class ToolBundleManager:
                         )
                         tool_names.append(entry.name)
                     except ValueError as exc:
-                        # Name collision (another bundle exported the same
-                        # name, or an in-process tool already claims it).
-                        # Surface as a startup error — silent dispatch would
-                        # be confusing.
+                        # Name collision between two RPC bundles exporting the
+                        # same name. Surface as a startup error — silent
+                        # dispatch would be confusing.
                         client.close()
                         raise ToolBundleStartupError(
                             f"tool bundle {name!r}: cannot register "
