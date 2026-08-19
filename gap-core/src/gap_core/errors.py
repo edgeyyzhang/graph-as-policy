@@ -44,6 +44,17 @@ class ToolError(PipelineError):
         super().__init__(f"{tool}: {detail}")
 
 
+class ToolArgumentError(ToolError):
+    """A tool was called with a parameter it does not declare.
+
+    Its own error rather than a filtered-away no-op: an argument the tool
+    never accepts means the caller believes something false about the
+    contract, and dropping it returns the *default* result under an ok
+    status. The mistake then surfaces far downstream as behaviour — a grasp
+    that closes on the wrong axis — instead of at the call that caused it.
+    """
+
+
 class WorkflowValidationError(PipelineError):
     """Workflow JSON is structurally invalid."""
 

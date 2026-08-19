@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from gap_core.errors import ToolArgumentError
 from gap_core.tools.schema import UnitSchema, extract_schema
 
 logger = logging.getLogger(__name__)
@@ -143,15 +144,38 @@ class PythonAdapter:
         self._requires_ctx[name] = requires_ctx
 
     def invoke(self, name: str, ctx: Any | None, **kwargs: Any) -> Any:
+        """Call a registered tool, refusing arguments it does not declare.
+
+        This used to filter unknown keys out and call anyway. That is the
+        worst available behaviour for a code-writing caller: a policy that
+        asked ``robot.grasp_frame(yaw=-0.105)`` when the parameter is
+        ``close_heading_deg`` got the *default* frame back with a status of
+        ok, and every downstream symptom pointed somewhere else. An argument
+        the tool never declared is a contract error at the call site; say so
+        there, with the accepted names, rather than silently substituting a
+        default and letting the mistake surface as physics.
+        """
         fn = self._callables.get(name)
         if fn is None:
             raise KeyError(f"Python tool {name!r} not registered with this adapter")
         sig = inspect.signature(fn)
-        accepted = set(sig.parameters.keys()) - {"ctx"}
-        filtered = {k: v for k, v in kwargs.items() if k in accepted}
+        parameters = sig.parameters
+        # A tool that declares **kwargs has opted into arbitrary keys.
+        if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters.values()):
+            accepted_kwargs = dict(kwargs)
+        else:
+            accepted = set(parameters) - {"ctx"}
+            unknown = sorted(set(kwargs) - accepted)
+            if unknown:
+                raise ToolArgumentError(
+                    name,
+                    f"does not accept {', '.join(repr(u) for u in unknown)}; "
+                    f"its parameters are {', '.join(sorted(accepted)) or '(none)'}",
+                )
+            accepted_kwargs = kwargs
         if self._requires_ctx[name]:
-            return fn(ctx, **filtered)
-        return fn(**filtered)
+            return fn(ctx, **accepted_kwargs)
+        return fn(**accepted_kwargs)
 
 
 class RpcAdapter:
