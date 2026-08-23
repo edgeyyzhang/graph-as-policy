@@ -13,6 +13,7 @@ mechanics — it sees a flat catalog of typed tools.
 
 from __future__ import annotations
 
+import difflib
 import importlib.util
 import inspect
 import logging
@@ -26,6 +27,23 @@ from gap_core.errors import ToolArgumentError
 from gap_core.tools.schema import UnitSchema, extract_schema
 
 logger = logging.getLogger(__name__)
+
+
+def _with_suggestions(unknown: list[str], accepted: set[str]) -> str:
+    """``'arm' (did you mean 'arm_id'?)`` -- name the fix, not just the fault.
+
+    Most contract mistakes are near misses of a real parameter, because the
+    surface is not uniform: ``motion.plan_linear`` takes ``end`` while
+    ``motion.plan_joint`` takes ``pose``, and ``sim.check_grasp`` takes ``arm``
+    while everything else takes ``arm_id``. A caller regularizing one to the
+    other is reasoning correctly about an irregular surface, and the error is
+    the only place that can say so.
+    """
+    parts = []
+    for u in unknown:
+        close = difflib.get_close_matches(u, sorted(accepted), n=1, cutoff=0.6)
+        parts.append(f"{u!r} (did you mean {close[0]!r}?)" if close else repr(u))
+    return ", ".join(parts)
 
 ToolScope = Literal["runtime", "codegen"]
 ToolTransport = Literal["python", "rpc"]
@@ -160,16 +178,46 @@ class PythonAdapter:
             raise KeyError(f"Python tool {name!r} not registered with this adapter")
         sig = inspect.signature(fn)
         parameters = sig.parameters
+        # The ctx-injected parameter is passed positionally and is not always
+        # spelled "ctx" -- `register_callable(..., requires_ctx=True)` takes
+        # whatever the first parameter is called. Identify it by position, or
+        # nothing named `conn` reads as a caller-supplied argument.
+        injected = (
+            next(iter(parameters), None) if self._requires_ctx.get(name)
+            else ("ctx" if "ctx" in parameters else None)
+        )
         # A tool that declares **kwargs has opted into arbitrary keys.
         if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters.values()):
             accepted_kwargs = dict(kwargs)
         else:
-            accepted = set(parameters) - {"ctx"}
+            accepted = set(parameters) - ({injected} if injected else set())
             unknown = sorted(set(kwargs) - accepted)
             if unknown:
                 raise ToolArgumentError(
                     name,
-                    f"does not accept {', '.join(repr(u) for u in unknown)}; "
+                    f"does not accept {_with_suggestions(unknown, accepted)}; "
+                    f"its parameters are {', '.join(sorted(accepted)) or '(none)'}",
+                )
+            # A missing required argument reaches the caller as a TypeError
+            # naming the bound *method* -- "SimTools.check_grasp() missing 1
+            # required positional argument: 'object_name'" -- which names a
+            # class the policy author has never seen and cannot look up. Raise
+            # the same error the unknown-argument case raises, in terms of the
+            # tool, so both halves of the same mistake read alike.
+            missing = [
+                pname for pname, param in parameters.items()
+                if pname != injected
+                and pname not in kwargs
+                and param.default is inspect.Parameter.empty
+                and param.kind in (
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
+                )
+            ]
+            if missing:
+                raise ToolArgumentError(
+                    name,
+                    f"requires {', '.join(repr(m) for m in missing)}; "
                     f"its parameters are {', '.join(sorted(accepted)) or '(none)'}",
                 )
             accepted_kwargs = kwargs
