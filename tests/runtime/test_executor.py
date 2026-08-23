@@ -164,6 +164,50 @@ def test_conditional_routing_on_error_path(tmp_path: Path) -> None:
     assert ex.cross_subgraph_outputs["sg_work"] == {}
 
 
+def test_node_error_message_reaches_the_trace(tmp_path: Path) -> None:
+    """A routed failure still records *why* on the trace node.
+
+    Regression: the on_error path swallowed the exception into a log line, so
+    ``dag_trace.json`` carried ``status: error, error_message: null`` and no
+    consumer of the trace could tell a wrong grasp from a typo'd dict key.
+    """
+    def _boom() -> dict:
+        raise KeyError("z")
+
+    reg = _registry({"stub.work": _boom})
+    wf_dir = _write_workflow(tmp_path, _sg_workflow())
+
+    ex = _executor(wf_dir, reg)
+    with pytest.raises(PipelineError, match="failure"):
+        ex.execute()
+
+    ex.trace.flush()
+    trace = json.loads((wf_dir / "dag_trace.json").read_text())
+    node = next(n for n in trace["nodes"] if n["name"] == "sg_work.work")
+    assert node["status"] == "error"
+    # A bare KeyError stringifies to "'z'"; the type name is what makes it
+    # readable, so it has to be part of the recorded text.
+    assert node["error_message"] is not None
+    assert "KeyError" in node["error_message"]
+    assert "'z'" in node["error_message"]
+
+
+def test_terminal_failure_names_the_first_node_error(tmp_path: Path) -> None:
+    """The top-level error says what broke, not just which end node it hit."""
+    def _boom() -> dict:
+        raise RuntimeError("the fingers closed on nothing")
+
+    reg = _registry({"stub.work": _boom})
+    wf_dir = _write_workflow(tmp_path, _sg_workflow())
+
+    ex = _executor(wf_dir, reg)
+    with pytest.raises(PipelineError) as excinfo:
+        ex.execute()
+    message = str(excinfo.value)
+    assert "sg_work.work" in message
+    assert "the fingers closed on nothing" in message
+
+
 # ---------------------------------------------------------------------------
 # Parallel super-step fan-out with first-error cancellation
 # ---------------------------------------------------------------------------
@@ -414,6 +458,91 @@ def test_conditional_back_edge_loops_until_threshold(tmp_path: Path) -> None:
     assert ex.exit_status == "success"
     # step re-ran on each loop iteration until n reached the threshold.
     assert count["n"] == 3
+
+
+def test_a_looping_node_records_how_many_times_it_ran(tmp_path: Path) -> None:
+    """A retry ladder and a livelock differ only in the count.
+
+    Backward edges are the format's only loop and carry no bound, so a graph
+    that spins reports nothing but whatever the step budget did to it. The
+    count is the one number that separates the two.
+    """
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "decide.py").write_text(_LOOP_ROUTER_PY)
+
+    count = {"n": 0}
+
+    def _step() -> dict:
+        count["n"] += 1
+        return {"n": count["n"]}
+
+    reg = _registry({"stub.step": _step})
+    wf_dir = _write_workflow(tmp_path, {
+        "version": 3,
+        "meta": {},
+        "nodes": {
+            "step": {"type": "tool", "tool": "stub.step", "inputs": {}},
+            "decide": {
+                "type": "router", "script": "scripts/decide.py",
+                "inputs": {"n": {"$ref": "step.n"}},
+            },
+            "done": {"type": "end", "status": "success"},
+        },
+        "edges": [["START", "step"], ["step", "decide"]],
+        "conditional_edges": {
+            "decide": {"router_field": None,
+                       "mapping": {"loop": "step", "done": "done"}},
+        },
+    })
+
+    ex = _executor(wf_dir, reg)
+    ex.execute()
+    ex.trace.flush()
+
+    trace = json.loads((wf_dir / "dag_trace.json").read_text())
+    step = next(n for n in trace["nodes"] if n["name"] == "step")
+    assert step["visits"] == count["n"] > 1
+
+
+def test_a_terminal_error_is_not_routed_to_on_error(tmp_path: Path) -> None:
+    """"The episode ended" must stop the graph, not send it round again.
+
+    A recovery loop answering a closed world by calling another tool raises
+    the same thing forever; one study episode spun 9,186 times that way.
+    """
+    class WorldGone(RuntimeError):
+        terminal = True
+
+    calls = {"n": 0}
+
+    def _boom() -> dict:
+        calls["n"] += 1
+        raise WorldGone("the simulation bus closed: the episode ended")
+
+    reg = _registry({"stub.work": _boom})
+    wf_dir = _write_workflow(tmp_path, _sg_workflow())
+
+    ex = _executor(wf_dir, reg)
+    with pytest.raises(NodeExecutionError, match="episode ended"):
+        ex.execute()
+    # Propagated on the first raise rather than routed into the recovery path.
+    assert calls["n"] == 1
+    assert ex.exit_status is None
+
+
+def test_an_ordinary_failure_still_routes(tmp_path: Path) -> None:
+    """The terminal check must not swallow the on_error exit it guards."""
+    def _boom() -> dict:
+        raise PipelineError("the fingers closed on nothing")
+
+    reg = _registry({"stub.work": _boom})
+    wf_dir = _write_workflow(tmp_path, _sg_workflow())
+
+    ex = _executor(wf_dir, reg)
+    with pytest.raises(PipelineError, match="failure"):
+        ex.execute()
+    assert ex.exit_status == "failure"
 
 
 def test_unbounded_conditional_loop_trips_cap(tmp_path: Path) -> None:

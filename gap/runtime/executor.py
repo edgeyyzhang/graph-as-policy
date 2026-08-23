@@ -31,9 +31,11 @@ from typing import Any
 
 from gap_core.errors import (
     GraphValidationError,
+    NodeExecutionError,
     PipelineError,
     TaskCancelled,
     VerificationFailed,
+    is_terminal,
 )
 from gap_core.tools import guards
 
@@ -59,6 +61,29 @@ from .workflow import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _typed_error_text(exc: BaseException) -> str:
+    """``TypeName: message``, because the message alone is often not enough.
+
+    A bare ``KeyError`` stringifies to ``'z'`` and a ``PipelineError`` raised
+    by a policy's own check stringifies to the sentence its author wrote. Only
+    the type separates "my code indexed a field that is not there" from "my
+    check fired" -- and that is the first thing a reader has to decide.
+    """
+    message = str(exc)
+    return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
+
+
+def _node_error_text(exc: BaseException) -> str:
+    """The sentence a reader needs: which node, what kind, and what it said.
+
+    ``NodeExecutionError`` carries the node id but renders its cause with
+    ``str()``, which drops the cause's type. Rebuild it so the type survives.
+    """
+    if isinstance(exc, NodeExecutionError):
+        return f"Node {exc.node_id!r} failed: {_typed_error_text(exc.cause)}"
+    return _typed_error_text(exc)
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +273,10 @@ class WorkflowExecutor:
         # ("success" | "failure"), or None if it never reached one.
         self.exit_status: str | None = None
 
+        # First node error of the current execute(), kept so the terminal
+        # failure can name a cause instead of only an end-node label.
+        self._first_node_error: str | None = None
+
         self._stream_grace_s = float(
             os.environ.get("GAP_PARALLEL_CANCEL_GRACE_S", "2.0"),
         )
@@ -261,6 +290,7 @@ class WorkflowExecutor:
         guards.reset_counters()
         self.checkpoint_results = []
         self.exit_status = None
+        self._first_node_error = None
 
         issues = validate_workflow(
             self.workflow,
@@ -352,8 +382,12 @@ class WorkflowExecutor:
         if node.status == "success":
             logger.info("Workflow terminated at end node %r (success)", terminal)
             return
+        detail = (
+            f"; first node error -- {self._first_node_error}"
+            if self._first_node_error else ""
+        )
         raise PipelineError(
-            f"workflow terminated at end node {terminal!r} (failure)"
+            f"workflow terminated at end node {terminal!r} (failure){detail}"
         )
 
     # ------------------------------------------------------------------
@@ -616,6 +650,7 @@ class WorkflowExecutor:
 
         self.trace.start_node(full_id)
         success = False
+        error_text: str | None = None
         try:
             resolved = resolve_inputs(node.inputs, scope.local_outputs)
             self.trace.record_resolved_inputs(full_id, resolved)
@@ -643,8 +678,22 @@ class WorkflowExecutor:
                 )
             success = True
             return result
+        except Exception as exc:
+            # The message is the only record of *why* a node failed, and a
+            # failure is routed, not propagated: `_run_subgraph` catches this
+            # and takes the `on_error` exit. Without recording it here the
+            # reason survives only in the log stream, so every consumer of
+            # dag_trace.json -- the visualizer, and any feedback loop reading
+            # the trace -- sees `status: error, error_message: null` and has
+            # to guess. Record, then let it propagate unchanged.
+            error_text = _node_error_text(exc)
+            raise
         finally:
             self.trace.end_node(full_id, success)
+            if error_text is not None:
+                self.trace.record_error(full_id, error_text)
+                if self._first_node_error is None:
+                    self._first_node_error = f"{full_id}: {error_text}"
             # Incremental flush: a crash mid-run (segfault, OOM kill, disk
             # full during video render) previously lost the WHOLE trace —
             # node_data/ was on disk but dag_trace.json never existed, so
@@ -698,7 +747,11 @@ class WorkflowExecutor:
                 scope_name=sg_name,
             )
         except Exception as exc:
-            if sg.on_error is None:
+            if sg.on_error is None or is_terminal(exc):
+                # Terminal means the world this graph acts on is gone -- the
+                # episode ended under it. Routing would send the graph around
+                # its recovery edge to call another tool that raises the same
+                # thing, forever. See `gap_core.errors.is_terminal`.
                 raise
             logger.warning(
                 "subgraph %r raised %s; routing to on_error=%r",

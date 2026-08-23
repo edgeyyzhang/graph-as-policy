@@ -48,6 +48,13 @@ class NodeTrace:
     error_message: str | None = None
     has_inputs: bool = False
     has_output: bool = False
+    visits: int = 0
+    """Times this node ran in the episode. A backward edge is the only loop
+    the format has and it carries no bound, so a retry ladder and a livelock
+    look identical from the outside -- until the count is printed. Runs that
+    spun a graph thousands of times reported only that the simulation bus had
+    closed, which reads as infrastructure trouble rather than as a policy that
+    never stopped trying."""
     assets: list[str] = field(default_factory=list)
 
 
@@ -361,6 +368,7 @@ class DagTrace:
         if node:
             node.started_at = time.time()
             node.status = "running"
+            node.visits += 1
             self._record_event(
                 "node_started",
                 node_name=name,
@@ -457,7 +465,7 @@ class DagTrace:
                 detail={"asset_count": len(all_assets), "keys": sorted(resolved.keys())},
             )
         except Exception:
-            logger.debug("Failed to record inputs for %s", name, exc_info=True)
+            logger.warning("Failed to record inputs for %s", name, exc_info=True)
 
     def record_output(self, name: str, output: Any) -> None:
         """Serialize node output to disk and extract visual assets."""
@@ -493,7 +501,7 @@ class DagTrace:
                 detail={"asset_count": len(all_assets)},
             )
         except Exception:
-            logger.debug("Failed to record output for %s", name, exc_info=True)
+            logger.warning("Failed to record output for %s", name, exc_info=True)
 
     def record_request(
         self,
@@ -514,7 +522,7 @@ class DagTrace:
             with open(node_dir / "request.meta.json", "w") as f:
                 json.dump(meta, f, indent=2)
         except Exception:
-            logger.debug("Failed to record request for %s", name, exc_info=True)
+            logger.warning("Failed to record request for %s", name, exc_info=True)
         else:
             node = self._node_map.get(name)
             self._record_event(
@@ -568,7 +576,7 @@ class DagTrace:
                 detail={"seq": seq, "tool": tool},
             )
         except Exception:
-            logger.debug(
+            logger.warning(
                 "Failed to record subcall %d for %s", seq, node_name, exc_info=True,
             )
 
@@ -624,7 +632,7 @@ class DagTrace:
                 },
             )
         except Exception:
-            logger.debug(
+            logger.warning(
                 "Failed to record stream read %d for %s", seq, node_name, exc_info=True,
             )
 
@@ -727,6 +735,7 @@ class DagTrace:
                     "error_message": n.error_message,
                     "has_inputs": n.has_inputs,
                     "has_output": n.has_output,
+                    "visits": n.visits,
                     "assets": n.assets,
                 }
                 for n in self._nodes
