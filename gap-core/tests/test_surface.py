@@ -87,6 +87,9 @@ def test_schema_type_registry_resolves():
     from gap_core.schema import TYPE_REGISTRY, resolve_type
     assert "Se3Pose" in TYPE_REGISTRY
     assert resolve_type("Se3Pose") is TYPE_REGISTRY["Se3Pose"]
+    # The feature/payload/plan/curve vocabulary the manipulation skills declare.
+    for name in ("FunctionalFeature", "AttachedObject", "PoseSequence", "Centerline"):
+        assert name in TYPE_REGISTRY, name
 
 
 def test_no_gap_runtime_import_at_load():

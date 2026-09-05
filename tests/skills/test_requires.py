@@ -62,6 +62,27 @@ def test_full_block_round_trips(tmp_path: Path):
     )
 
 
+def test_connector_entries_round_trip(tmp_path: Path):
+    md = write_bundle(
+        tmp_path,
+        requires="  requires: {connector: [motion.plan_joint, sim.query]}\n",
+    )
+    meta = parse_skill_md(md)
+    assert meta.requires == SkillRequires(connector=["motion.plan_joint", "sim.query"])
+
+
+def test_connector_entry_shape_rejected(tmp_path: Path):
+    """A connector entry is a flat tool name, ``<prefix>.<name>``; a bare
+    word or an empty string would be an entry nothing could ever resolve."""
+    for bad in ('[""]', "[noprefix]", '["Motion.Plan"]'):
+        md = write_bundle(
+            tmp_path, name=f"req-conn-{abs(hash(bad)) % 1000}",
+            requires=f"  requires: {{connector: {bad}}}\n",
+        )
+        with pytest.raises(ValueError, match="requires.connector entries"):
+            parse_skill_md(md)
+
+
 def test_absent_vs_explicitly_empty(tmp_path: Path):
     absent = parse_skill_md(write_bundle(tmp_path, name="req-absent"))
     assert absent.requires is None
