@@ -72,8 +72,9 @@ def test_skills_meta_dataclasses_construct():
     assert serving.command == ["python", "-m", "x"]
     assert serving.protocol == "in-process"
 
-    req = SkillRequires(gpu=True)
+    req = SkillRequires(gpu=True, connector=["motion.plan_joint"])
     assert req.gpu is True
+    assert req.connector == ["motion.plan_joint"]
 
     cs = CanonicalScript(name="n", path="scripts/n.py")
     assert cs.name == "n"
