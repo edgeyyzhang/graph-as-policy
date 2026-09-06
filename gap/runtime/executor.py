@@ -954,28 +954,41 @@ class WorkflowExecutor:
         cannot run without a declared input, and failing here names the
         input, where failing later names whatever the script did with
         ``None``.
+
+        Each call-site input is resolved **on its own**, and one that cannot
+        be resolved falls through to the next source rather than failing the
+        call. Before these inputs were honoured at all they were ignored
+        wholesale, so a graph carrying a stale ``$ref`` beside inputs its
+        upstream subgraphs already produce ran perfectly well; resolving the
+        dict as a unit turned every such graph into a load-time abort. The
+        shipped expert tool-hanging graph is one: its realign node passes
+        ``$ref realign.held_object_in_tcp``, no node produces that field, and
+        the six of eight episodes it used to hang became zero.
         """
         site: dict[str, Any] = {}
+        unresolved: dict[str, str] = {}
         if node is not None and node.inputs:
             local = scope.local_outputs if scope is not None else {}
-            passed = {k: v for k, v in node.inputs.items() if k in sg.inputs}
-            if passed:
+            for in_name, spec in node.inputs.items():
+                if in_name not in sg.inputs:
+                    continue
                 try:
-                    site = resolve_inputs(passed, local)
-                except Exception as exc:  # noqa: BLE001 - reported as a bind failure
-                    raise PipelineError(
-                        f"subgraph node for {sg_name!r}: cannot resolve the "
-                        f"inputs it passes ({sorted(passed)}): {exc}"
-                    ) from exc
+                    site[in_name] = resolve_inputs({in_name: spec}, local)[in_name]
+                except Exception as exc:  # noqa: BLE001 - recorded, then the next source is tried
+                    unresolved[in_name] = str(exc)
         bound: dict[str, Any] = {}
         for in_name in sg.inputs:
             value = site.get(in_name)
             if value is None:
                 value = self._lookup_cross_subgraph_output(in_name)
             if value is None:
+                detail = (
+                    f"; the calling node passes one but it does not resolve ({unresolved[in_name]})"
+                    if in_name in unresolved
+                    else " and the calling node passes no value for it"
+                )
                 raise PipelineError(
-                    f"subgraph {sg_name!r} input {in_name!r} has no upstream "
-                    f"producer and the calling node passes no value for it"
+                    f"subgraph {sg_name!r} input {in_name!r} has no upstream producer{detail}"
                 )
             bound[in_name] = value
         return bound

@@ -1033,3 +1033,38 @@ def test_unbound_subgraph_input_leaves_a_trace_naming_the_node(tmp_path: Path) -
     errors = [e for e in trace["events"] if e["event_type"] == "error_recorded"]
     assert errors and errors[0]["node_name"] == "run"
     assert "arm_id" in errors[0]["detail"]["error"]
+
+
+def test_a_stale_call_site_ref_falls_through_to_the_upstream_producer(tmp_path: Path) -> None:
+    """One unresolvable input must not sink the call.
+
+    Before call-site inputs were honoured they were ignored wholesale, so a
+    graph carrying a stale `$ref` beside inputs its upstream subgraphs
+    produce ran fine. The shipped expert tool-hanging graph is one of those:
+    resolving the passed dict as a unit turned six of eight hung wrenches
+    into a load-time abort in every episode.
+    """
+    seen: list[int] = []
+    reg = _registry({
+        "stub.const": lambda value: {"value": value},
+        "stub.use": lambda arm_id: seen.append(arm_id) or {"arm_id": arm_id},
+    })
+    wf_dir = _write_workflow(tmp_path, _passing_workflow({"arm_id": {"$ref": "seed.missing"}}))
+    ex = _executor(wf_dir, reg, trace_dir=tmp_path / "trace")
+    ex.initial_inputs = {"arm_id": 3}
+    ex.execute()
+    assert seen == [3], "the upstream value stands in for the ref that would not resolve"
+
+
+def test_an_input_no_source_answers_names_both_attempts(tmp_path: Path) -> None:
+    """With nothing upstream either, the error says the ref was tried and why."""
+    reg = _registry({
+        "stub.const": lambda value: {"value": value},
+        "stub.use": lambda arm_id: {"arm_id": arm_id},
+    })
+    wf_dir = _write_workflow(tmp_path, _passing_workflow({"arm_id": {"$ref": "seed.missing"}}))
+    ex = _executor(wf_dir, reg, trace_dir=tmp_path / "trace")
+    with pytest.raises(PipelineError) as excinfo:
+        ex.execute()
+    message = str(excinfo.value)
+    assert "arm_id" in message and "does not resolve" in message
