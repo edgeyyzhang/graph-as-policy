@@ -74,9 +74,13 @@ def test_connector_entries_round_trip(tmp_path: Path):
 def test_connector_entry_shape_rejected(tmp_path: Path):
     """A connector entry is a flat tool name, ``<prefix>.<name>``; a bare
     word or an empty string would be an entry nothing could ever resolve."""
-    for bad in ('[""]', "[noprefix]", '["Motion.Plan"]'):
+    for index, bad in enumerate(('[""]', "[noprefix]", '["Motion.Plan"]')):
+        # The name is the loop position, not a hash of the string: str.hash is
+        # randomised per process (pytest-randomly sets PYTHONHASHSEED), so two
+        # of the three could land in one bucket and the second mkdir would
+        # raise FileExistsError on some runs and not others.
         md = write_bundle(
-            tmp_path, name=f"req-conn-{abs(hash(bad)) % 1000}",
+            tmp_path, name=f"req-conn-{index}",
             requires=f"  requires: {{connector: {bad}}}\n",
         )
         with pytest.raises(ValueError, match="requires.connector entries"):
