@@ -907,6 +907,88 @@ def test_script_node_typed_run(tmp_path: Path) -> None:
     assert ex.cross_subgraph_outputs["sg_script"]["y"] == 15
 
 
+_OPTIONAL_PY = '''\
+from typing import NotRequired, TypedDict
+
+
+class Out(TypedDict):
+    y: int
+    measured: NotRequired[float]
+
+
+def run(ctx, x: int) -> Out:
+    # The measurement exists only on some runs; that is what NotRequired says.
+    return {"y": x * 3}
+'''
+
+
+_MISSING_REQUIRED_PY = '''\
+from typing import NotRequired, TypedDict
+
+
+class Out(TypedDict):
+    y: int
+    measured: NotRequired[float]
+
+
+def run(ctx, x: int) -> Out:
+    return {"measured": 1.5}
+'''
+
+
+def _typed_script_workflow(tmp_path: Path, body: str) -> Path:
+    scripts = tmp_path / "scripts"
+    scripts.mkdir(exist_ok=True)
+    (scripts / "compute.py").write_text(body)
+    return _write_workflow(tmp_path, {
+        "version": 3,
+        "meta": {},
+        "nodes": {
+            "run_sg": {"type": "subgraph", "ref": "sg_script"},
+            "done": {"type": "end", "status": "success"},
+        },
+        "edges": [["START", "run_sg"]],
+        "conditional_edges": {"run_sg": {"router_field": "exit", "mapping": {"ok": "done"}}},
+        "subgraphs": {
+            "sg_script": {
+                "skill": "stub_skill",
+                "inputs": {},
+                "outputs": {"y": {"$ref": "compute.y"}},
+                "nodes": {
+                    "compute": {"type": "script", "script": "scripts/compute.py", "inputs": {"x": 5}},
+                    "ok": {"type": "noop"},
+                },
+                "edges": [["START", "compute"], ["compute", "ok"], ["ok", "END"]],
+                "conditional_edges": {},
+                "exit": {"router_field": None, "success_values": ["ok"]},
+            },
+        },
+    })
+
+
+def test_script_may_omit_a_not_required_output(tmp_path: Path) -> None:
+    """``NotRequired`` declares a key that MAY be absent, and the executor honours it.
+
+    Reading every annotation instead of ``__required_keys__`` made a script that
+    returns a measurement only when it has one fail on the runs where it has
+    none -- so the author's only options were to drop the annotation or return a
+    placeholder. A shipped cable script had dropped it, with a comment saying
+    why, and every early return in another one raised here.
+    """
+    ex = _executor(_typed_script_workflow(tmp_path, _OPTIONAL_PY), _registry({}))
+    ex.execute()
+
+    assert ex.exit_status == "success"
+    assert ex.cross_subgraph_outputs["sg_script"]["y"] == 15
+
+
+def test_script_omitting_a_required_output_still_fails(tmp_path: Path) -> None:
+    """The check still binds on the keys the TypedDict requires."""
+    ex = _executor(_typed_script_workflow(tmp_path, _MISSING_REQUIRED_PY), _registry({}))
+    with pytest.raises(NodeExecutionError, match="missing declared key 'y'"):
+        ex.execute()
+
+
 # ---------------------------------------------------------------------------
 # execute() facade
 # ---------------------------------------------------------------------------
