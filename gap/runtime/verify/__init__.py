@@ -16,6 +16,7 @@ from gap.runtime.verify.checkpoints import (
     load_checkpoints,
 )
 from gap.runtime.verify.world import (
+    Articulation,
     Body,
     BodyNotFoundError,
     Robot,
@@ -29,6 +30,7 @@ from gap.runtime.verify.world import (
 )
 
 __all__ = [
+    "Articulation",
     "Body",
     "BodyNotFoundError",
     "Checkpoint",

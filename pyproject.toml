@@ -16,12 +16,16 @@ classifiers = [
   "Operating System :: POSIX :: Linux",
 ]
 
-# Core stays lean: no gRPC, no protobuf, no torch (other than the LIBERO sim
-# pin below). Heavy model deps live in open-robot-skills (one pip extra per
-# tool bundle); sim deps live in the [libero] extra. The connector's default
-# motion-planning backend is cuRobo, shipped by the open-robot-skills curobo
-# tool bundle; PyRoKi (CPU-JAX, in-process) is available as an opt-in
-# fallback via the [pyroki] extra for no-GPU machines / 6-DOF arms.
+# Core stays lean: no gRPC, no protobuf, no torch, no MuJoCo, no CUDA build
+# step. Heavy model deps live in open-robot-skills (one pip extra per tool
+# bundle); the sim stack lives in the [libero] extra and the motion-planning
+# backend in [curobo]. Nothing in `gap/` imports either at module scope
+# (`gap/__init__.py` is lazy by design), so the lean core is genuinely
+# importable on its own — that is what lets gap drop into a host project that
+# already pins its own mujoco/robosuite. The dev box is unaffected: the `sim`
+# dependency group below is a default group and pulls both extras back in, so
+# a bare `uv sync` installs exactly what it installed before.
+# PyRoKi (CPU-JAX, in-process) remains an opt-in [pyroki] IK fallback.
 dependencies = [
   # Bundle-author surface (workspace sibling): @tool decorator, gap_core.types,
   # gap_core.errors, gap_core.schema, gap_core.skills.meta, gap_core.rpc. Tool
@@ -50,29 +54,39 @@ dependencies = [
   "imageio[ffmpeg]>=2.31",
   "viser>=0.2.3",
 
-  # Robotics: URDF + robot descriptions + cuRobo (the default IK / motion
-  # backend). cuRobo JIT-compiles CUDA extensions at install time, so
-  # `[tool.uv].no-build-isolation-package = ["nvidia-curobo"]` is already
-  # set below and `CUDA_HOME` must point at a toolkit matching torch's CUDA
-  # when running `uv sync`. PyRoKi moved to the [pyroki] extra below for the
-  # no-GPU / 6-DOF YAM opt-in path.
+  # Robotics: URDF + robot descriptions. Both are pure-Python and lazily
+  # imported (gap/connector/ik.py, gap/viz/replay3d.py). cuRobo — the default
+  # IK / motion backend — moved to the [curobo] extra: it JIT-compiles CUDA
+  # extensions at install time and so cannot be a baseline dep of a package
+  # that must install on a CPU box.
   "robot_descriptions>=1.16.0",
   "yourdfpy>=0.0.56",
-  "nvidia-curobo @ git+https://github.com/NVlabs/curobo.git@4ea77366ca48ee453e7df139e39fa6532af49f3b",
-  "cuda-core[cu12]>=0.7",
   "trimesh",
 
   # Real-robot msgpack bridge (robots_realtime)
   "msgpack>=1.0",
   "msgpack-numpy>=0.4.8",
 
+  # The vab fork's task schema (libero.vab.schema) is pydantic v2; also used
+  # by gap's own config models, so it stays baseline.
+  "pydantic>=2.0",
+
   # NotRequired backport for py3.10
   "typing_extensions>=4.10; python_version < '3.11'",
+]
 
-  # LIBERO sim stack (Variational-Automation-Benchmark fork + robosuite).
-  # Vendored as third_party submodules and resolved via [tool.uv.sources] —
-  # the dev/CI box always runs the sim, so promote these from an opt-in
-  # extra to baseline deps. `gap run --sim …` works out of the box.
+[project.optional-dependencies]
+# LIBERO simulation stack (quickstart, benchmark). The posvar LIBERO fork and
+# robosuite are vendored submodules wired via [tool.uv.sources] below; pip
+# users: `pip install -e third_party/Variational-Automation-Benchmark -e third_party/robosuite`.
+#
+# This is an extra rather than a baseline dep because `robosuite` and `mujoco`
+# are exactly the names a host project pins for itself. gap's connector reads
+# the simulator through duck-typing (gap/connector/world_adapter.py never
+# imports mujoco), so a host that already has its own MuJoCo can install the
+# lean core beside it. The dev/CI box gets the stack anyway via the default
+# `sim` dependency group below — `uv sync` is unchanged.
+libero = [
   # Physics-exact pin: the dev tree's uv.lock resolved 3.6.0 and the
   # acceptance numbers were measured on it — MuJoCo minors change contact
   # dynamics enough to move grasp/drop success rates materially.
@@ -95,22 +109,21 @@ dependencies = [
   "cloudpickle>=2.1.0",
   "mediapy>=1.2.4",
   "tyro>=0.9.17",
-  # The vab fork's task schema (libero.vab.schema) is pydantic v2.
-  "pydantic>=2.0",
   # Classic-suite init states are torch pickles (libero.benchmark imports
   # torch at module scope) — pin explicitly rather than riding robomimic's
   # loose transitive requirement.
   "torch>=2.7",
 ]
-
-[project.optional-dependencies]
-# LIBERO simulation stack (quickstart, benchmark). The posvar LIBERO fork and
-# robosuite are vendored submodules wired via [tool.uv.sources] below; pip
-# users: `pip install -e third_party/Variational-Automation-Benchmark -e third_party/robosuite`.
-libero = []   # historical alias: the LIBERO sim stack is now a baseline
-              # dep (see [project.dependencies]). Kept as an empty extra so
-              # `pip install graph-as-policy[libero]` and meta-extras that
-              # reference `[libero]` don't break.
+# cuRobo: the default IK / motion-planning backend behind the connector and
+# the open-robot-skills `curobo` tool bundle. Separated from baseline because
+# it JIT-compiles CUDA extensions at install time — `CUDA_HOME` must point at
+# a toolkit matching torch's CUDA, and `[tool.uv].no-build-isolation-package`
+# below is already set for it. Without this extra the connector falls back to
+# its analytic/[pyroki] IK path.
+curobo = [
+  "nvidia-curobo @ git+https://github.com/NVlabs/curobo.git@4ea77366ca48ee453e7df139e39fa6532af49f3b",
+  "cuda-core[cu12]>=0.7",
+]
 # In-process PyRoKi IK fallback (CPU-JAX). Opt-in only — the default
 # connector backend is cuRobo (open-robot-skills[curobo]). Pick this extra
 # when running without a GPU, or when targeting 6-DOF YAM which cuRobo
@@ -136,9 +149,9 @@ policy = [
 # open-robot-skills bundle set, resolved from the side-by-side checkout via
 # [tool.uv.sources] below. Per-bundle dependencies and setup stay declared
 # bundle-by-bundle in open-robot-skills/pyproject.toml (one extra per bundle).
-quickstart = ["graph-as-policy[libero]", "open-robot-skills[quickstart]"]
-grocery = ["graph-as-policy[libero]", "open-robot-skills[grocery]"]
-all = ["graph-as-policy[libero,ray,vertex,policy]", "open-robot-skills[all]"]
+quickstart = ["graph-as-policy[libero,curobo]", "open-robot-skills[quickstart]"]
+grocery = ["graph-as-policy[libero,curobo]", "open-robot-skills[grocery]"]
+all = ["graph-as-policy[libero,curobo,ray,vertex,policy]", "open-robot-skills[all]"]
 
 [dependency-groups]
 # Installed by default with `uv sync` (pip users: `pip install --group dev`).
@@ -148,6 +161,13 @@ dev = [
   "ruff>=0.5",
   "mypy>=1.10",
 ]
+# The dev/CI box always runs the sim and always has CUDA, so the sim stack and
+# cuRobo come back by default here — a bare `uv sync` in this repo installs
+# what it always did. They are declared as *extras* (above) rather than
+# baseline deps so that `pip install graph-as-policy`, and any host project
+# that pins its own mujoco/robosuite, gets the lean core instead.
+# Opt out with `uv sync --no-group sim`.
+sim = ["graph-as-policy[libero,curobo]"]
 
 [project.scripts]
 gap = "gap.cli:main"
@@ -171,6 +191,10 @@ open-robot-skills = { path = "../open-robot-skills", editable = true }
 graph-as-policy-core = { workspace = true }
 
 [tool.uv]
+# `sim` is a default group (see [dependency-groups]): it re-adds the [libero]
+# and [curobo] extras so this repo's own `uv sync` behaviour is unchanged.
+default-groups = ["dev", "sim"]
+
 # sam3's published metadata over-pins numpy==1.26, which is unsolvable next to
 # its own decord2 dependency in one strict resolution; the measured release
 # environment runs sam3 on numpy 2.x (same override as open-robot-skills' uv.lock).

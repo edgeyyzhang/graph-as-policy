@@ -58,6 +58,7 @@ class CheckpointResult:
     name: str
     subgraph: str
     passed: bool
+    validate: bool = True
     eval_error: str | None = None
     diagnostics: dict | None = None
     eval_time_s: float = 0.0
@@ -67,6 +68,7 @@ class CheckpointResult:
             "name": self.name,
             "subgraph": self.subgraph,
             "passed": self.passed,
+            "validate": self.validate,
             "eval_error": self.eval_error,
             "diagnostics": self.diagnostics,
             "eval_time_s": self.eval_time_s,
@@ -123,6 +125,7 @@ def evaluate_checkpoint(
         name=checkpoint.name,
         subgraph=checkpoint.subgraph,
         passed=passed,
+        validate=checkpoint.validate,
         eval_error=eval_error,
         diagnostics=diagnostics,
         eval_time_s=time.perf_counter() - t0,

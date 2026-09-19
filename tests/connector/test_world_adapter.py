@@ -116,6 +116,51 @@ def test_object_pose_from_sim_state(world):
     np.testing.assert_allclose(cube.quaternion_wxyz, [1.0, 0.0, 0.0, 0.0])
 
 
+def test_privileged_accessors_share_the_public_motion_frame():
+    adapter = LiberoWorldAdapter(make_fake_env())
+    assert adapter.reference_frame_name() == "robot_base"
+    position, quat = adapter.object_pose("cube")
+    center, half, box_quat = adapter.object_box("cube")
+
+    # Raw MuJoCo x is 0.1, but LIBERO's camera and robot APIs use the
+    # robot-base/public-world frame: 0.1 - (-0.4) == 0.5.
+    np.testing.assert_allclose(position, [0.5, 0.0, 0.42])
+    np.testing.assert_allclose(center, [0.5, 0.0, 0.42])
+    np.testing.assert_allclose(half, [0.02, 0.02, 0.02])
+    np.testing.assert_allclose(quat, [1.0, 0.0, 0.0, 0.0])
+    np.testing.assert_allclose(box_quat, [1.0, 0.0, 0.0, 0.0])
+
+
+def test_named_frames_and_collision_features_use_public_frame():
+    env = make_fake_env()
+    model, data = env.handle.env.sim.model, env.handle.env.sim.data
+    geom_names = [
+        "table_collision", "base_collision", "gripper_collision",
+        "cube_collision", "bowl_collision",
+    ]
+    model.geom_name2id = lambda name: geom_names.index(name)
+    model.geom_id2name = lambda index: geom_names[index]
+    model.site_name2id = lambda name: {"cube_site": 0}[name]
+    data.geom_xpos = data.body_xpos[model.geom_bodyid].copy()
+    data.geom_xmat = np.tile(np.eye(3).reshape(1, 9), (len(geom_names), 1))
+    data.site_xpos = np.array([[0.12, 0.01, 0.43]])
+
+    adapter = LiberoWorldAdapter(env)
+    assert adapter.collision_feature_contact_pairs() == [
+        ("cube_collision", "table_collision"),
+        ("cube_collision", "gripper_collision"),
+    ]
+
+    geom_position, geom_quat = adapter.named_frame_pose("cube_collision")
+    site_position, site_quat = adapter.named_frame_pose("cube_site")
+    body_position, _body_quat = adapter.named_frame_pose("cube_main")
+    np.testing.assert_allclose(geom_position, [0.5, 0.0, 0.42])
+    np.testing.assert_allclose(site_position, [0.52, 0.01, 0.43])
+    np.testing.assert_allclose(body_position, [0.5, 0.0, 0.42])
+    np.testing.assert_allclose(geom_quat, [1.0, 0.0, 0.0, 0.0])
+    np.testing.assert_allclose(site_quat, [1.0, 0.0, 0.0, 0.0])
+
+
 def test_aabbs_from_model_geoms(world):
     cube = world.body("cube")
     assert cube.bottom_z == pytest.approx(0.40)
@@ -170,6 +215,72 @@ def test_refresh_after_reset_rebuilds(world):
     assert set(w2.body_names()) == {"cube", "bowl", "table"}
 
 
+def test_articulated_root_obb_tracks_live_child_joint_motion():
+    names = _BODY_NAMES + ["drawer_main", "drawer_link"]
+
+    class ArticulatedModel(FakeModel):
+        def __init__(self):
+            super().__init__()
+            self.nbody = 8
+            self.body_parentid = np.concatenate([self.body_parentid, [0, 6]])
+            self.body_pos = np.vstack([self.body_pos, [0, 0, 0], [0.10, 0, 0]])
+            self.body_quat = np.vstack([
+                self.body_quat,
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+            ])
+            self.geom_bodyid = np.concatenate([self.geom_bodyid, [6, 7]])
+            self.geom_type = np.concatenate([self.geom_type, [_GEOM_BOX, _GEOM_BOX]])
+            self.geom_size = np.vstack([
+                self.geom_size,
+                [0.10, 0.10, 0.10],
+                [0.05, 0.05, 0.05],
+            ])
+            self.geom_pos = np.vstack([self.geom_pos, [0, 0, 0], [0, 0, 0]])
+            self.geom_quat = np.vstack([
+                self.geom_quat,
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+            ])
+            self.geom_rbound = np.linalg.norm(self.geom_size, axis=1)
+
+        def body_name2id(self, name):
+            return names.index(name)
+
+        def body_id2name(self, bid):
+            return names[bid]
+
+    model = ArticulatedModel()
+    data = FakeData()
+    data.body_xpos = np.vstack([
+        data.body_xpos,
+        [0.20, 0.0, 0.50],
+        [0.30, 0.0, 0.50],
+    ])
+    data.body_xquat = np.vstack([
+        data.body_xquat,
+        [1.0, 0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0],
+    ])
+    data.cvel = np.vstack([data.cvel, np.zeros((2, 6))])
+    sim = SimpleNamespace(model=model, data=data)
+    env = SimpleNamespace(
+        handle=SimpleNamespace(env=SimpleNamespace(
+            sim=sim, obj_body_id={"drawer": 6}
+        ))
+    )
+    adapter = LiberoWorldAdapter(env)
+
+    before_center, before_half, _ = adapter.object_box("drawer")
+    data.body_xpos[7, 0] = 0.50  # slide the drawer link after reset
+    after_center, after_half, _ = adapter.object_box("drawer")
+    part_center, _, _ = adapter.object_box("drawer_link")
+
+    assert after_center[0] > before_center[0]
+    assert after_half[0] > before_half[0]
+    assert part_center[0] == pytest.approx(0.90)  # live world x + 0.4 base offset
+
+
 def test_obs_dict_fallback_without_sim():
     """No reachable MuJoCo sim → cube_poses (GetState source) fallback."""
 
@@ -185,6 +296,22 @@ def test_obs_dict_fallback_without_sim():
     can = world.body("soup_can")
     np.testing.assert_allclose(can.position, [0.2, 0.1, 0.45])
     assert can.aabb_upper[2] > can.aabb_lower[2]
+
+
+def test_describe_workspace_measures_before_first_snapshot():
+    from gap.connector import SimConnector
+
+    from .conftest import FakeEnvConfig, FakeIK
+
+    conn = SimConnector(make_fake_env(), FakeEnvConfig(), ik=FakeIK())
+    assert conn._world_adapter is None
+
+    workspace = conn.describe_workspace()
+
+    assert conn._world_adapter is not None
+    assert workspace["source"] == "measured"
+    assert workspace["surface_z"] == pytest.approx(0.40)
+    assert workspace["transport_z"] == pytest.approx(0.65)
 
 
 def test_simconnector_world_snapshot_wired():

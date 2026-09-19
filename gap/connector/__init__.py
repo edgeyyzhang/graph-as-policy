@@ -16,14 +16,21 @@ from __future__ import annotations
 from gap.connector.collector import DataCollector
 from gap.connector.core import Capabilities, Connector
 from gap.connector.real import RealConnector, real
+from gap.connector.robosuite import RobosuiteConnector, robosuite
+from gap.connector.scene_adapter import PrivilegedSceneAdapter
 from gap.connector.sim import SimConnector, sim
+from gap.connector.world_adapter import MujocoSceneAdapter
 
 __all__ = [
     "Capabilities",
     "Connector",
     "DataCollector",
     "RealConnector",
+    "RobosuiteConnector",
     "SimConnector",
+    "MujocoSceneAdapter",
+    "PrivilegedSceneAdapter",
     "real",
+    "robosuite",
     "sim",
 ]

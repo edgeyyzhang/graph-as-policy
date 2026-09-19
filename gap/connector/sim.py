@@ -49,11 +49,36 @@ class SimConnector(Connector):
         ik: Any | None = None,
         record_video: bool = False,
         seed: int | None = None,
+        scene_adapter: Any | None = None,
+        task_flags_provider: Any | None = None,
+        condition_definitions: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(env, config, camera_names=camera_names, ik=ik)
         self._record_video = bool(record_video)
         self._pending_seed = seed
-        self._world_adapter: Any | None = None
+        self._world_adapter: Any | None = scene_adapter
+        self._task_flags_provider = task_flags_provider
+        self._condition_definitions = dict(condition_definitions or {})
+
+    def get_task_flags(self) -> dict[str, Any]:
+        """Return adapter-owned task state, including history-dependent latches."""
+        if callable(self._task_flags_provider):
+            flags = self._task_flags_provider()
+            if not isinstance(flags, dict):
+                try:
+                    flags = dict(flags)
+                except Exception as exc:
+                    raise ToolError(
+                        "sim.get_task_flags",
+                        "task_flags_provider must return a mapping",
+                    ) from exc
+            return dict(flags)
+        completed, _reward = self.check_success()
+        return {"native_success": bool(completed)}
+
+    def get_condition_definitions(self) -> dict[str, Any]:
+        """Named benchmark conditions available to the portable evaluator."""
+        return dict(self._condition_definitions)
 
     # ------------------------------------------------------------------
     # Capabilities
@@ -71,6 +96,8 @@ class SimConnector(Connector):
 
     def _supports_world_state(self) -> bool:
         """Ground-truth world snapshots need a reachable MuJoCo sim."""
+        if self._world_adapter is not None:
+            return True
         try:
             from gap.connector.world_adapter import find_mujoco_sim
 
@@ -98,6 +125,15 @@ class SimConnector(Connector):
            summary="Enable or disable in-sim video frame capture.")
         rc("sim.save_video", self.save_video,
            summary="Encode buffered video frames to an mp4 file.")
+        # Privileged scene geometry. Registered unconditionally, like the rest
+        # of sim.*: the codegen catalog is built from an env-less connector,
+        # so gating on a reachable MuJoCo here would hide these from the graph
+        # generator entirely. Whether the privilege is actually available is
+        # advertised by `capabilities.world_state`, and a connector without it
+        # fails these calls with a named error rather than a wrong answer.
+        from gap.connector.privileged import PrivilegedSimTools
+
+        PrivilegedSimTools(self).register(reg)
 
     # ------------------------------------------------------------------
     # Reset / step / success (absorbed SimBridgeServicer)
@@ -243,13 +279,48 @@ class SimConnector(Connector):
 
         return {"arm_states": arm_states, "objects": objects}
 
-    def world_snapshot(self):
-        """Build a :class:`gap.runtime.verify.World` from sim ground truth."""
+    def _ensure_world_adapter(self):
+        """Return the injected provider, or lazily build the LIBERO default."""
         if self._world_adapter is None:
             from gap.connector.world_adapter import LiberoWorldAdapter
 
             self._world_adapter = LiberoWorldAdapter(self.env)
-        return self._world_adapter.snapshot()
+        return self._world_adapter
+
+    def world_snapshot(self):
+        """Build a :class:`gap.runtime.verify.World` from sim ground truth."""
+        return self._ensure_world_adapter().snapshot()
+
+    def _workspace_payload(self) -> dict:
+        """Measure the table height instead of taking the configured one.
+
+        ``surface_z`` drives every hover, lift and descent floor, and it is
+        the one number that genuinely varies scene to scene. In sim the top of
+        the table body is known exactly, so read it; fall back to the config
+        value when the scene has no table.
+        """
+        payload = super()._workspace_payload()
+        adapter = self._ensure_world_adapter()
+        try:
+            surface = getattr(adapter, "workspace_surface_box", None)
+            if callable(surface):
+                box = surface()
+            else:
+                names = list(adapter.object_names())
+                tables = [n for n in names if n.lower() in {"table", "table_top"}]
+                box = adapter.object_box(tables[0]) if len(tables) == 1 else None
+        except Exception:  # noqa: BLE001 — a missing table is not an error
+            return payload
+        if box is None:
+            return payload
+        center, half, _quat = box
+        payload["surface_z"] = float(center[2] + half[2])
+        # Only the derived cruise height follows the measurement; an
+        # explicitly configured transport_z is a deliberate choice and stands.
+        if self._workspace_spec().transport_z is None:
+            payload["transport_z"] = payload["surface_z"] + 0.25
+        payload["source"] = "measured"
+        return payload
 
     # ------------------------------------------------------------------
     # Video (absorbed EnableVideoCapture / SaveVideo)
@@ -324,6 +395,9 @@ def sim(
     headless: bool = True,
     seed: int | None = None,
     record_video: bool = False,
+    scene_adapter_factory: Any | None = None,
+    task_flags_provider: Any | None = None,
+    condition_definitions: dict[str, Any] | None = None,
     **env_kwargs: Any,
 ) -> SimConnector:
     """Build a :class:`SimConnector` for a registered simulation backend.
@@ -340,6 +414,13 @@ def sim(
         seed: Seed applied by the connector's first ``reset()``.
         record_video: Construct with render enabled and start frame capture
             on reset.
+        scene_adapter_factory: Optional ``factory(env_obj)`` implementing
+            ``PrivilegedSceneAdapter``. Omit for the built-in LIBERO/MuJoCo
+            provider.
+        task_flags_provider: Optional ``provider(env_obj) -> Mapping`` for
+            benchmark flags and history-dependent latches.
+        condition_definitions: Optional named relation trees used by
+            ``{"ref": "..."}`` conditions.
         **env_kwargs: Extra keyword arguments forwarded to the env factory.
     """
     try:
@@ -374,6 +455,15 @@ def sim(
         camera_names=cameras,
         record_video=record_video,
         seed=seed,
+        scene_adapter=(
+            scene_adapter_factory(env_obj)
+            if callable(scene_adapter_factory) else None
+        ),
+        task_flags_provider=(
+            (lambda: task_flags_provider(env_obj))
+            if callable(task_flags_provider) else None
+        ),
+        condition_definitions=condition_definitions,
     )
 
 

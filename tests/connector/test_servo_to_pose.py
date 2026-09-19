@@ -64,5 +64,11 @@ def test_servo_stall_raises_tool_error():
 
     stub, _ = _stub([0.40, 0.0, 0.30], move=False)
     pose = {"position": {"x": 0.45, "y": 0.04, "z": 0.25}, "rotation": None}
-    with pytest.raises(ToolError):
+    with pytest.raises(ToolError) as excinfo:
         Connector._servo_to_pose(stub, pose, stall_ticks=10, max_ticks=200)
+    message = str(excinfo.value)
+    assert "after 11/200 ticks (patience=10)" in message
+    assert "target=(0.4500,0.0400,0.2500)" in message
+    assert "achieved=(0.4000,0.0000,0.3000)" in message
+    assert stub._last_motion_diagnostic["status"] == "stalled"
+    assert stub._last_motion_diagnostic["position_error_m"] > 0.0

@@ -29,6 +29,53 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class GripperSpec:
+    """What the hand on this arm is, in the terms skills reason about.
+
+    Declared, not measured: the numbers come from the hand's datasheet or
+    MJCF, and a skill that reads them stays portable because it never has to
+    know *which* hand it is holding. Defaults describe the Panda parallel jaw
+    that robosuite/LIBERO ship.
+    """
+
+    name: str = "panda_hand"
+    #: Widest jaw gap, metres. The refusal threshold for grasp proposals.
+    span_m: float = 0.08
+    #: Narrowest useful gap — below this the jaws are effectively shut.
+    min_grasp_width_m: float = 0.0
+    #: Unit axis, in EE frame, the jaws translate ALONG as they close.
+    close_axis: tuple[float, float, float] = (0.0, 1.0, 0.0)
+    #: Unit axis, in EE frame, pointing out of the palm toward the object.
+    approach_axis: tuple[float, float, float] = (0.0, 0.0, 1.0)
+    #: Fingertip reach past the TCP, metres. ``None`` = unstated, which
+    #: tells the grasp skills to skip their support-surface correction
+    #: rather than apply it with a made-up number.
+    finger_reach_m: float | None = None
+    #: Margin kept between fingertip and support surface, metres.
+    finger_clearance_m: float = 0.005
+    #: Measured gap at fraction 0. ``None`` falls back to the span model.
+    width_at_closed_m: float | None = None
+
+
+@dataclass(frozen=True)
+class WorkspaceSpec:
+    """Where the work happens, in world-frame metres.
+
+    ``surface_z`` is the one number most worth overriding per scene; a sim
+    connector measures it from the table body instead (see
+    :meth:`gap.connector.sim.SimConnector._workspace_payload`).
+    """
+
+    #: Height of the primary support surface.
+    surface_z: float = 0.0
+    #: Cruise height for carrying an object across the scene. ``None``
+    #: derives ``surface_z + 0.25``.
+    transport_z: float | None = None
+    #: Hover clearance above an object before descending onto it.
+    align_clearance_m: float = 0.08
+
+
+@dataclass(frozen=True)
 class EnvConfig:
     """Static per-env robot/control metadata consumed by the connector."""
 
@@ -37,12 +84,20 @@ class EnvConfig:
     action_mode: str = "absolute_joints"
     control_freq: float = 20.0
     home_joints: tuple | None = None
+    joint_names: tuple[str, ...] | None = None
+    joint_limits: tuple[tuple[float, float], ...] | None = None
     tcp_offset: tuple | None = None
     tcp_rotation_z: float | None = None
     arm_bases: tuple | None = None
     robot_urdf_path: str | None = None
     default_cameras: tuple = ("agentview", "robot0_eye_in_hand")
     is_real: bool = False
+    #: Embodiment description surfaced by ``robot.describe_gripper`` /
+    #: ``robot.describe_workspace``. Geometry that is not explicitly
+    #: declared stays unstated; concrete env factories should override it
+    #: when they have a measured embodiment value.
+    gripper: GripperSpec = GripperSpec()
+    workspace: WorkspaceSpec = WorkspaceSpec()
 
 
 @dataclass(frozen=True)

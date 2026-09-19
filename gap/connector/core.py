@@ -47,6 +47,29 @@ from gap import env_config
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Free-space OSC servo budget (``go_to_pose_cartesian`` fast path).
+#
+# These are the numbers the authoring agent has to plan against, so they are
+# named here rather than spelled inline: the tool catalog it reads interpolates
+# them into the motion tools' summaries, and ``_servo_to_pose`` takes them as
+# its defaults. One definition, so the prompt can never quote a stale budget.
+# ---------------------------------------------------------------------------
+
+#: Hard cap on control ticks for one servo'd leg. Exhausting it is
+#: ``not_converged``: the arm kept making progress but ran out of budget.
+OSC_MAX_TICKS = 200
+
+#: Patience: consecutive ticks with no improvement in position error before
+#: the leg is declared ``stalled``. Much shorter than :data:`OSC_MAX_TICKS`,
+#: because a servo that has stopped closing the gap will not restart on its
+#: own — it is in contact, at a joint limit, or commanding into a wall.
+OSC_STALL_TICKS = 25
+
+#: Convergence tolerances for a servo'd leg.
+OSC_POS_TOL_M = 0.005
+OSC_ROT_TOL_RAD = 0.05
+
 # Franka Panda home joint configuration (radians)
 _FRANKA_HOME_JOINTS = [0.0, -0.785, 0.0, -2.356, 0.0, 1.571, 0.785]
 
@@ -86,6 +109,20 @@ def _as_vec3(value: Any) -> np.ndarray | None:
             [float(value["x"]), float(value["y"]), float(value["z"])], dtype=np.float64
         )
     return np.asarray(value, dtype=np.float64).reshape(3)
+
+
+def _vec3_dict(value: Any) -> dict[str, float]:
+    """Render a Vec3-ish value as the ``{"x", "y", "z"}`` wire shape."""
+    v = _as_vec3(value)
+    if v is None:
+        v = np.zeros(3)
+    return {"x": float(v[0]), "y": float(v[1]), "z": float(v[2])}
+
+
+def _unit(v: np.ndarray) -> np.ndarray:
+    """Normalize, leaving a degenerate vector alone rather than dividing by 0."""
+    n = float(np.linalg.norm(v))
+    return v if n < 1e-12 else v / n
 
 
 def _as_positions(value: Any) -> list[float]:
@@ -139,6 +176,15 @@ class Connector:
         self._gripper_fraction: float = 1.0  # open
         self._arm_dof: int = int(getattr(config, "arm_dof", 7))
         self.num_arms: int = int(getattr(config, "num_arms", 1) or 1)
+        configured_names = getattr(config, "joint_names", None)
+        self._joint_names: tuple[str, ...] = tuple(
+            configured_names or (f"joint{i + 1}" for i in range(self._arm_dof))
+        )
+        configured_limits = getattr(config, "joint_limits", None)
+        self._joint_limits: np.ndarray | None = (
+            np.asarray(configured_limits, dtype=np.float64).reshape(-1, 2)
+            if configured_limits is not None else None
+        )
         home = getattr(config, "home_joints", None)
         self._home_joints: list[float] | None = list(home) if home is not None else None
         self._robot_urdf_path: str | None = getattr(config, "robot_urdf_path", None)
@@ -266,32 +312,83 @@ class Connector:
            summary="Get the gripper open fraction (0 closed, 1 open).")
         rc("robot.get_gripper_pose", self._tool_get_gripper_pose,
            summary="Get the gripper (end-effector) pose in world frame.")
+        rc("robot.get_joint_state", self.get_joint_state,
+           summary="Get named arm joints with limits, normalized progress and margin.")
+        # Embodiment description — what hand/arm/table this actually is, so
+        # skills can stay written against "the hand" rather than a Panda.
+        rc("robot.describe_gripper", self.describe_gripper,
+           summary="Describe the hand: jaw span, closing axis, fingertip geometry.")
+        rc("robot.describe_arm", self.describe_arm,
+           summary="Describe the arm: DOF, TCP offset, home pose, solver behaviour.")
+        rc("robot.describe_workspace", self.describe_workspace,
+           summary="Describe the work surface height, transport height and clearances.")
+        rc("robot.grasp_frame", self.grasp_frame,
+           summary="Compose the wrist rotation for an approach direction "
+                   "plus a jaw-closing heading, in THIS hand's axes.")
         # Control — sim_step guard tag.
         rc("robot.go_to_pose", self.go_to_pose,
-           summary="Move the end-effector to a world-frame pose via IK.",
+           summary="Move the end-effector to a world-frame pose via IK. "
+                   "BLOCKING: returns only once the arm converged, and raises "
+                   "if it did not. Pose is the connector-public TCP pose in "
+                   "connector-world coordinates — the same frame "
+                   "robot.get_ee_pose reports; never pre-apply a TCP offset.",
            tags=("sim_step",))
         rc("robot.go_to_pose_cartesian", self.go_to_pose_cartesian,
-           summary="Move the end-effector along a straight Cartesian line.",
+           summary="Move the end-effector along a straight Cartesian line. "
+                   "BLOCKING and collision-UNAWARE on the servo'd fast path, "
+                   "so use it only for a leg you know is clear. Raises "
+                   f"'stalled' after {OSC_STALL_TICKS} ticks with no progress "
+                   f"in position error, or 'not_converged' after "
+                   f"{OSC_MAX_TICKS} ticks; tolerances are "
+                   f"{OSC_POS_TOL_M} m / {OSC_ROT_TOL_RAD} rad. Either error "
+                   "reports target, achieved and residual in "
+                   "connector-world coordinates. Split a long move into "
+                   "short legs rather than raising the budget.",
            tags=("sim_step",))
-        rc("robot.move_to_joints", self._tool_move_to_joints,
-           summary="Move the arm to a joint configuration, blocking until converged.",
-           tags=("sim_step",))
-        rc("robot.execute_trajectory", self._tool_execute_trajectory,
-           summary="Execute a joint trajectory waypoint-by-waypoint.",
-           tags=("sim_step",))
-        rc("robot.go_home", self.go_home,
-           summary="Move all arms to the home joint configuration.",
-           tags=("sim_step",))
+        if self.supports_joint_position_control():
+            rc("robot.move_to_joints", self._tool_move_to_joints,
+               summary="Move the arm to a joint configuration, blocking until converged.",
+               tags=("sim_step",))
+            rc("robot.execute_trajectory", self._tool_execute_trajectory,
+               summary="Execute a joint trajectory waypoint-by-waypoint.",
+               tags=("sim_step",))
+            rc("robot.go_home", self.go_home,
+               summary="Move all arms to the home joint configuration.",
+               tags=("sim_step",))
         rc("robot.open_gripper", self.open_gripper,
            summary="Open the gripper and let physics settle.",
            tags=("sim_step",))
         rc("robot.close_gripper", self.close_gripper,
            summary="Close the gripper and let physics settle.",
            tags=("sim_step",))
+        rc("robot.set_grip", self.set_grip,
+           summary="Command a partial jaw opening (0 closed, 1 open).",
+           tags=("sim_step",))
+        rc("robot.wait_steps", self.wait_steps,
+           summary="Hold the current command for N control steps and let physics settle.",
+           tags=("sim_step",))
         # Planning.
         rc("robot.solve_ik", self._tool_solve_ik,
            summary="Solve IK for a world-frame pose; returns a joint configuration.",
            tags=("planning",))
+
+    def supports_joint_position_control(self) -> bool:
+        """Whether this connector can honestly execute joint targets."""
+        return (
+            hasattr(self.env, "move_to_joints_blocking")
+            or (
+                self.action_mode in {"velocity_joints", "absolute_joints"}
+                and hasattr(self.env, "handle")
+            )
+        )
+
+    def joint_position_control_reason(self) -> str:
+        if self.supports_joint_position_control():
+            return "available"
+        return (
+            f"unsupported by {type(self.env).__name__}: controller action_mode="
+            f"{self.action_mode!r} does not accept joint-position commands"
+        )
 
     def _register_extra_tools(self, reg: ToolRegistry) -> None:
         """Subclass hook for ``sim.*`` / backend-specific tools."""
@@ -480,6 +577,63 @@ class Connector:
     def _tool_get_gripper(self, arm_id: int = 0) -> dict:
         return {"position": self.get_gripper_fraction(arm_id=arm_id)}
 
+    def get_joint_state(
+        self, arm_id: int = 0, near_limit_threshold: float = 0.05
+    ) -> dict:
+        """Return simulator-neutral named joint diagnostics for one arm."""
+        values = self._current_joints(arm_id)
+        if values is None:
+            raise ToolError("robot.get_joint_state", f"arm {arm_id} joint state unavailable")
+        threshold = max(0.0, float(near_limit_threshold))
+        rows: list[dict[str, Any]] = []
+        for index, position in enumerate(values):
+            name = (
+                self._joint_names[index]
+                if index < len(self._joint_names) else f"joint{index + 1}"
+            )
+            row: dict[str, Any] = {
+                "name": name, "position": float(position), "limit": None,
+                "progress": None, "margin": None, "distance_to_limit": None,
+                "near_limit": False,
+            }
+            if self._joint_limits is not None and index < len(self._joint_limits):
+                lower, upper = (float(v) for v in self._joint_limits[index])
+                span = upper - lower
+                if np.isfinite(lower) and np.isfinite(upper) and span > 0:
+                    progress = (float(position) - lower) / span
+                    margin = min(progress, 1.0 - progress)
+                    row.update({
+                        "limit": {"lower": lower, "upper": upper},
+                        "progress": float(progress),
+                        "margin": float(margin),
+                        "distance_to_limit": float(
+                            min(float(position) - lower, upper - float(position))
+                        ),
+                        "near_limit": bool(margin <= threshold + 1e-12),
+                    })
+            rows.append(row)
+        return {
+            "arm_id": int(arm_id), "near_limit_threshold": threshold,
+            "limits_available": self._joint_limits is not None, "joints": rows,
+        }
+
+    def _joint_limit_diagnostic(self, arm_id: int = 0) -> str:
+        state = self.get_joint_state(arm_id=arm_id)
+        limited = [row for row in state["joints"] if row["margin"] is not None]
+        if not limited:
+            return "joint limits unavailable"
+        limited.sort(key=lambda row: row["margin"])
+        rows = [row for row in limited if row["near_limit"]] or limited[:2]
+        fields = []
+        for row in rows[:3]:
+            limit = row["limit"]
+            side = "lower" if row["progress"] <= 0.5 else "upper"
+            fields.append(
+                f"{row['name']}={row['position']:.4f}, "
+                f"{side}={limit[side]:.4f}, margin={row['margin']:.3f}"
+            )
+        return "; ".join(fields)
+
     # ------------------------------------------------------------------
     # Low-level sim operations (verbatim from SimState)
     # ------------------------------------------------------------------
@@ -667,6 +821,171 @@ class Connector:
             arm_id, settle, position,
         )
         return {"position": position}
+
+    # ------------------------------------------------------------------
+    # Embodiment description
+    # ------------------------------------------------------------------
+    #
+    # Skills are written against "the hand", not against a Panda. These four
+    # tools are how a skill asks what it is actually holding, so the same
+    # grasp logic survives a change of gripper, arm, or table height. They
+    # are pure description — no privilege, no physics step — which is why
+    # they live here and not in the sim connector.
+
+    def _gripper_spec(self) -> Any:
+        from gap.envs.registry import GripperSpec
+
+        return getattr(self.config, "gripper", None) or GripperSpec()
+
+    def _workspace_spec(self) -> Any:
+        from gap.envs.registry import WorkspaceSpec
+
+        return getattr(self.config, "workspace", None) or WorkspaceSpec()
+
+    def describe_gripper(self, arm_id: int = 0) -> dict:
+        """What the hand is: jaw span, closing axis, fingertip geometry."""
+        g = self._gripper_spec()
+        closed = g.width_at_closed_m
+        payload: dict[str, Any] = {
+            "name": g.name,
+            "arm_id": int(arm_id),
+            "type": "parallel_jaw",
+            "span_m": float(g.span_m),
+            "max_grasp_width_m": float(g.span_m),
+            "min_grasp_width_m": float(g.min_grasp_width_m),
+            "close_axis": _vec3_dict(g.close_axis),
+            "approach_axis": _vec3_dict(g.approach_axis),
+            "width_fit": {
+                # "span" says these are the declared span and a zero, not a
+                # calibration — verifying-grasps keys its wording off this.
+                "source": "measured" if closed is not None else "span",
+                "at_open_m": float(g.span_m),
+                "at_closed_m": float(closed or 0.0),
+            },
+        }
+        reach = g.finger_reach_m
+        payload["finger"] = {
+            "stated": reach is not None,
+            "reach_m": float(reach or 0.0),
+            "clearance_m": float(g.finger_clearance_m),
+        }
+        return payload
+
+    def describe_arm(self, arm_id: int = 0) -> dict:
+        """What the arm is: DOF, TCP, home, and what its solver honours."""
+        off = self._default_tcp_offset()
+        base = None
+        if self._arm_bases is not None and arm_id < len(self._arm_bases):
+            base = _vec3_dict(self._arm_bases[arm_id])
+        name = f"arm{arm_id}" if self.num_arms > 1 else "arm"
+        return {
+            "arm_id": int(arm_id),
+            "arm": name,
+            "name": name,
+            "dof": int(self._arm_dof),
+            "num_arms": int(self.num_arms),
+            "tcp_offset": _vec3_dict(off),
+            "home_joints": list(self._home_joints) if self._home_joints else None,
+            "base_position": base,
+            "control_freq": float(self.control_freq),
+            # go_to_pose solves full-SE(3) IK, so a commanded wrist roll is
+            # reached rather than dropped. Connectors that only servo
+            # position + approach must report False here.
+            "solver": {"honours_roll": True, "blocking": True},
+            "joint_position_control": {
+                "available": self.supports_joint_position_control(),
+                "reason": self.joint_position_control_reason(),
+            },
+            "rot_key": "rotation",
+        }
+
+    def _workspace_payload(self) -> dict:
+        """Subclass hook: the sim connector measures ``surface_z`` instead."""
+        w = self._workspace_spec()
+        surface_z = float(w.surface_z)
+        transport_z = w.transport_z
+        return {
+            "surface_z": surface_z,
+            "transport_z": float(transport_z) if transport_z is not None else surface_z + 0.25,
+            "align_clearance_m": float(w.align_clearance_m),
+            "source": "config",
+        }
+
+    def describe_workspace(self, arm_id: int = 0) -> dict:
+        """Where the work surface is and how high to carry things over it."""
+        payload = self._workspace_payload()
+        payload["arm_id"] = int(arm_id)
+        return payload
+
+    def grasp_frame(
+        self,
+        approach: Any | None = None,
+        close_heading_deg: float = 0.0,
+        arm_id: int = 0,
+    ) -> dict:
+        """The wrist rotation that points the hand *approach* and closes along
+        *close_heading_deg*.
+
+        Asked for rather than composed, because "closing heading" only means
+        something once you know which way this particular hand's jaws travel.
+        ``approach`` defaults to straight down; ``close_heading_deg`` is a
+        compass bearing in the world XY plane (0 = +x, 90 = +y).
+
+        The heading is NOT the object's long-axis heading. They are ninety
+        degrees apart, and confusing them closes the fingers down the length
+        of a handle instead of across it.
+        """
+        from scipy.spatial.transform import Rotation as _R
+
+        g = self._gripper_spec()
+        e_close = _unit(_as_vec3(g.close_axis))
+        e_appr = _unit(_as_vec3(g.approach_axis))
+        e_close = _unit(e_close - float(e_close @ e_appr) * e_appr)
+
+        w_appr = _unit(_as_vec3(approach) if approach is not None else np.array([0.0, 0.0, -1.0]))
+        heading = math.radians(float(close_heading_deg))
+        w_close = np.array([math.cos(heading), math.sin(heading), 0.0])
+        w_close = w_close - float(w_close @ w_appr) * w_appr
+        if float(np.linalg.norm(w_close)) < 1e-8:
+            # Heading is parallel to the approach: the roll is unconstrained,
+            # so pick any perpendicular rather than emitting a NaN rotation.
+            fallback = np.array([1.0, 0.0, 0.0])
+            if abs(float(fallback @ w_appr)) > 0.9:
+                fallback = np.array([0.0, 1.0, 0.0])
+            w_close = fallback - float(fallback @ w_appr) * w_appr
+        w_close = _unit(w_close)
+
+        ee = np.column_stack([e_close, e_appr, np.cross(e_close, e_appr)])
+        world = np.column_stack([w_close, w_appr, np.cross(w_close, w_appr)])
+        x, y, z, w = _R.from_matrix(world @ ee.T).as_quat()
+        return {
+            "rotation": {"x": float(x), "y": float(y), "z": float(z), "w": float(w)},
+            "approach": _vec3_dict(w_appr),
+            "close_axis_world": _vec3_dict(w_close),
+            "close_heading_deg": float(close_heading_deg),
+            "arm_id": int(arm_id),
+        }
+
+    def wait_steps(self, steps: int = 20, arm_id: int = 0) -> dict:
+        """Hold the current command for *steps* control steps and let physics
+        settle. The honest way to wait for a released object to come to rest."""
+        n = max(0, int(steps))
+        with self._quiet_motion():
+            self._settle(n)
+        return {"steps": n}
+
+    def set_grip(self, fraction: float, settle_steps: int = 0, arm_id: int = 0) -> dict:
+        """Command a partial jaw opening (0 closed, 1 open).
+
+        ``open_gripper``/``close_gripper`` are the ends of this range; this is
+        for the middle — a pre-shape wider than the object but narrower than
+        the neighbour it must not sweep.
+        """
+        self.set_gripper(fraction, arm_id=arm_id)
+        if settle_steps > 0:
+            with self._quiet_motion():
+                self._settle(int(settle_steps))
+        return {"position": self.get_gripper_fraction(arm_id=arm_id)}
 
     # ------------------------------------------------------------------
     # IK orchestration (absorbed RobotControlServicer)
@@ -894,10 +1213,11 @@ class Connector:
         pose: Se3Pose,
         *,
         arm_id: int = 0,
-        pos_tol: float = 0.005,
-        rot_tol: float = 0.05,
-        max_ticks: int = 200,
-        stall_ticks: int = 25,
+        pos_tol: float = OSC_POS_TOL_M,
+        rot_tol: float = OSC_ROT_TOL_RAD,
+        max_ticks: int = OSC_MAX_TICKS,
+        stall_ticks: int = OSC_STALL_TICKS,
+        tool_name: str = "robot.go_to_pose_cartesian",
     ) -> None:
         """Drive the EE to ``pose`` (world frame) by streaming clamped OSC
         deltas through the env's ``apply_policy_action`` — the policy's own
@@ -937,10 +1257,36 @@ class Connector:
         gcmd = 1.0 - 2.0 * float(getattr(self.env, "_gripper_fraction", 1.0))
         out_p, out_r = 0.05, 0.5  # OSC output_max (m, rad)
 
+        def motion_record(
+            status: str,
+            *,
+            achieved: Se3Pose | None = None,
+            position_error: float | None = None,
+            rotation_error: float | None = None,
+            ticks: int = 0,
+        ) -> dict[str, Any]:
+            record = {
+                "tool": tool_name,
+                "status": status,
+                "target": pose,
+                "achieved": achieved,
+                "position_error_m": position_error,
+                "rotation_error_rad": rotation_error,
+                "ticks": int(ticks),
+                "max_ticks": int(max_ticks),
+                "stall_patience_ticks": int(stall_ticks),
+                "frame": "connector_world",
+            }
+            self._last_motion_diagnostic = record
+            return record
+
+        motion_record("running")
         best = float("inf")
         stuck = 0
         pos_err = float("inf")
-        for _ in range(int(max_ticks)):
+        rot_err = float("inf")
+        cur: Se3Pose | None = None
+        for tick in range(1, int(max_ticks) + 1):
             cur = self.get_ee_pose(arm_id=arm_id)
             cp = cur["position"]
             cur_pos = np.array(
@@ -955,33 +1301,93 @@ class Connector:
             pos_err = float(np.linalg.norm(dpos))
             rot_err = float(np.linalg.norm(dori))
             if pos_err < pos_tol and rot_err < rot_tol:
+                motion_record(
+                    "reached",
+                    achieved=cur,
+                    position_error=pos_err,
+                    rotation_error=rot_err,
+                    ticks=tick - 1,
+                )
                 return
             action = np.empty(7, dtype=np.float64)
             action[:3] = np.clip(dpos / out_p, -1.0, 1.0)
             action[3:6] = np.clip(dori / out_r, -1.0, 1.0)
             action[6] = gcmd
             apply(action)
+            emit_step = getattr(self, "_emit_step", None)
+            if callable(emit_step):
+                try:
+                    obs = self.env.get_observation()
+                except Exception:
+                    obs = {}
+                try:
+                    reward = float(self.env.compute_reward() or 0.0)
+                except Exception:
+                    reward = 0.0
+                emit_step(
+                    action, obs, reward,
+                    bool(getattr(self.env, "_current_done", False)),
+                )
             if pos_err < best - 1e-4:
                 best, stuck = pos_err, 0
             else:
                 stuck += 1
                 if stuck >= int(stall_ticks):
-                    raise ToolError(
-                        "robot.go_to_pose_cartesian",
-                        f"servo stalled at pos_err={pos_err:.4f} "
-                        "(joint limit / singularity?)",
+                    diagnostic_fn = getattr(self, "_joint_limit_diagnostic", None)
+                    diagnostic = (
+                        diagnostic_fn(arm_id)
+                        if callable(diagnostic_fn)
+                        else "joint state unavailable"
                     )
+                    motion_record(
+                        "stalled",
+                        achieved=cur,
+                        position_error=pos_err,
+                        rotation_error=rot_err,
+                        ticks=tick,
+                    )
+                    tp_text = ",".join(f"{value:.4f}" for value in target_pos)
+                    cp_text = ",".join(f"{value:.4f}" for value in cur_pos)
+                    raise ToolError(
+                        tool_name,
+                        f"OSC servo stalled after {tick}/{max_ticks} ticks "
+                        f"(patience={stall_ticks}): target=({tp_text}), "
+                        f"achieved=({cp_text}), pos_err={pos_err:.4f} m, "
+                        f"rot_err={rot_err:.4f} rad; {diagnostic}",
+                    )
+        diagnostic_fn = getattr(self, "_joint_limit_diagnostic", None)
+        diagnostic = (
+            diagnostic_fn(arm_id)
+            if callable(diagnostic_fn)
+            else "joint state unavailable"
+        )
+        motion_record(
+            "not_converged",
+            achieved=cur,
+            position_error=pos_err,
+            rotation_error=rot_err,
+            ticks=int(max_ticks),
+        )
+        tp_text = ",".join(f"{value:.4f}" for value in target_pos)
+        cp_text = ",".join(
+            f"{value:.4f}" for value in (
+                cur_pos if cur is not None else np.full(3, np.nan)
+            )
+        )
         raise ToolError(
-            "robot.go_to_pose_cartesian",
-            f"servo did not converge in {max_ticks} ticks (pos_err={pos_err:.4f})",
+            tool_name,
+            f"OSC servo did not converge in {max_ticks} ticks: "
+            f"target=({tp_text}), achieved=({cp_text}), "
+            f"pos_err={pos_err:.4f} m, rot_err={rot_err:.4f} rad; {diagnostic}",
         )
 
     def go_to_pose_cartesian(self, pose: Se3Pose, arm_id: int = 0) -> None:
         """Move along a straight Cartesian line to ``pose``.
 
-        The caller is responsible for providing target poses already in the
-        IK link frame (panda_hand for Franka, link_6 for YAM) — matching the
-        source's GoToPoseCartesian contract.
+        The target uses the same connector-public end-effector / TCP pose and
+        connector-world frame returned by :meth:`get_ee_pose`. Backend-specific
+        IK-link offsets are an implementation detail and must not be applied by
+        graph code.
         """
         if not pose:
             raise ToolError("robot.go_to_pose_cartesian", "pose required")

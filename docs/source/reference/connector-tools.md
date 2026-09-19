@@ -1,9 +1,9 @@
 # Connector Tools
 
-Every connector ships a small, fixed set of embodiment tools: thirteen
-`robot.*` tools registered by the connector base class, plus six `sim.*`
-tools added by simulation connectors. These are the engine's entire
-built-in tool surface — everything else (perception, geometry, motion
+Every connector ships a small embodiment-specific `robot.*` tool surface,
+plus `sim.*` tools on simulation connectors. The exact motion surface is
+capability-gated: a connector must not advertise a command its controller
+cannot execute faithfully. Everything else (perception, geometry, motion
 planning) comes from skill bundles, documented in the
 [Tool catalog](../skills/tool-catalog.md).
 
@@ -45,8 +45,8 @@ runaway loop cannot swallow it with `except Exception`. See
 
 | Tag | Cap variable | Tools |
 |---|---|---|
-| *(none)* | — | the five `robot.get_*` getters, `sim.reset`, `sim.check_success`, `sim.enable_video`, `sim.save_video` |
-| `sim_step` | `GAP_MAX_SIM_STEPS` | all seven `robot.*` motion tools, `sim.step`, `sim.apply_policy_action` |
+| *(none)* | — | read-only `robot.get_*` / `robot.describe_*` tools, `sim.reset`, `sim.check_success`, `sim.enable_video`, `sim.save_video` |
+| `sim_step` | `GAP_MAX_SIM_STEPS` | registered `robot.*` motion tools, `sim.step`, `sim.apply_policy_action` |
 | `planning` | `GAP_MAX_PLANNING_CALLS` | `robot.solve_ik` |
 
 No connector tool carries the `perception` tag — that one is used by
@@ -63,6 +63,7 @@ Untagged, read-only, available on every connector (sim and real).
 | `robot.get_ee_pose` | `arm_id: int = 0` | `{"pose": Se3Pose}` — end-effector in world frame |
 | `robot.get_gripper` | `arm_id: int = 0` | `{"position": float}` — open fraction, 0 closed → 1 open |
 | `robot.get_gripper_pose` | `arm_id: int = 0` | `{"pose": Se3Pose}` — same pose as `robot.get_ee_pose` |
+| `robot.get_joint_state` | `arm_id: int = 0`, `near_limit_threshold: float = 0.05` | Named positions plus physical limits, normalized `progress`, normalized `margin`, `distance_to_limit`, and `near_limit` |
 
 ## robot.* — motion (tag: `sim_step`)
 
@@ -75,6 +76,14 @@ Untagged, read-only, available on every connector (sim and real).
 | `robot.go_home` | — | `None` |
 | `robot.open_gripper` | `settle_steps: int = 40`, `arm_id: int = 0` | `{"position": float}` — measured fraction after settling |
 | `robot.close_gripper` | `settle_steps: int = 60`, `arm_id: int = 0` | `{"position": float}` |
+
+`robot.move_to_joints`, `robot.execute_trajectory`, and `robot.go_home` are
+registered only when the connector provides genuine joint-position control.
+In particular, the Robosuite/MimicGen connector uses `OSC_POSE`, so these
+three tools are intentionally absent: writing MuJoCo `qpos` would teleport
+the arm and invalidate contact dynamics. `robot.describe_arm()` reports
+both availability and the unsupported reason. Cartesian OSC tools and the
+read-only `robot.get_joint_state` remain available.
 
 Behavioral details, verified against
 [`gap/connector/core.py`](gh-engine:gap/connector/core.py):
@@ -91,7 +100,9 @@ Behavioral details, verified against
 - **`robot.go_to_pose_cartesian`** plans a straight Cartesian line from
   the current EE pose and executes it. The target must already be in the
   **IK link frame** (`panda_hand` for Franka, `link_6` for 6-DOF arms).
-  Raises `ToolError` when the linear plan fails.
+  Raises `ToolError` when the linear plan fails. A stall/non-convergence
+  error includes the nearest joint limits (name, position, bound and margin),
+  so a wrist at its stop is distinguishable from a generic pose error.
 - **`robot.move_to_joints`** blocks until convergence; `tolerance <= 0` →
   0.01 rad, `max_steps <= 0` → 120. Empty `joint_config` raises
   `ToolError`.
@@ -153,6 +164,32 @@ tool on hardware (validation flags it as a warning before the run).
   writes per-camera extras as `<stem>_<cam>.mp4` next to the main file.
   An empty buffer returns `success: True` with `num_frames: 0`; encoding
   errors return `success: False` rather than raising.
+
+## sim.* — privileged task state
+
+Simulation connectors also register a provider-backed, read-only scene surface.
+The task adapter supplies flags and named condition definitions; the scene
+adapter supplies simulator-specific frames, collision features and joints.
+
+| Tool | Parameters | Returns |
+|---|---|---|
+| `sim.get_task_flags` | — | `{"flags": {...}, "source": "task_adapter"}`, including history-dependent latches |
+| `sim.evaluate_condition` | `condition: dict` | `{"satisfied", "condition", "diagnostics"}` |
+| `sim.describe_condition` | `name: str` | exact named definition plus recursively expanded `ref` relations |
+
+`sim.describe_condition` is a zero-step introspection call. It exposes only
+the condition definitions already injected from the task contract, while making
+geom/site names and nested references explicit before a graph commits to a
+verification branch.
+
+`sim.evaluate_condition` accepts both semantic relations used by reusable
+skills (`holding`, `inside`, `on`, `near`, `settled`,
+`articulation`) and the complete Agent2Policy benchmark vocabulary:
+`ref`, `all`, `any`, `not`, `flag`, `joint`,
+`offset`, `in_box`, and exact collision-feature `touching`.
+A MuJoCo provider maps collision features to geoms and named frames to
+geom/body/site poses; other simulators implement the same provider concepts
+with their own colliders and frames.
 
 ## Availability by backend
 

@@ -51,6 +51,11 @@ __all__ = [
     "WorldConfig",
     "GraspCandidates",
     "FunctionalFeature",
+    "SceneEntity",
+    "SceneFeature",
+    "ArticulationState",
+    "Condition",
+    "ConditionResult",
     "CollisionSphere",
     "AttachedObject",
     "PoseWaypoint",
@@ -210,6 +215,64 @@ class FunctionalFeature(TypedDict):
     insertion_depth: NotRequired[float]  # meters; how far into an aperture a mate seats
     seating_margin: NotRequired[float]  # meters
     local_center: NotRequired[Vec3]  # the feature centre in the parent object's frame
+
+
+class SceneEntity(TypedDict):
+    """Simulator/perception-neutral description of one scene entity."""
+
+    name: str
+    kind: str  # object | fixture | region | robot
+    movable: bool
+    pose: Se3Pose
+    obb: OrientedBoundingBox
+    frame: str
+    source: str  # privileged | perception
+    backend_id: NotRequired[str]
+    parts: NotRequired[list[str]]
+    features: NotRequired[list[str]]
+
+
+class SceneFeature(TypedDict):
+    """A geometric or functional feature belonging to a scene entity."""
+
+    name: str
+    parent: str
+    kind: str
+    pose: Se3Pose
+    obb: OrientedBoundingBox
+    frame: str
+    source: str
+    functional: NotRequired[FunctionalFeature]
+    backend_id: NotRequired[str]
+
+
+class ArticulationState(TypedDict):
+    """Backend-neutral state of a scalar articulated degree of freedom."""
+
+    name: str
+    parent: str
+    child: str
+    kind: str  # revolute | prismatic
+    axis: Vec3
+    pivot: Vec3
+    position: float
+    lower: float
+    upper: float
+    progress: float
+    frame: str
+    source: str
+    backend_id: NotRequired[str]
+
+
+Condition = dict
+
+
+class ConditionResult(TypedDict):
+    """Result of evaluating a portable graph milestone or stop condition."""
+
+    satisfied: bool
+    condition: Condition
+    diagnostics: dict
 
 
 class CollisionSphere(TypedDict):

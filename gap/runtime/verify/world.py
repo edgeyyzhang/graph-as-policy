@@ -524,6 +524,27 @@ class Body:
 
 
 # ---------------------------------------------------------------------------
+# Articulation
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Articulation:
+    """Simulator-neutral scalar prismatic or revolute joint state."""
+
+    name: str
+    parent: str
+    child: str
+    kind: str
+    position: float
+    lower: float
+    upper: float
+    progress: float
+    axis: np.ndarray
+    pivot: np.ndarray
+
+
+# ---------------------------------------------------------------------------
 # Robot
 # ---------------------------------------------------------------------------
 
@@ -568,6 +589,7 @@ class World:
 
     env_id: int
     bodies: dict[str, Body]
+    articulations: dict[str, Articulation] = field(default_factory=dict)
     robot_view: Robot | None = None
     time_s: float = 0.0
     history_snapshots: list[World] = field(default_factory=list)
@@ -697,6 +719,19 @@ class World:
 
     def body_names(self) -> list[str]:
         return sorted(self.bodies.keys())
+
+    def articulation(self, name: str) -> Articulation:
+        """Return one named scalar DOF or raise with the available names."""
+        if name in self.articulations:
+            return self.articulations[name]
+        available = sorted(self.articulations)
+        raise KeyError(f"articulation {name!r} not found; available: {available}")
+
+    def has_articulation(self, name: str) -> bool:
+        return name in self.articulations
+
+    def articulation_names(self) -> list[str]:
+        return sorted(self.articulations)
 
     def region(self, name: str) -> Body:
         """Return the body for a physics-free region marker.
@@ -948,6 +983,7 @@ class World:
         return cls(
             env_id=last.env_id,
             bodies=dict(last.bodies),
+            articulations=dict(last.articulations),
             robot_view=last.robot_view,
             time_s=last.time_s,
             history_snapshots=list(snapshots[:-1]),
@@ -956,6 +992,7 @@ class World:
             tabletop_body_name=last.tabletop_body_name,
             raw_contact_diagnostics=dict(last.raw_contact_diagnostics),
             sim_state=dict(last.sim_state),
+            scene_spec_ids=tuple(last.scene_spec_ids),
         )
 
 

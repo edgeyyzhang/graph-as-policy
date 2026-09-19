@@ -1,4 +1,4 @@
-"""LiberoWorldAdapter — verify.World snapshots from sim ground truth.
+"""MuJoCo scene adapters — portable privileged state from sim ground truth.
 
 Builds :class:`gap.runtime.verify.World` snapshots for checkpoint
 enforcement from the LIBERO/robosuite MuJoCo sim underneath the env:
@@ -9,8 +9,9 @@ enforcement from the LIBERO/robosuite MuJoCo sim underneath the env:
   ``cube_poses`` entry is used as a fallback;
 - **AABBs** precomputed once per reset from the MuJoCo *model* geoms
   (per-body local bounds from geom type/size/pos/quat, preferring the
-  model's own ``geom_aabb`` when present), cached by body and re-oriented
-  into world frame at snapshot time;
+  model's own ``geom_aabb``, falling back to the mesh's own vertices on
+  builds that predate it), cached by body and re-oriented into world frame
+  at snapshot time;
 - **contacts** from ``sim.data.contact`` pairs, resolved to object names via
   body-subtree membership and filtered to named bodies + robot/gripper
   links, then canonicalized with :func:`verify.contacts_from_pairs`;
@@ -27,7 +28,7 @@ from typing import Any
 
 import numpy as np
 
-from gap.runtime.verify import Robot, World, contacts_from_pairs
+from gap.runtime.verify import Articulation, Robot, World, contacts_from_pairs
 from gap.runtime.verify.world import Body
 
 logger = logging.getLogger(__name__)
@@ -114,6 +115,54 @@ def _quat_wxyz_to_rotmat(q: np.ndarray) -> np.ndarray:
     ])
 
 
+def _mesh_vertices(model: Any, gid: int, cache: dict[int, np.ndarray | None] | None) -> np.ndarray | None:
+    """Mesh geom *gid*'s vertices, in the geom's own frame.
+
+    MuJoCo applies the mesh's scale and origin at compile time, so these need
+    no further correction. Cached by *mesh* id, not geom id: a scene reuses
+    one mesh across many geoms.
+    """
+    meshid = int(np.asarray(model.geom_dataid)[gid])
+    if meshid < 0:
+        return None
+    if cache is not None and meshid in cache:
+        return cache[meshid]
+
+    verts: np.ndarray | None = None
+    try:
+        adr = int(np.asarray(model.mesh_vertadr)[meshid])
+        num = int(np.asarray(model.mesh_vertnum)[meshid])
+        if num > 0:
+            verts = np.asarray(model.mesh_vert)[adr : adr + num].astype(np.float64)
+    except (AttributeError, IndexError, ValueError):
+        verts = None
+
+    if cache is not None:
+        cache[meshid] = verts
+    return verts
+
+
+def _geom_local_points(
+    model: Any, gid: int, cache: dict[int, np.ndarray | None] | None = None
+) -> np.ndarray | None:
+    """Points, in geom *gid*'s own frame, whose bounds are the geom's bounds.
+
+    A mesh contributes its **vertices**, not the corners of its own AABB. The
+    caller re-bounds these in the body frame, and bounding an already-bounded
+    box inflates it whenever the geom is rotated relative to the body. Across
+    a 33-piece convex decomposition of a mug that inflation came to 3 cm of
+    height — enough to put the box's floor below the table it stands on, and
+    to make the object look too tall to fit under the drawer it goes into.
+    """
+    gtype = int(np.asarray(model.geom_type)[gid])
+    if gtype == _GEOM_MESH:
+        verts = _mesh_vertices(model, gid, cache)
+        if verts is not None:
+            return verts
+    box = _geom_local_box(model, gid)
+    return None if box is None else _box_corners(*box)
+
+
 def _geom_local_box(model: Any, gid: int) -> tuple[np.ndarray, np.ndarray] | None:
     """(center, half-extents) of geom *gid* in the geom's own frame."""
     gtype = int(np.asarray(model.geom_type)[gid])
@@ -134,7 +183,16 @@ def _geom_local_box(model: Any, gid: int) -> tuple[np.ndarray, np.ndarray] | Non
         half = np.array([size[0], size[0], size[1]])
     elif gtype in (_GEOM_BOX, _GEOM_ELLIPSOID):
         half = size[:3].copy()
-    else:  # mesh without geom_aabb: bounding-sphere radius
+    else:
+        # Mesh on a build with no geom_aabb (MuJoCo < 3): bound the vertices.
+        # geom_size is meaningless for a mesh and geom_rbound is the bounding
+        # *sphere*, which makes a mug as wide as it is tall — the difference
+        # between a grasp across the body and one the hand refuses outright.
+        verts = _mesh_vertices(model, gid, None)
+        if verts is not None:
+            lo, hi = verts.min(axis=0), verts.max(axis=0)
+            return (lo + hi) * 0.5, (hi - lo) * 0.5
+        # Last resort: the bounding sphere. Over-wide, but never under-covers.
         rbound = float(np.asarray(model.geom_rbound)[gid])
         half = np.array([rbound] * 3)
     return np.zeros(3), half
@@ -172,8 +230,13 @@ def _box_corners(center: np.ndarray, half: np.ndarray) -> np.ndarray:
     return center[None, :] + signs * half[None, :]
 
 
-class LiberoWorldAdapter:
-    """Build verify.World snapshots from a LIBERO-style env's ground truth."""
+class MujocoSceneAdapter:
+    """Build portable scene state from a robosuite-style MuJoCo environment.
+
+    Despite its historical LIBERO-only name, this implementation only relies
+    on the MuJoCo / robosuite object model. It is therefore also the shared
+    privileged provider for MimicGen and other robosuite benchmarks.
+    """
 
     def __init__(
         self,
@@ -189,6 +252,16 @@ class LiberoWorldAdapter:
         self._objects: dict[str, int] = {}            # object name -> root body id
         self._body_owner: dict[int, str] = {}          # any body id -> contact name
         self._local_aabbs: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        self._body_aabbs: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+        # Per-body boxes and ids for the *parts* of an object — the model
+        # bodies inside a root's subtree. An articulated object's moving piece
+        # (a drawer's sliding link, a door's leaf) is the thing a grasp
+        # actually targets, and its box is nothing like the whole cabinet's.
+        self._part_aabbs: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        self._part_bids: dict[str, tuple[str, int]] = {}   # part -> (root, bid)
+        self._feature_geoms: dict[str, tuple[str, int, np.ndarray, np.ndarray]] = {}
+        self._articulations: dict[str, tuple[str, int]] = {}
+        self._movable: set[str] = set()                    # free-jointed objects
         self._tabletop_name = "table"
         self._prepared = False
         self.refresh()
@@ -204,6 +277,12 @@ class LiberoWorldAdapter:
         self._objects = {}
         self._body_owner = {}
         self._local_aabbs = {}
+        self._body_aabbs = {}
+        self._part_aabbs = {}
+        self._part_bids = {}
+        self._feature_geoms = {}
+        self._articulations = {}
+        self._movable = set()
         self._base_bid: int | None = None
         self._prepared = False
         if self._sim is None:
@@ -252,8 +331,17 @@ class LiberoWorldAdapter:
                     self._body_owner[b] = name
 
         self._objects = objects
+        # Which of those can actually be picked up. An object hung on a free
+        # joint moves as a whole when a hand lifts it; one hung on a slide or
+        # hinge (a drawer, a door) is bolted to the scene and only articulates.
+        # Both are "objects" to the task; only the first is a grasp target.
+        free_bids = set(self._free_joint_bodies(model).values())
+        self._movable = {n for n, bid in objects.items() if bid in free_bids}
 
         # Per-body local AABBs from model geoms, accumulated over the subtree.
+        # One mesh-vertex cache for the whole sweep: scenes reuse meshes
+        # heavily and this loop visits every geom of every named body.
+        mesh_cache: dict[int, np.ndarray | None] = {}
         for name, root in roots.items():
             lo = np.full(3, np.inf)
             hi = np.full(3, -np.inf)
@@ -261,24 +349,55 @@ class LiberoWorldAdapter:
             for b in members:
                 offset_pos, offset_rot = self._subtree_transform(model, root, b)
                 gids = np.where(np.asarray(model.geom_bodyid) == b)[0]
+                # This body's own box falls out of the same points, one
+                # transform earlier, so parts cost nothing beyond the dict.
+                blo = np.full(3, np.inf)
+                bhi = np.full(3, -np.inf)
                 for gid in gids:
-                    box = _geom_local_box(model, int(gid))
-                    if box is None:
+                    pts = _geom_local_points(model, int(gid), mesh_cache)
+                    if pts is None:
                         continue
-                    center, half = box
                     gpos = np.asarray(model.geom_pos)[gid].astype(np.float64)
                     grot = _quat_wxyz_to_rotmat(np.asarray(model.geom_quat)[gid])
-                    corners = _box_corners(center, half)        # geom frame
-                    corners = (grot @ corners.T).T + gpos        # body frame
-                    corners = (offset_rot @ corners.T).T + offset_pos  # root frame
-                    lo = np.minimum(lo, corners.min(axis=0))
-                    hi = np.maximum(hi, corners.max(axis=0))
+                    feature_name = self._geom_name(model, int(gid))
+                    if feature_name:
+                        flo, fhi = pts.min(axis=0), pts.max(axis=0)
+                        self._feature_geoms[feature_name] = (
+                            name, int(gid),
+                            (flo + fhi) / 2.0,
+                            (fhi - flo) / 2.0,
+                        )
+                    pts = (grot @ pts.T).T + gpos                # body frame
+                    blo = np.minimum(blo, pts.min(axis=0))
+                    bhi = np.maximum(bhi, pts.max(axis=0))
+                    pts = (offset_rot @ pts.T).T + offset_pos    # root frame
+                    lo = np.minimum(lo, pts.min(axis=0))
+                    hi = np.maximum(hi, pts.max(axis=0))
+                part = self._body_name(model, b)
+                if np.all(np.isfinite(blo)):
+                    self._body_aabbs[b] = (blo, bhi)
+                if part and b != root and np.all(np.isfinite(blo)):
+                    self._part_aabbs[part] = (blo, bhi)
+                    self._part_bids[part] = (name, b)
             if np.all(np.isfinite(lo)):
                 self._local_aabbs[name] = (lo, hi)
             else:
                 self._local_aabbs[name] = (
                     -0.05 * np.ones(3), 0.05 * np.ones(3),
                 )
+        for jid in range(int(getattr(model, "njnt", 0))):
+            try:
+                jtype = int(np.asarray(model.jnt_type)[jid])
+                bid = int(np.asarray(model.jnt_bodyid)[jid])
+            except Exception:
+                continue
+            if jtype not in (2, 3):  # slide / hinge
+                continue
+            root = self._body_owner.get(bid)
+            if root is None or root.startswith(self.robot_link_prefixes):
+                continue
+            name = self._joint_name(model, jid) or f"{root}:dof{jid}"
+            self._articulations[name] = (root, jid)
         self._prepared = True
 
     @staticmethod
@@ -294,6 +413,26 @@ class LiberoWorldAdapter:
             return model.body_id2name(bid)
         except Exception:
             return None
+
+    @staticmethod
+    def _geom_name(model: Any, gid: int) -> str | None:
+        try:
+            return model.geom_id2name(gid)
+        except Exception:
+            try:
+                return model.id2name(gid, "geom")
+            except Exception:
+                return None
+
+    @staticmethod
+    def _joint_name(model: Any, jid: int) -> str | None:
+        try:
+            return model.joint_id2name(jid)
+        except Exception:
+            try:
+                return model.jnt_id2name(jid)
+            except Exception:
+                return None
 
     def _free_joint_bodies(self, model: Any) -> dict[str, int]:
         """Fallback object discovery: bodies hung on a free joint."""
@@ -358,13 +497,7 @@ class LiberoWorldAdapter:
 
         # World -> robot-base transform (p_base = R_b^T @ (p_world - t_b)):
         # keeps privileged truth in the frame all workflow outputs use.
-        base_t = np.zeros(3)
-        base_Rt = np.eye(3)
-        if self._base_bid is not None:
-            base_t = np.asarray(data.body_xpos)[self._base_bid].astype(np.float64)
-            base_Rt = _quat_wxyz_to_rotmat(
-                np.asarray(data.body_xquat)[self._base_bid].astype(np.float64)
-            ).T
+        base_t, base_Rt = self._reference_transform()
 
         bodies: dict[str, Body] = {}
         names = dict(self._objects)
@@ -375,14 +508,20 @@ class LiberoWorldAdapter:
         for name, bid in names.items():
             pos = np.asarray(data.body_xpos)[bid].astype(np.float64).copy()
             quat = np.asarray(data.body_xquat)[bid].astype(np.float64).copy()  # wxyz
-            lo, hi = self._local_aabbs.get(
-                name, (-0.05 * np.ones(3), 0.05 * np.ones(3))
-            )
-            R = _quat_wxyz_to_rotmat(quat)
+            live_box = self._object_box_world(name)
+            if live_box is None:
+                box_center = pos
+                half = 0.05 * np.ones(3)
+                box_quat = quat
+            else:
+                box_center, half, box_quat = live_box
             pos = base_Rt @ (pos - base_t)
-            R = base_Rt @ R
-            quat = _rotmat_to_quat_wxyz(R)
-            corners = (R @ _box_corners((lo + hi) / 2.0, (hi - lo) / 2.0).T).T + pos
+            box_center = base_Rt @ (box_center - base_t)
+            R = base_Rt @ _quat_wxyz_to_rotmat(box_quat)
+            quat = _rotmat_to_quat_wxyz(
+                base_Rt @ _quat_wxyz_to_rotmat(quat)
+            )
+            corners = (R @ _box_corners(np.zeros(3), half).T).T + box_center
             lin, ang = self._body_velocity(data, bid)
             bodies[name] = Body(
                 name=name,
@@ -393,6 +532,20 @@ class LiberoWorldAdapter:
                 linear_velocity=base_Rt @ lin,
                 angular_velocity=base_Rt @ ang,
                 contacts=contacts.get(name, frozenset()),
+            )
+
+        articulations: dict[str, Articulation] = {}
+        for articulation_name in self.articulation_names():
+            state = self.articulation_state(articulation_name)
+            if state is None:
+                continue
+            articulations[articulation_name] = Articulation(
+                name=state["name"], parent=state["parent"], child=state["child"],
+                kind=state["kind"], position=float(state["position"]),
+                lower=float(state["lower"]), upper=float(state["upper"]),
+                progress=float(state["progress"]),
+                axis=np.asarray(state["axis"], dtype=np.float64).copy(),
+                pivot=np.asarray(state["pivot"], dtype=np.float64).copy(),
             )
 
         robot_view = self._robot_view(model, data, base_t=base_t, base_Rt=base_Rt)
@@ -406,6 +559,7 @@ class LiberoWorldAdapter:
         return World(
             env_id=int(env_id),
             bodies=bodies,
+            articulations=articulations,
             robot_view=robot_view,
             time_s=time_s,
             robot_link_prefixes=self.robot_link_prefixes,
@@ -414,6 +568,361 @@ class LiberoWorldAdapter:
 
     # Alias so SimConnector.world_snapshot can pass straight through.
     __call__ = snapshot
+
+    # ------------------------------------------------------------------
+    # Connector-reference ground truth (backs the privileged sim.* tools)
+    # ------------------------------------------------------------------
+    #
+    # ``snapshot()``, perception clouds, motion targets, and these accessors
+    # must share one frame. In the sim connector that reference is the robot
+    # base frame; raw MuJoCo-world coordinates create a constant base-offset
+    # error in every privileged grasp.
+
+    def object_names(self) -> list[str]:
+        """Every body the privileged accessors below can answer about."""
+        if self._sim is None or not self._prepared:
+            self.refresh()
+        names = list(self._objects)
+        if self._tabletop_name in self._local_aabbs and self._tabletop_name not in names:
+            names.append(self._tabletop_name)
+        return names
+
+    def task_object_names(self) -> list[str]:
+        """The subset of :meth:`object_names` the *task* declares.
+
+        Everything else in the list is scene furniture the adapter adds for
+        reference — today just the tabletop. The distinction matters to a
+        caller trying to turn a natural noun phrase into a body name: LIBERO
+        habitually calls the one manipulable body ``object``, so "the white
+        mug" matches nothing by text and everything by elimination.
+        """
+        return [n for n in self.object_names() if n in self._objects]
+
+    def movable_object_names(self) -> list[str]:
+        """The subset of :meth:`task_object_names` a hand could carry away.
+
+        Free-jointed bodies, as opposed to objects bolted to the scene that
+        merely articulate — a mug rather than the drawer it goes into.
+        """
+        return [n for n in self.object_names() if n in self._movable]
+
+    def workspace_surface_box(self):
+        """Primary support surface in connector coordinates, when present."""
+        return self.object_box(self._tabletop_name)
+
+    def part_names(self, root: str) -> list[str]:
+        """The model bodies inside *root*'s subtree, excluding *root* itself.
+
+        These are the object's moving or distinguishable pieces — a drawer's
+        sliding link, a door's leaf — addressable by the same accessors as a
+        whole object. Names are the model's own body names, which is what the
+        caller has to quote: there is no noun-phrase layer down here.
+        """
+        if self._sim is None or not self._prepared:
+            self.refresh()
+        return sorted(p for p, (r, _bid) in self._part_bids.items() if r == root)
+
+    def feature_names(self, root: str) -> list[str]:
+        """Named contact geometry and body parts owned by *root*."""
+        if self._sim is None or not self._prepared:
+            self.refresh()
+        geoms = [
+            name for name, (owner, *_rest) in self._feature_geoms.items()
+            if owner == root
+        ]
+        return sorted(set(geoms + self.part_names(root)))
+
+    def feature_box(
+        self, root: str, feature: str,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+        """Live feature OBB in connector coordinates."""
+        if feature in self._part_bids and self._part_bids[feature][0] == root:
+            return self.object_box(feature)
+        record = self._feature_geoms.get(feature)
+        if record is None or record[0] != root or self._sim is None:
+            return None
+        _owner, gid, local_center, half = record
+        data = self._sim.data
+        try:
+            world_pos = np.asarray(data.geom_xpos)[gid].astype(np.float64)
+            world_R = np.asarray(data.geom_xmat)[gid].astype(np.float64).reshape(3, 3)
+        except Exception:
+            return None
+        center = world_pos + world_R @ local_center
+        base_t, base_Rt = self._reference_transform()
+        R = base_Rt @ world_R
+        return (
+            base_Rt @ (center - base_t),
+            half.copy(),
+            _rotmat_to_quat_wxyz(R),
+        )
+
+    def articulation_names(self, root: str | None = None) -> list[str]:
+        """Every scalar prismatic/revolute DOF, optionally scoped to entity."""
+        if self._sim is None or not self._prepared:
+            self.refresh()
+        return sorted(
+            name for name, (owner, _jid) in self._articulations.items()
+            if root is None or owner == root
+        )
+
+    def articulation_state(self, name: str) -> dict[str, Any] | None:
+        """Backend-neutral live joint state in connector coordinates."""
+        record = self._articulations.get(name)
+        if record is None or self._sim is None:
+            return None
+        root, jid = record
+        model, data = self._sim.model, self._sim.data
+        jtype = int(np.asarray(model.jnt_type)[jid])
+        bid = int(np.asarray(model.jnt_bodyid)[jid])
+        child = self._body_name(model, bid) or root
+        try:
+            addr = int(np.asarray(model.jnt_qposadr)[jid])
+        except Exception:
+            try:
+                addr = model.get_joint_qpos_addr(name)
+                if isinstance(addr, tuple):
+                    addr = addr[0]
+                addr = int(addr)
+            except Exception:
+                return None
+        position = float(np.asarray(data.qpos)[addr])
+        try:
+            limited = bool(np.asarray(model.jnt_limited)[jid])
+            limits = np.asarray(model.jnt_range)[jid].astype(np.float64)
+            lower, upper = (
+                (float(limits[0]), float(limits[1]))
+                if limited else (-np.inf, np.inf)
+            )
+        except Exception:
+            lower, upper = -np.inf, np.inf
+        progress = (
+            (position - lower) / (upper - lower)
+            if np.isfinite(lower) and np.isfinite(upper) and upper > lower
+            else 0.0
+        )
+        axis_local = np.asarray(model.jnt_axis)[jid].astype(np.float64)
+        body_R = _quat_wxyz_to_rotmat(
+            np.asarray(data.body_xquat)[bid].astype(np.float64)
+        )
+        _base_t, base_Rt = self._reference_transform()
+        axis = base_Rt @ body_R @ axis_local
+        joint_local = np.asarray(model.jnt_pos)[jid].astype(np.float64)
+        body_position = np.asarray(data.body_xpos)[bid].astype(np.float64)
+        pivot_world = body_position + body_R @ joint_local
+        pivot = base_Rt @ (pivot_world - _base_t)
+        norm = float(np.linalg.norm(axis))
+        if norm > 1e-12:
+            axis /= norm
+        return {
+            "name": name,
+            "parent": root,
+            "child": child,
+            "kind": "prismatic" if jtype == 2 else "revolute",
+            "axis": axis,
+            "pivot": pivot,
+            "position": position,
+            "lower": lower,
+            "upper": upper,
+            "progress": float(progress),
+        }
+
+    def contact_pairs(self) -> list[tuple[str, str]]:
+        """Live canonical contact pairs with backend geom ids removed."""
+        if self._sim is None or not self._prepared:
+            self.refresh()
+        if self._sim is None:
+            return []
+        return self._contact_pairs(self._sim.model, self._sim.data)
+
+    def collision_feature_contact_pairs(self) -> list[tuple[str, str]]:
+        """Exact live collision-shape pairs, named without exposing numeric ids."""
+        if self._sim is None or not self._prepared:
+            self.refresh()
+        if self._sim is None:
+            return []
+        model, data = self._sim.model, self._sim.data
+        pairs: list[tuple[str, str]] = []
+        try:
+            count = int(data.ncon)
+        except Exception:
+            return pairs
+        for index in range(count):
+            contact = data.contact[index]
+            first_id, second_id = int(contact.geom1), int(contact.geom2)
+            first = self._geom_name(model, first_id) or f"geom_{first_id}"
+            second = self._geom_name(model, second_id) or f"geom_{second_id}"
+            pairs.append((first, second))
+        return pairs
+
+    def named_frame_pose(
+        self, name: str,
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        """Exact named collision/body/site frame in connector coordinates.
+
+        Resolution order matches Agent2Policy's normalized state contract:
+        collision feature, body, then site. Sites are points there, so their
+        orientation is the public-world basis rather than a simulator-only
+        site orientation.
+        """
+        if self._sim is None or not self._prepared:
+            self.refresh()
+        if self._sim is None:
+            return None
+        if name == "world":
+            return np.zeros(3), np.array([1.0, 0.0, 0.0, 0.0])
+        model, data = self._sim.model, self._sim.data
+        position: np.ndarray | None = None
+        rotation: np.ndarray | None = None
+        for kind, pos_attr, mat_attr in (
+            ("geom", "geom_xpos", "geom_xmat"),
+            ("body", "body_xpos", None),
+            ("site", "site_xpos", None),
+        ):
+            try:
+                lookup = getattr(model, f"{kind}_name2id")
+                index = int(lookup(name))
+            except Exception:
+                continue
+            position = np.asarray(getattr(data, pos_attr))[index].astype(np.float64)
+            if kind == "body":
+                rotation = _quat_wxyz_to_rotmat(
+                    np.asarray(data.body_xquat)[index].astype(np.float64)
+                )
+            elif mat_attr is not None:
+                rotation = np.asarray(getattr(data, mat_attr))[index].astype(
+                    np.float64
+                ).reshape(3, 3)
+            else:
+                rotation = np.eye(3)
+            break
+        if position is None or rotation is None:
+            return None
+        base_t, base_Rt = self._reference_transform()
+        return (
+            base_Rt @ (position - base_t),
+            _rotmat_to_quat_wxyz(base_Rt @ rotation),
+        )
+
+    def _live_body(self, name: str) -> tuple[int, np.ndarray, np.ndarray] | None:
+        """``(body_id, world_position, world_quat_wxyz)`` of the body origin."""
+        if self._sim is None or not self._prepared:
+            self.refresh()
+        if self._sim is None:
+            return None
+        bid = self._objects.get(name)
+        if bid is None and name == self._tabletop_name:
+            model = self._sim.model
+            bid = self._body_id(model, "table") or self._body_id(model, "table_top")
+        if bid is None and name in self._part_bids:
+            bid = self._part_bids[name][1]
+        if bid is None:
+            return None
+        data = self._sim.data
+        return (
+            int(bid),
+            np.asarray(data.body_xpos)[bid].astype(np.float64).copy(),
+            np.asarray(data.body_xquat)[bid].astype(np.float64).copy(),
+        )
+
+    def reference_frame_name(self) -> str:
+        """Concrete basis behind the connector public-world label."""
+        if self._sim is None or not self._prepared:
+            self.refresh()
+        return "robot_base" if self._base_bid is not None else "mujoco_world"
+
+    def object_pose(self, name: str) -> tuple[np.ndarray, np.ndarray] | None:
+        """Body pose in the connector reference frame (robot-base in sim)."""
+        live = self._live_body(name)
+        if live is None:
+            return None
+        _bid, pos, quat = live
+        base_t, base_Rt = self._reference_transform()
+        return (
+            base_Rt @ (pos - base_t),
+            _rotmat_to_quat_wxyz(base_Rt @ _quat_wxyz_to_rotmat(quat)),
+        )
+
+    def _reference_transform(self) -> tuple[np.ndarray, np.ndarray]:
+        """MuJoCo-world to connector-reference translation and rotation."""
+        if self._sim is None or self._base_bid is None:
+            return np.zeros(3), np.eye(3)
+        data = self._sim.data
+        base_t = np.asarray(data.body_xpos)[self._base_bid].astype(np.float64)
+        base_Rt = _quat_wxyz_to_rotmat(
+            np.asarray(data.body_xquat)[self._base_bid].astype(np.float64)
+        ).T
+        return base_t, base_Rt
+
+    def _object_box_world(
+        self, name: str,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+        """Live box in MuJoCo world coordinates before reference conversion.
+
+        For an articulated root, every child's cached local geometry is
+        carried by that child's live pose and re-bounded in the root frame.
+        A drawer or door therefore stays correct after its joint moves.
+        """
+        live = self._live_body(name)
+        if live is None or self._sim is None:
+            return None
+        _bid, pos, quat = live
+
+        if name in self._part_bids:
+            bounds = self._part_aabbs.get(name)
+            if bounds is None:
+                return None
+            lo, hi = bounds
+            R = _quat_wxyz_to_rotmat(quat)
+            return pos + R @ ((lo + hi) / 2.0), (hi - lo) / 2.0, quat
+
+        members = [
+            b for b, owner in self._body_owner.items()
+            if owner == name and b in self._body_aabbs
+        ]
+        if not members:
+            bounds = self._local_aabbs.get(name)
+            if bounds is None:
+                return None
+            lo, hi = bounds
+            R = _quat_wxyz_to_rotmat(quat)
+            return pos + R @ ((lo + hi) / 2.0), (hi - lo) / 2.0, quat
+
+        data = self._sim.data
+        root_R = _quat_wxyz_to_rotmat(quat)
+        points_root: list[np.ndarray] = []
+        for member in members:
+            lo, hi = self._body_aabbs[member]
+            member_pos = np.asarray(data.body_xpos)[member].astype(np.float64)
+            member_R = _quat_wxyz_to_rotmat(
+                np.asarray(data.body_xquat)[member].astype(np.float64)
+            )
+            world_pts = (
+                member_R
+                @ _box_corners((lo + hi) / 2.0, (hi - lo) / 2.0).T
+            ).T + member_pos
+            points_root.append((root_R.T @ (world_pts - pos).T).T)
+        pts = np.concatenate(points_root, axis=0)
+        lo, hi = pts.min(axis=0), pts.max(axis=0)
+        return pos + root_R @ ((lo + hi) / 2.0), (hi - lo) / 2.0, quat
+
+    def object_box(self, name: str) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+        """Live oriented box in the connector reference frame.
+
+        ``center`` is the geometry center, not necessarily the body origin.
+        Object roots aggregate their live subtree; named parts use their own
+        body-local geometry.
+        """
+        box = self._object_box_world(name)
+        if box is None:
+            return None
+        center, half, quat = box
+        base_t, base_Rt = self._reference_transform()
+        return (
+            base_Rt @ (center - base_t),
+            half,
+            _rotmat_to_quat_wxyz(base_Rt @ _quat_wxyz_to_rotmat(quat)),
+        )
 
     def _contact_pairs(self, model: Any, data: Any) -> list[tuple[str, str]]:
         pairs: list[tuple[str, str]] = []
@@ -523,4 +1032,8 @@ class LiberoWorldAdapter:
         )
 
 
-__all__ = ["LiberoWorldAdapter", "find_mujoco_sim"]
+class LiberoWorldAdapter(MujocoSceneAdapter):
+    """Backward-compatible LIBERO spelling of :class:`MujocoSceneAdapter`."""
+
+
+__all__ = ["LiberoWorldAdapter", "MujocoSceneAdapter", "find_mujoco_sim"]

@@ -170,7 +170,9 @@ def test_validate_flag_defaults_true_and_carries_through():
     assert hard.validate is True
     assert probe.validate is False
     # Probes still evaluate normally; enforcement policy is the caller's job.
-    assert evaluate_checkpoint(probe, _fixture_world()).passed is True
+    result = evaluate_checkpoint(probe, _fixture_world())
+    assert result.passed is True
+    assert result.validate is False
 
 
 # ---------------------------------------------------------------------------

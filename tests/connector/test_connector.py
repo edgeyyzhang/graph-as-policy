@@ -17,6 +17,7 @@ EXPECTED_TOOLS = {
     "robot.get_ee_pose",
     "robot.get_gripper",
     "robot.get_gripper_pose",
+    "robot.get_joint_state",
     # robot.* — control
     "robot.go_to_pose",
     "robot.go_to_pose_cartesian",
@@ -58,12 +59,34 @@ class TestToolRegistration:
         for name in (
             "robot.get_observation", "robot.get_ee_pose",
             "robot.get_gripper", "robot.get_gripper_pose",
-            "robot.get_camera_pose", "sim.check_success", "sim.reset",
+            "robot.get_joint_state", "robot.get_camera_pose", "sim.check_success", "sim.reset",
         ):
             assert reg.get(name).tags == (), name
 
     def test_registry_built_once(self, connector):
         assert connector.tool_registry is connector.tool_registry
+
+
+class TestEmbodimentDescription:
+    def test_default_finger_reach_is_explicitly_unstated(self, connector):
+        from gap.envs.registry import GripperSpec
+
+        assert GripperSpec().finger_reach_m is None
+        finger = connector.describe_gripper()["finger"]
+        assert finger == {
+            "stated": False,
+            "reach_m": 0.0,
+            "clearance_m": pytest.approx(0.005),
+        }
+
+    def test_explicit_zero_reach_is_stated(self, fake_env, fake_config):
+        from gap.envs.registry import GripperSpec
+
+        fake_config.gripper = GripperSpec(finger_reach_m=0.0)
+        conn = SimConnector(fake_env, fake_config, ik=FakeIK())
+        finger = conn.describe_gripper()["finger"]
+        assert finger["stated"] is True
+        assert finger["reach_m"] == pytest.approx(0.0)
 
 
 class TestObservationAssembly:
@@ -116,6 +139,22 @@ class TestObservationAssembly:
         assert out["pose"]["rotation"]["y"] == 1.0
         with pytest.raises(ToolError):
             connector.get_camera_pose("nope")
+
+
+class TestJointState:
+    def test_named_limits_progress_margin_and_near_limit(self, fake_env, fake_config):
+        fake_config.joint_names = tuple(f"joint{i + 1}" for i in range(7))
+        fake_config.joint_limits = tuple((-1.0, 1.0) for _ in range(7))
+        fake_env._joints[:] = [0.0, 0.9, -1.0, 0.2, 0.3, 0.4, 0.5]
+        conn = SimConnector(fake_env, fake_config, ik=FakeIK())
+        state = conn.get_joint_state(near_limit_threshold=0.05)
+        by_name = {row["name"]: row for row in state["joints"]}
+        assert by_name["joint1"]["progress"] == pytest.approx(0.5)
+        assert by_name["joint1"]["margin"] == pytest.approx(0.5)
+        assert by_name["joint2"]["margin"] == pytest.approx(0.05)
+        assert by_name["joint2"]["near_limit"] is True
+        assert by_name["joint3"]["distance_to_limit"] == pytest.approx(0.0)
+        assert by_name["joint3"]["near_limit"] is True
 
 
 class TestGripper:

@@ -156,29 +156,11 @@ def test_quickstart_scripts_exist(graph: str) -> None:
     assert missing == [], f"missing scripts in {graph}: {missing}"
 
 
-def test_quickstart_no_legacy_tool_names() -> None:
-    """The migration script reports the example fully migrated."""
-    import sys
-
-    sys.path.insert(0, str(REPO_ROOT / "scripts"))
-    try:
-        import migrate_tool_names as mig
-    finally:
-        sys.path.pop(0)
-
-    hits: list[str] = []
-    for graph in GRAPHS:
-        graph_dir = EXAMPLE_DIR / graph
-        # Only the authored artifacts: workflow.json + scripts/ +
-        # checkpoints/ (a stray runtime trace dir must not fail the check).
-        targets = [graph_dir / "workflow.json"]
-        for sub in ("scripts", "checkpoints"):
-            targets.extend(sorted((graph_dir / sub).rglob("*.py")))
-        for path in targets:
-            if path.is_file():
-                _, file_hits = mig.migrate_file(path, check=True)
-                hits.extend(f"{path}: {h}" for h in file_hits)
-    assert hits == [], hits
+# The legacy-tool-name check used to run the one-off ``scripts/
+# migrate_tool_names.py``; that script was retired with the scripts/
+# directory, and the tool names it rewrote no longer exist anywhere the
+# example can reach -- ``test_quickstart_tool_names_known`` above
+# already binds every referenced name to the live registry.
 
 
 def test_quickstart_checkpoint_module_loads() -> None:

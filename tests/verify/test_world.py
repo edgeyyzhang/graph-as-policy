@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from gap.runtime.verify import (
+    Articulation,
     Body,
     BodyNotFoundError,
     Robot,
@@ -352,3 +353,17 @@ def test_stub_world_has_bodies_robot_and_cavities():
     basket = world.body("basket")
     assert basket.cavity_lower is not None and basket.cavity_upper is not None
     assert world.body("soup_can").cavity_lower is None
+
+
+def test_world_exposes_named_articulations():
+    hinge = Articulation(
+        name="lid_hinge", parent="machine", child="lid", kind="revolute",
+        position=0.2, lower=0.0, upper=2.1, progress=0.2 / 2.1,
+        axis=np.array([0.0, 1.0, 0.0]), pivot=np.array([0.1, 0.0, 0.2]),
+    )
+    world = World(env_id=0, bodies={}, articulations={hinge.name: hinge})
+    assert world.articulation_names() == ["lid_hinge"]
+    assert world.has_articulation("lid_hinge")
+    assert world.articulation("lid_hinge").position == pytest.approx(0.2)
+    with pytest.raises(KeyError, match="available"):
+        world.articulation("missing")

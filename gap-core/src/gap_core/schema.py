@@ -40,6 +40,11 @@ TYPE_REGISTRY: dict[str, Any] = {
     "GraspCandidates": _t.GraspCandidates,
     # Features, payloads, plans, curves
     "FunctionalFeature": _t.FunctionalFeature,
+    "SceneEntity": _t.SceneEntity,
+    "SceneFeature": _t.SceneFeature,
+    "ArticulationState": _t.ArticulationState,
+    "Condition": _t.Condition,
+    "ConditionResult": _t.ConditionResult,
     "CollisionSphere": _t.CollisionSphere,
     "AttachedObject": _t.AttachedObject,
     "PoseWaypoint": _t.PoseWaypoint,
