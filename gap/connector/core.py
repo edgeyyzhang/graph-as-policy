@@ -1044,6 +1044,7 @@ class Connector:
         subsample: int = 0,
         tolerance: float = 0.0,
         max_steps_per_waypoint: int = 0,
+        arm_id: int = 0,
     ) -> None:
         """Execute a joint trajectory (source ExecuteJointTrajectory defaults)."""
         if not trajectory or not trajectory.get("waypoints"):
@@ -1051,7 +1052,9 @@ class Connector:
         subsample = subsample if subsample > 0 else 1
         tolerance = tolerance if tolerance > 0 else 0.01
         max_steps = max_steps_per_waypoint if max_steps_per_waypoint > 0 else 120
-        self._execute_trajectory(trajectory, subsample, tolerance, max_steps)
+        self._execute_trajectory(
+            trajectory, subsample, tolerance, max_steps, arm_id=int(arm_id)
+        )
 
     def _tool_move_to_joints(
         self,

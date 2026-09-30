@@ -21,6 +21,7 @@ from gap.skills import (
     SkillsRegistry,
     load_prompt,
     load_skills,
+    parse_skill_md,
 )
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -98,6 +99,27 @@ def test_frontmatter_maps_into_skillmeta() -> None:
     # body captured verbatim for the prompt assembler
     assert meta.body.startswith("# fixture-skill")
     assert meta.bundle_dir == FIXTURES / "skills" / "fixture-skill"
+
+
+def test_canonical_scripts_mapping_form_is_backward_compatible(tmp_path: Path) -> None:
+    bundle = _write_bundle(
+        tmp_path,
+        "skills",
+        "mapping-scripts",
+        "name: mapping-scripts\n"
+        "description: Exercise the compact canonical script mapping form.\n"
+        "gap:\n"
+        "  canonical_scripts:\n"
+        "    first: scripts/first.py\n"
+        "    second: scripts/second.py\n",
+    )
+
+    meta = parse_skill_md(bundle / "SKILL.md")
+
+    assert meta.canonical_scripts == [
+        CanonicalScript(name="first", path="scripts/first.py"),
+        CanonicalScript(name="second", path="scripts/second.py"),
+    ]
 
 
 def test_tool_bundle_meta_maps_gap_tools() -> None:

@@ -37,6 +37,8 @@ __all__ = [
     "Vec3",
     "Quaternion",
     "Se3Pose",
+    "PoseWaypoint",
+    "PoseSequence",
     "OrientedBoundingBox",
     "BoundingBox2D",
     "CameraFrame",
@@ -49,6 +51,8 @@ __all__ = [
     "Observation",
     "CollisionMesh",
     "WorldConfig",
+    "CollisionSphere",
+    "AttachedObject",
     "GraspCandidates",
     "identity_pose",
     "make_pose",
@@ -84,6 +88,32 @@ class Se3Pose(TypedDict):
 
     position: Vec3
     rotation: Quaternion
+
+
+class PoseWaypoint(TypedDict):
+    """One typed leg of a collision-aware manipulation sequence.
+
+    ``mode`` is preferred for new graphs. ``cartesian`` remains for existing
+    graphs and means ``planned_linear`` when true, ``planned_joint`` otherwise.
+    """
+
+    pose: Se3Pose
+    cartesian: NotRequired[bool]
+    mode: NotRequired[str]
+    allow_start_contact: NotRequired[bool]
+    allow_goal_contact: NotRequired[bool]
+    contact_margin: NotRequired[float]
+    use_attachment: NotRequired[bool]
+    max_attempts: NotRequired[int]
+
+
+class PoseSequence(TypedDict):
+    """Ordered Cartesian poses for a shaped manipulation path."""
+
+    waypoints: list[PoseWaypoint]
+    world_config: NotRequired["WorldConfig"]
+    attached_object: NotRequired["AttachedObject"]
+    time_scale: NotRequired[float]
 
 
 class OrientedBoundingBox(TypedDict):
@@ -175,6 +205,21 @@ class WorldConfig(TypedDict):
     """Planner-agnostic collision scene."""
 
     meshes: list[CollisionMesh]
+
+
+class CollisionSphere(TypedDict):
+    """One sphere fixed in the frame declared by an attached object."""
+
+    center: Vec3
+    radius: float
+
+
+class AttachedObject(TypedDict):
+    """Planner-agnostic collision approximation rigidly held by a robot."""
+
+    frame: str  # currently ``"tcp"``
+    spheres: list[CollisionSphere]
+    sphere_fit_type: NotRequired[str]
 
 
 class GraspCandidates(TypedDict):

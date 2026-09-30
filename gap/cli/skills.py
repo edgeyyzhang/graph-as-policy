@@ -893,7 +893,7 @@ def _required_bundles_for_workflow(workflow_dir: str, registry_set) -> list[str]
 
     candidates: set[str] = set()
     script_paths: set[Path] = set()
-    for sg in wf.subgraphs.values():
+    for sg in (wf, *wf.subgraphs.values()):
         for node in sg.nodes.values():
             if node.type == "tool" and node.tool:
                 candidates.add(node.tool.split(".", 1)[0])

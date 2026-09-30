@@ -23,6 +23,8 @@ TYPE_REGISTRY: dict[str, Any] = {
     "Quaternion": _t.Quaternion,
     "Se3Pose": _t.Se3Pose,
     "Pose": _t.Se3Pose,  # legacy graphs use the short name
+    "PoseWaypoint": _t.PoseWaypoint,
+    "PoseSequence": _t.PoseSequence,
     "OrientedBoundingBox": _t.OrientedBoundingBox,
     "BoundingBox2D": _t.BoundingBox2D,
     "CameraFrame": _t.CameraFrame,
@@ -37,6 +39,8 @@ TYPE_REGISTRY: dict[str, Any] = {
     "ObservationResponse": _t.Observation,  # proto-era name
     "CollisionMesh": _t.CollisionMesh,
     "WorldConfig": _t.WorldConfig,
+    "CollisionSphere": _t.CollisionSphere,
+    "AttachedObject": _t.AttachedObject,
     "GraspCandidates": _t.GraspCandidates,
     # Scalars usable in declarations
     "str": str,

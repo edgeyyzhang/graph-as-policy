@@ -948,12 +948,28 @@ def _check_cross_subgraph_io(
         for out_name in sg.outputs:
             producers.setdefault(out_name, []).append(sg_name)
 
+    # Inputs of a subgraph reached directly from START may be supplied by the
+    # facade through execute(..., inputs=...).  The executor explicitly treats
+    # those initial inputs as the base producer; do not reject the matching
+    # declaration merely because no earlier subgraph can exist before START.
+    begin_initial_bindings: set[tuple[str, str]] = set()
+    for name in wf.begin_targets():
+        node = wf.nodes.get(name)
+        if node is None or node.type != "subgraph" or node.ref is None:
+            continue
+        for input_name, value in node.inputs.items():
+            if (isinstance(value, Ref)
+                    and value.path == f"{RESERVED_INPUT_PSEUDOSTATE}.{input_name}"):
+                begin_initial_bindings.add((node.ref, input_name))
+
     # Consumers: each reachable subgraph's declared inputs must have a producer.
     for sg_name in reachable_sgs:
         sg = wf.subgraphs.get(sg_name)
         if sg is None:
             continue
         for in_name, in_type in sg.inputs.items():
+            if (sg_name, in_name) in begin_initial_bindings:
+                continue
             if (
                 in_name == OBSERVATION_STREAM_INPUT_NAME
                 and in_type.endswith(_OBSERVATION_STREAM_TYPE_NAME)

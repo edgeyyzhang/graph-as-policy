@@ -65,6 +65,47 @@ class ToolBundleManager:
         self._lock = threading.Lock()
         self._managed: dict[str, _Managed] = {}
 
+    def _register_client(self, registry: Any, bundle: str, client: Any) -> list[str]:
+        """Register one live client's catalog into ``registry``."""
+        tool_names: list[str] = []
+        for entry in client.catalog:
+            if entry.name in registry:
+                existing = registry.get(entry.name)
+                if existing.transport == "python" and bundle in existing.tags:
+                    logger.info(
+                        "[tool-bundle:%s] retaining in-process %s",
+                        bundle, entry.name,
+                    )
+                    continue
+                raise ValueError(f"Tool name collision: {entry.name!r} already registered")
+            registry.register_rpc(
+                entry.name,
+                client,
+                summary=entry.summary,
+                tags=tuple(entry.tags),
+            )
+            tool_names.append(entry.name)
+        return tool_names
+
+    def attach_registry(self, tool_registry: Any) -> None:
+        """Expose the already-running servers through a fresh registry.
+
+        Connectors are intentionally episode-scoped, while expensive model
+        servers can be run-scoped.  Rebinding only installs RPC descriptors;
+        no model process is restarted and no episode-local connector state is
+        retained.
+        """
+        with self._lock:
+            managed = list(self._managed.values())
+            self._tool_registry = tool_registry
+        for item in managed:
+            try:
+                self._register_client(tool_registry, item.bundle, item.client)
+            except ValueError as exc:
+                raise ToolBundleStartupError(
+                    f"tool bundle {item.bundle!r}: cannot attach to fresh registry — {exc}"
+                ) from exc
+
     def boot_all(self, bundle_names: Iterable[str]) -> None:
         """Spawn one server per bundle, register every catalog entry.
 
@@ -79,6 +120,9 @@ class ToolBundleManager:
         started: list[_Managed] = []
         try:
             for name in names:
+                with self._lock:
+                    if name in self._managed:
+                        continue
                 info = self._skill_registry.get(name)
                 serving = info.meta.serving
                 if serving is None or serving.protocol != "stdio-msgpack":
@@ -98,26 +142,13 @@ class ToolBundleManager:
                         f"({type(exc).__name__}: {exc})"
                     ) from exc
 
-                tool_names: list[str] = []
-                for entry in client.catalog:
-                    try:
-                        self._tool_registry.register_rpc(
-                            entry.name,
-                            client,
-                            summary=entry.summary,
-                            tags=tuple(entry.tags),
-                        )
-                        tool_names.append(entry.name)
-                    except ValueError as exc:
-                        # Name collision (another bundle exported the same
-                        # name, or an in-process tool already claims it).
-                        # Surface as a startup error — silent dispatch would
-                        # be confusing.
-                        client.close()
-                        raise ToolBundleStartupError(
-                            f"tool bundle {name!r}: cannot register "
-                            f"{entry.name!r} — {exc}"
-                        ) from exc
+                try:
+                    tool_names = self._register_client(self._tool_registry, name, client)
+                except ValueError as exc:
+                    client.close()
+                    raise ToolBundleStartupError(
+                        f"tool bundle {name!r}: cannot register its catalog — {exc}"
+                    ) from exc
                 started.append(_Managed(bundle=name, client=client,
                                          tool_names=tool_names))
                 logger.info("[tool-bundle:%s] %d tools registered",
@@ -155,6 +186,4 @@ class ToolBundleManager:
 
     def loaded_bundles(self) -> list[str]:
         return sorted(self._managed.keys())
-
-
 __all__ = ["ToolBundleManager", "ToolBundleStartupError"]

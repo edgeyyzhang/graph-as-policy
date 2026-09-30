@@ -18,6 +18,7 @@ from gap_core.tools import ToolRegistry
 from gap_core.tools._registry import RpcAdapter
 
 from gap.runtime.tool_bundle_boot import (
+    ToolBundleSession,
     boot_tool_bundles,
     required_rpc_tool_bundles,
 )
@@ -217,6 +218,33 @@ def test_boot_name_collision_tears_down(fake_client_cls, tmp_path):
     assert all(c.closed for c in instances), [c.closed for c in instances]
 
 
+def test_boot_retains_same_bundle_tagged_in_process_tool(fake_client_cls, tmp_path):
+    """A connector-native implementation may overlap its open tool bundle."""
+    skill_registry = _FakeSkillRegistry({
+        "geometry": _FakeSkillInfo(bundle_dir=tmp_path / "geometry"),
+    })
+    tool_registry = ToolRegistry()
+    tool_registry.register_callable(
+        "geometry.native", lambda: {"source": "connector"}, tags=("geometry",)
+    )
+    catalog = [
+        _FakeCatalogEntry(name="geometry.native", summary="overlap"),
+        _FakeCatalogEntry(name="geometry.extra", summary="bundle-only"),
+    ]
+
+    import gap_core.rpc.client as client_mod
+    with patch.object(
+        client_mod, "ToolClient", lambda *a, **kw: _FakeToolClient(*a, **kw, catalog=catalog)
+    ):
+        mgr = ToolBundleManager(skill_registry, tool_registry)
+        mgr.boot_all(["geometry"])
+        try:
+            assert tool_registry.get("geometry.native").transport == "python"
+            assert tool_registry.get("geometry.extra").transport == "rpc"
+        finally:
+            mgr.shutdown_all()
+
+
 def test_shutdown_is_idempotent(fake_client_cls, tmp_path):
     skill_registry = _FakeSkillRegistry({
         "sam3": _FakeSkillInfo(bundle_dir=tmp_path / "sam3"),
@@ -225,6 +253,40 @@ def test_shutdown_is_idempotent(fake_client_cls, tmp_path):
     mgr.boot_all(["sam3"])
     mgr.shutdown_all()
     mgr.shutdown_all()  # second call is a no-op
+    assert fake_client_cls[0].closed is True
+
+
+def test_attach_registry_reuses_live_client(fake_client_cls, tmp_path):
+    skill_registry = _FakeSkillRegistry({
+        "sam3": _FakeSkillInfo(bundle_dir=tmp_path / "sam3"),
+    })
+    first = ToolRegistry()
+    mgr = ToolBundleManager(skill_registry, first)
+    mgr.boot_all(["sam3"])
+    second = ToolRegistry()
+    try:
+        mgr.attach_registry(second)
+        assert len(fake_client_cls) == 1
+        assert second.invoke("sam3.echo", None, episode=2) == {
+            "echoed": {"episode": 2}
+        }
+    finally:
+        mgr.shutdown_all()
+
+
+def test_session_keeps_bundle_alive_across_registries(fake_client_cls, tmp_path):
+    wf_dir = _write_workflow(tmp_path, ["sam3.segment"])
+    skills = _FakeSkillRegistry({
+        "sam3": _FakeSkillInfo(bundle_dir=tmp_path / "sam3"),
+    })
+    session = ToolBundleSession()
+    first, second = ToolRegistry(), ToolRegistry()
+    session.prepare(wf_dir, skills, first)
+    session.prepare(wf_dir, skills, second)
+    assert len(fake_client_cls) == 1
+    assert fake_client_cls[0].closed is False
+    assert "sam3.echo" in first and "sam3.echo" in second
+    session.close()
     assert fake_client_cls[0].closed is True
 
 
@@ -277,6 +339,35 @@ def test_required_rpc_tool_bundles_filters_by_protocol(tmp_path):
         # `sim.*` is a connector tool — never in the registry.
     })
     assert required_rpc_tool_bundles(wf_dir, registry) == {"sam3"}
+
+
+def test_required_rpc_tool_bundles_discovers_local_script_calls(tmp_path):
+    wf_dir = _write_workflow(tmp_path, ["robot.get_observation"])
+    workflow_path = wf_dir / "workflow.json"
+    workflow = json.loads(workflow_path.read_text())
+    node = workflow["subgraphs"]["m"]["nodes"]["n0"]
+    node.clear()
+    node.update({"type": "script", "script": "scripts/perceive.py", "inputs": {}})
+    workflow_path.write_text(json.dumps(workflow))
+    scripts = wf_dir / "scripts"
+    scripts.mkdir()
+    (scripts / "perceive.py").write_text(
+        'def run(ctx):\n    return ctx.tool("sam3.segment_text", image=None)\n'
+    )
+    registry = _FakeSkillRegistry({
+        "sam3": _FakeSkillInfo(bundle_dir=tmp_path / "sam3", protocol="stdio-msgpack"),
+    })
+    assert required_rpc_tool_bundles(wf_dir, registry) == {"sam3"}
+
+
+def test_required_rpc_tool_bundles_reuses_connector_tool(tmp_path):
+    wf_dir = _write_workflow(tmp_path, ["geometry.iou"])
+    registry = _FakeSkillRegistry({
+        "geometry": _FakeSkillInfo(bundle_dir=tmp_path / "geom", protocol="stdio-msgpack"),
+    })
+    tools = ToolRegistry()
+    tools.register_callable("geometry.iou", lambda: None, summary="local geometry")
+    assert required_rpc_tool_bundles(wf_dir, registry, tools) == set()
 
 
 def test_boot_tool_bundles_returns_none_when_no_rpc_needed(tmp_path):

@@ -76,6 +76,9 @@ def execute(
     checkpoints: str = "warn",
     max_node_workers: int = 8,
     policies: dict[str, dict[str, Any]] | None = None,
+    tool_bundle_session: Any = None,
+    on_node_start: Any = None,
+    on_node_end: Any = None,
 ) -> ExecutionResult:
     """Execute a workflow graph and return an :class:`ExecutionResult`.
 
@@ -111,6 +114,15 @@ def execute(
             Policy skills otherwise auto-resolve to their shipped preset, so
             this is only needed to point a policy at an external/custom
             server.
+        tool_bundle_session: Optional run-scoped
+            :class:`gap.runtime.tool_bundle_boot.ToolBundleSession`. When
+            supplied, RPC vision/model servers survive this workflow and are
+            rebound to fresh connector registries on later executions. The
+            caller owns and must close the session.
+        on_node_start: Optional callback receiving ``(node_name, None)`` when
+            a workflow node begins.
+        on_node_end: Optional callback receiving ``(node_name, success)`` when
+            a workflow node finishes.
 
     Never raises on workflow failure — the exception lands in
     ``result.error`` with ``result.success == False``.
@@ -173,9 +185,14 @@ def execute(
         policy_manager, policy_executor = boot_policies(
             target, skill_registry, config_policies=policies,
         )
-        tool_bundle_manager = boot_tool_bundles(
-            target, skill_registry, tool_registry,
-        )
+        if tool_bundle_session is None:
+            tool_bundle_manager = boot_tool_bundles(
+                target, skill_registry, tool_registry,
+            )
+        else:
+            tool_bundle_manager = tool_bundle_session.prepare(
+                target, skill_registry, tool_registry,
+            )
         executor = WorkflowExecutor(
             target,
             tool_registry=tool_registry,
@@ -187,6 +204,8 @@ def execute(
             world_snapshot_fn=world_snapshot_fn,
             max_node_workers=max_node_workers,
         )
+        executor.trace.on_node_start = on_node_start
+        executor.trace.on_node_end = on_node_end
         if inputs:
             executor.initial_inputs.update(inputs)
         executor.execute()
@@ -194,7 +213,7 @@ def execute(
         error = exc
         logger.warning("workflow execution failed: %s", exc)
     finally:
-        if tool_bundle_manager is not None:
+        if tool_bundle_manager is not None and tool_bundle_session is None:
             tool_bundle_manager.shutdown_all()
         if policy_manager is not None:
             policy_manager.shutdown_all()
@@ -232,5 +251,3 @@ def execute(
         duration_s=duration_s,
         latency=latency,
     )
-
-
