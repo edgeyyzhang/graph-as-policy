@@ -249,6 +249,7 @@ def render(
     legend: bool = True,
     title: str | None = None,
     also_png: bool = True,
+    highlight: str | None = None,
 ) -> Path:
     """Render a v3 workflow graph to a PDF (and optionally a sibling PNG).
 
@@ -262,6 +263,9 @@ def render(
         legend: Draw the node-type / route-color legend.
         title: Reserved figure-title override (kept for CLI parity).
         also_png: Write a PNG next to the requested output format.
+        highlight: A node to mark as active, as ``<top-level node>.<node>``
+            for a node inside a subgraph or ``<node>`` for a bare top-level
+            node; its lane and box are drawn in orange.
 
     Returns:
         The primary output path.
@@ -269,12 +273,27 @@ def render(
     wf = load_graph(graph)
     out_path = Path(out)
     _render(wf, out_path, data_edges=data_edges, legend=legend,
-            title=title, also_png=also_png)
+            title=title, also_png=also_png, highlight=highlight)
     return out_path
 
 
+HIGHLIGHT = ("#ffe27a", "#d98800")   # active node (fill, edge)
+HIGHLIGHT_LANE = ("#fff8dc", "#e0a020")
+
+
+def _highlight_parts(highlight: str | None) -> tuple[str | None, str | None]:
+    """``"lane.node"`` -> (lane, node); ``"node"`` -> (node, node)."""
+    if not highlight:
+        return None, None
+    if "." in highlight:
+        lane, node = highlight.split(".", 1)
+        return lane, node
+    return highlight, highlight
+
+
 def _render(wf: dict, out_path: Path, *, data_edges: bool, legend: bool,
-            title: str | None, also_png: bool = True) -> None:
+            title: str | None, also_png: bool = True, highlight: str | None = None) -> None:
+    hl_lane, hl_node = _highlight_parts(highlight)
     wf = _strip_hidden(wf)
     top_nodes: dict = wf.get("nodes", {})
     subgraphs: dict = wf.get("subgraphs", {})
@@ -336,10 +355,13 @@ def _render(wf: dict, out_path: Path, *, data_edges: bool, legend: bool,
     # Lane frames + titles.
     for lane in lanes:
         if lane.framed:
+            active = lane.id == hl_lane
             ax.add_patch(FancyBboxPatch(
                 (lane.x0, lane.y0), lane.w, lane.h,
                 boxstyle="round,pad=0.02,rounding_size=0.18",
-                linewidth=1.0, edgecolor=LANE_EDGE, facecolor=LANE_FILL, zorder=1))
+                linewidth=2.0 if active else 1.0,
+                edgecolor=HIGHLIGHT_LANE[1] if active else LANE_EDGE,
+                facecolor=HIGHLIGHT_LANE[0] if active else LANE_FILL, zorder=1))
             # Title sits inside the frame's top-left corner (horizontal), so
             # the left gutter stays free for the macro arrows + their labels.
             ax.text(lane.x0 + 0.14, lane.y0 + lane.h - 0.1, lane.title,
@@ -367,7 +389,7 @@ def _render(wf: dict, out_path: Path, *, data_edges: bool, legend: bool,
     for lane in lanes:
         for name, node in lane.nodes.items():
             cx, cy = lane.abs_pos(name)
-            _draw_node(ax, cx, cy, name, node)
+            _draw_node(ax, cx, cy, name, node, active=(lane.id == hl_lane and name == hl_node))
 
     # Macro transitions between lanes, routed as a tidy spine in the left
     # gutter. Lanes are stacked top→bottom, so each edge is a (mostly)
@@ -481,8 +503,8 @@ def _ref_path(val) -> str | None:
     return None
 
 
-def _draw_node(ax, cx, cy, name, node):
-    fill, edge = _node_style(node)
+def _draw_node(ax, cx, cy, name, node, *, active: bool = False):
+    fill, edge = HIGHLIGHT if active else _node_style(node)
     style = "round,pad=0.02,rounding_size=0.12"
     if node.get("type") == "noop":
         w, h = NODE_W * 0.78, NODE_H * 0.78
@@ -490,7 +512,7 @@ def _draw_node(ax, cx, cy, name, node):
         w, h = NODE_W, NODE_H
     ax.add_patch(FancyBboxPatch(
         (cx - w / 2, cy - h / 2), w, h, boxstyle=style,
-        linewidth=1.2, edgecolor=edge, facecolor=fill, zorder=5))
+        linewidth=2.4 if active else 1.2, edgecolor=edge, facecolor=fill, zorder=5))
 
     nm, sub = _node_text(name, node)
     # Usable inner width in points, so each line is auto-fit (and only clipped

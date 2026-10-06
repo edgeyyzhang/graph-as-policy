@@ -200,7 +200,7 @@ def test_dag_trace_end_to_end(tmp_path):
     assert set(node.keys()) == {
         "id", "name", "node_type", "service", "method", "script",
         "started_at", "finished_at", "duration_ms", "status",
-        "condition", "condition_result", "error_message",
+        "condition", "condition_result", "error_message", "checkpoints",
         "has_inputs", "has_output", "visits", "assets",
     }
     assert node["id"] == "n_0000"

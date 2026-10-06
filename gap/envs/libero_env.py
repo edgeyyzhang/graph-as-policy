@@ -15,6 +15,7 @@ Dependencies (installed via the ``gap[libero]`` extra):
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import logging
 import os
 import time
@@ -177,6 +178,7 @@ class FrankaLiberoEnv(BaseEnv):
         # Controller refs are stale until the first reset() — robosuite rebuilds
         # robot.controller (and frees the MjSim) inside Robot.reset(). The pair
         # ``_osc_ctrl`` / ``_joint_ctrl`` is re-bound there.
+        self._gain_scope_depth = 0
         self._osc_ctrl = None
         self._joint_ctrl = None
         self._ctrl_mode: str = "osc"
@@ -223,6 +225,44 @@ class FrankaLiberoEnv(BaseEnv):
         self._joint_output_max = float(joint_cfg.get("output_max", 0.05))
         # Robosuite left OSC active after its rebuild; start there.
         self._ctrl_mode = "osc"
+        self._capture_gain_baselines()
+
+    def _capture_gain_baselines(self):
+        self._gain_baselines = tuple(
+            (ctrl.kp.copy(), ctrl.kd.copy())
+            for ctrl in (self._osc_ctrl, self._joint_ctrl)
+        )
+        for pair in self._gain_baselines:
+            for value in pair:
+                value.flags.writeable = False
+
+    @contextmanager
+    def controller_gain_scope(self, offsets):
+        """Apply independent absolute offsets to native gain vectors; always restore."""
+        from gap.runtime.motion_profile import ControllerGainOffsets
+        if not isinstance(offsets, ControllerGainOffsets):
+            raise TypeError("Expected ControllerGainOffsets")
+        if self._joint_motion_mode != "closed_loop":
+            raise ValueError("Gain profiles require closed_loop joint motion")
+        controllers = (self._osc_ctrl, self._joint_ctrl)
+        proposed = []
+        for ctrl, (kp, kd) in zip(controllers, self._gain_baselines):
+            if ctrl.impedance_mode != "fixed":
+                raise ValueError("Gain profiles require fixed impedance mode")
+            pair = (kp + offsets.kp_offset, kd + offsets.kd_offset)
+            if any(not np.isfinite(v).all() or np.any(v <= 0) for v in pair):
+                raise ValueError("Effective kp and kd must be finite and positive")
+            proposed.append(pair)
+        previous = [(c.kp.copy(), c.kd.copy()) for c in controllers]
+        self._gain_scope_depth += 1
+        try:
+            for ctrl, (kp, kd) in zip(controllers, proposed):
+                ctrl.kp, ctrl.kd = kp, kd
+            yield
+        finally:
+            for ctrl, (kp, kd) in zip(controllers, previous):
+                ctrl.kp, ctrl.kd = kp, kd
+            self._gain_scope_depth -= 1
 
     def _use_controller(self, mode: str) -> None:
         """Swap ``robots[0].controller`` and sync its internal state.
@@ -259,6 +299,8 @@ class FrankaLiberoEnv(BaseEnv):
         if seed is not None:
             self._rng = np.random.default_rng(seed)
 
+        if self._gain_scope_depth:
+            raise ValueError("Cannot reset inside an active gain profile")
         libero_obs, libero_info = self.handle.reset(seed=seed)
 
         self._current_obs = libero_obs

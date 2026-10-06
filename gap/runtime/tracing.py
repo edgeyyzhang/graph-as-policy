@@ -46,6 +46,7 @@ class NodeTrace:
     condition: dict | None = None
     condition_result: dict | None = None
     error_message: str | None = None
+    checkpoints: list = field(default_factory=list)
     has_inputs: bool = False
     has_output: bool = False
     visits: int = 0
@@ -475,6 +476,13 @@ class DagTrace:
         except Exception:
             logger.warning("Failed to record inputs for %s", name, exc_info=True)
 
+    def record_motion_profile(self, name, profile, nominal, effective):
+        """Keep each invocation's offsets and nominal/effective inputs."""
+        payload = _serialize_value(dict(profile=profile, nominal=nominal, effective=effective))
+        for directory in (self._node_dir(name), self._iter_dir(name)):
+            (directory / "motion_profile.json").write_text(
+                json.dumps(payload, indent=2, default=_json_default))
+
     def record_output(self, name: str, output: Any) -> None:
         """Serialize node output to disk and extract visual assets."""
         node = self._node_map.get(name)
@@ -661,6 +669,27 @@ class DagTrace:
                 detail={"met": met},
             )
 
+    def record_checkpoint(self, name: str, result: Any) -> None:
+        """Attach one checkpoint evaluation to the node that owns it.
+
+        ``name`` is the fully qualified id of the subgraph node whose exit
+        triggered the evaluation. Results accumulate per visit under
+        ``node.checkpoints`` and are flushed into ``dag_trace.json``.
+        """
+        node = self._node_map.get(name)
+        payload = result.to_dict() if hasattr(result, "to_dict") else dict(result)
+        payload = _serialize_value(payload)
+        payload["visit"] = self._visit_counts.get(name, 0)
+        if node:
+            node.checkpoints.append(payload)
+        self._record_event(
+            "checkpoint_evaluated",
+            node_name=name,
+            node_id=node.id if node else None,
+            status="ok" if payload.get("passed") else "error",
+            detail=payload,
+        )
+
     def record_error(self, name: str, error_msg: str) -> None:
         node = self._node_map.get(name)
         if node:
@@ -741,6 +770,7 @@ class DagTrace:
                     "condition": n.condition,
                     "condition_result": n.condition_result,
                     "error_message": n.error_message,
+                    "checkpoints": n.checkpoints,
                     "has_inputs": n.has_inputs,
                     "has_output": n.has_output,
                     "visits": n.visits,

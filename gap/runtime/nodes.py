@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING, Any
 from gap_core.errors import NodeExecutionError, WorkflowValidationError
 
 from .context import NodeContext
+from .motion_profile import prepare_inputs
+from gap_core.tools.schema import extract_schema
 from .observation_stream import ObservationStream, ObservationStreamHandle
 from .workflow import NodeDef
 
@@ -51,6 +53,8 @@ def execute_tool_node(
     policy_executor: Any = None,
     cancel_token: Any = None,
     stream_slot: Any = None,
+    motion_profile: Any = None,
+    trace: Any = None,
 ) -> Any:
     """Execute a ``type: tool`` node.
 
@@ -84,6 +88,10 @@ def execute_tool_node(
         )
         if stream_slot is not None:
             ctx._stream_slot = stream_slot
+        resolved_inputs = prepare_inputs(
+            motion_profile, resolved_inputs, tool_registry.get(tool_name).schema.inputs,
+            ctx=ctx, trace=trace, node_id=node_id,
+        ) if motion_profile is not None else resolved_inputs
         result = ctx.tool(tool_name, **resolved_inputs)
         logger.info("[%s] tool %s completed", node_id, tool_name)
         return result
@@ -103,6 +111,7 @@ def execute_script_node(
     bundle_name: str = "",
     skill_registry: Any = None,
     stream_slot: Any = None,
+    motion_profile: Any = None,
 ) -> dict[str, Any]:
     """Execute a script node: import module, call run().
 
@@ -135,6 +144,14 @@ def execute_script_node(
     )
     if stream_slot is not None:
         ctx._stream_slot = stream_slot
+
+    if motion_profile is not None:
+        resolved_inputs = prepare_inputs(
+            motion_profile, resolved_inputs, extract_schema(module).inputs, ctx=ctx,
+            resolver=getattr(module, "resolve_motion_profile_inputs", None),
+            validator=getattr(module, "validate_motion_profile_inputs", None),
+            trace=trace, node_id=node_id,
+        )
 
     # Filter inputs to only include parameters the script accepts,
     # so extra workflow inputs don't cause TypeError at call time.

@@ -484,6 +484,13 @@ class Connector:
     # Low-level sim operations (verbatim from SimState)
     # ------------------------------------------------------------------
 
+    def controller_gain_scope(self, offsets):
+        """Bind node-owned gains through a supporting environment backend."""
+        scope = getattr(self.env, "controller_gain_scope", None)
+        if scope is None:
+            raise ValueError("This backend does not support controller gain profiles")
+        return scope(offsets)
+
     def move_to_joints(
         self,
         target_joints: list[float],
@@ -499,6 +506,8 @@ class Connector:
         meaningful on envs whose ``move_to_joints_blocking`` honors the same
         convention (e.g. the real Franka env).
         """
+        if max_steps == 0 and getattr(self.env, "_gain_scope_depth", 0):
+            raise ValueError("Nonblocking motion is not supported inside a gain profile")
         dof = self._arm_dof
         target = np.array(target_joints[:dof], dtype=np.float64)
 

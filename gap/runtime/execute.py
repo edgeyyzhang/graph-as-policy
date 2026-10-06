@@ -25,6 +25,8 @@ function::
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import json
 import logging
 import tempfile
@@ -76,6 +78,9 @@ def execute(
     checkpoints: str = "warn",
     max_node_workers: int = 8,
     policies: dict[str, dict[str, Any]] | None = None,
+    motion_profiles: Any = None,
+    motion_profile_resolver: Callable[..., Any] | None = None,
+    on_executor: Callable[[WorkflowExecutor], None] | None = None,
 ) -> ExecutionResult:
     """Execute a workflow graph and return an :class:`ExecutionResult`.
 
@@ -106,6 +111,18 @@ def execute(
             mode for ``validate=True`` postcondition checkpoints (only
             active when the connector exposes ``world_snapshot``).
         max_node_workers: Thread budget per parallel super-step.
+        motion_profiles: Optional mapping from fully qualified node IDs to
+            MotionProfile objects. Requires max_node_workers=1 and blocking nodes.
+        motion_profile_resolver: Optional ``(full_id, node, resolved_inputs)``
+            callback invoked before every tool/script node; it returns that
+            visit's MotionProfile or ``None``. Use it instead of
+            ``motion_profiles`` when the profile is chosen per visit, as a
+            learner does. Same requirements as ``motion_profiles``.
+        on_executor: Optional callback invoked with the constructed
+            :class:`WorkflowExecutor` before ``execute()`` runs. Harnesses
+            use it to attach ``subgraph_exit_hook`` or the tracer's
+            ``on_node_start`` / ``on_node_end`` lifecycle hooks without
+            rebuilding the registry and boot sequence themselves.
         policies: Optional ``{policy_id: entry}`` overrides for learned-policy
             servers (e.g. ``{"pi05-libero": {"url": "ws://host:port"}}``).
             Policy skills otherwise auto-resolve to their shipped preset, so
@@ -186,9 +203,14 @@ def execute(
             checkpoints=checkpoints,
             world_snapshot_fn=world_snapshot_fn,
             max_node_workers=max_node_workers,
+            motion_profiles=motion_profiles,
+            motion_profile_resolver=motion_profile_resolver,
+            controller_gain_scope=getattr(connector, "controller_gain_scope", None),
         )
         if inputs:
             executor.initial_inputs.update(inputs)
+        if on_executor is not None:
+            on_executor(executor)
         executor.execute()
     except Exception as exc:
         error = exc

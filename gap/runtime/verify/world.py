@@ -125,6 +125,10 @@ class Body:
     ``None`` for primitives that have no mesh asset. Used by
     :meth:`bottom_footprint_xy` / :meth:`xy_coverage_over` to compute
     true mesh-projected geometry instead of AABB approximations."""
+    joints: dict[str, float] | None = None
+    """Interior joints of an articulated body (a drawer, a door, a knob):
+    joint name -> position, in metres for slides and radians for hinges.
+    ``None`` for rigid bodies."""
 
     # Backref to the owning world for prefix-aware predicates
     # (is_grasped needs the robot link prefixes).

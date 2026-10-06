@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Entry point for every command in this workspace.
+#
+#   ./eval/run validate            check the working graph (no simulator)
+#   ./eval/run rehearse            rehearse the working graph on the visible cases
+#   ./eval/run wait REQUEST_ID     keep waiting for a request that is still running
+#   ./eval/run status              rounds so far and the remaining budget
+#   ./eval/run COMMAND [args...]   any other command, run inside the workspace
+#
+# Commands run confined: they can read this workspace, write only under
+# results/, .cache/ and .requests/, and have no network access.
+set -euo pipefail
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+case "${1:-}" in
+  validate|rehearse|wait)
+    set -- python "$root/runtime/tools/submit.py" "$@"
+    ;;
+  status)
+    shift
+    set -- python "$root/runtime/tools/status.py" "$@"
+    ;;
+  ""|--help|-h)
+    sed -n 2,11p "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    exit 0
+    ;;
+esac
+exec "$root/runtime/tools/confine" "$root" author "$@"

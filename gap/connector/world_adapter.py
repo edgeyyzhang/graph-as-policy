@@ -187,6 +187,7 @@ class LiberoWorldAdapter:
         self.arm_dof = int(arm_dof)
         self._sim: Any | None = None
         self._objects: dict[str, int] = {}            # object name -> root body id
+        self._object_joints: dict[str, list[tuple[str, int]]] = {}  # object -> interior joints
         self._body_owner: dict[int, str] = {}          # any body id -> contact name
         self._local_aabbs: dict[str, tuple[np.ndarray, np.ndarray]] = {}
         self._tabletop_name = "table"
@@ -202,6 +203,7 @@ class LiberoWorldAdapter:
         a robosuite hard reset rebuilds the MjModel."""
         self._sim = find_mujoco_sim(self.env)
         self._objects = {}
+        self._object_joints = {}
         self._body_owner = {}
         self._local_aabbs = {}
         self._base_bid: int | None = None
@@ -252,6 +254,7 @@ class LiberoWorldAdapter:
                     self._body_owner[b] = name
 
         self._objects = objects
+        self._object_joints = self._interior_joints(model, set(objects))
 
         # Per-body local AABBs from model geoms, accumulated over the subtree.
         for name, root in roots.items():
@@ -280,6 +283,38 @@ class LiberoWorldAdapter:
                     -0.05 * np.ones(3), 0.05 * np.ones(3),
                 )
         self._prepared = True
+
+    def _interior_joints(self, model: Any, objects: set[str]) -> dict[str, list[tuple[str, int]]]:
+        """Slide and hinge joints inside each object's subtree: name -> [(joint, qpos address)].
+
+        These are what a drawer, a door or a knob moves on. Free and ball
+        joints are the objects' own placement and are left out.
+        """
+        out: dict[str, list[tuple[str, int]]] = {}
+        try:
+            njnt = int(getattr(model, "njnt", 0))
+            jnt_bodyid = np.asarray(model.jnt_bodyid)
+            jnt_type = np.asarray(model.jnt_type)
+            jnt_qposadr = np.asarray(model.jnt_qposadr)
+        except Exception:
+            return out
+        for j in range(njnt):
+            if int(jnt_type[j]) not in (2, 3):  # mjJNT_SLIDE, mjJNT_HINGE
+                continue
+            owner = self._body_owner.get(int(jnt_bodyid[j]))
+            if owner not in objects:
+                continue
+            name = None
+            try:
+                name = model.joint_id2name(j)
+            except Exception:
+                names = getattr(model, "joint_names", None)
+                if names is not None and j < len(names):
+                    name = names[j]
+            if not name:
+                continue
+            out.setdefault(owner, []).append((str(name), int(jnt_qposadr[j])))
+        return out
 
     @staticmethod
     def _body_id(model: Any, name: str) -> int | None:
@@ -384,6 +419,10 @@ class LiberoWorldAdapter:
             quat = _rotmat_to_quat_wxyz(R)
             corners = (R @ _box_corners((lo + hi) / 2.0, (hi - lo) / 2.0).T).T + pos
             lin, ang = self._body_velocity(data, bid)
+            joints = None
+            if name in self._object_joints:
+                qpos = np.asarray(data.qpos)
+                joints = {jn: float(qpos[addr]) for jn, addr in self._object_joints[name]}
             bodies[name] = Body(
                 name=name,
                 position=pos,
@@ -393,6 +432,7 @@ class LiberoWorldAdapter:
                 linear_velocity=base_Rt @ lin,
                 angular_velocity=base_Rt @ ang,
                 contacts=contacts.get(name, frozenset()),
+                joints=joints,
             )
 
         robot_view = self._robot_view(model, data, base_t=base_t, base_Rt=base_Rt)

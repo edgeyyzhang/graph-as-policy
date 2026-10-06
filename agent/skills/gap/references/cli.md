@@ -6,12 +6,14 @@
 ## gap
 
 ```text
-usage: gap [-h] {run,check,skills,tools,registry,generate,viz,trace-diff,benchmark,policy} ...
+usage: gap [-h]
+           {run,check,skills,tools,registry,generate,viz,trace-diff,benchmark,rehearse,rehearse-loop,policy}
+           ...
 
 gap — graph as policy: typed, verified robot skill graphs
 
 positional arguments:
-  {run,check,skills,tools,registry,generate,viz,trace-diff,benchmark,policy}
+  {run,check,skills,tools,registry,generate,viz,trace-diff,benchmark,rehearse,rehearse-loop,policy}
     run                 Execute a gap workflow graph
     check               Capability report: which tool bundles are operational here, and which
                         skills are therefore runnable
@@ -24,6 +26,8 @@ positional arguments:
                         aggregate agreement.
     benchmark           Run a benchmark sweep (families x variations x modes) or an acceptance
                         gate
+    rehearse            Run a graph over fixed simulator cases and write per-node feedback
+    rehearse-loop       Run the loop between an authoring agent and the rehearsal
     policy              Manage learned-policy servers (serve a bundle, list known bundles)
 
 options:
@@ -413,6 +417,121 @@ options:
   --modes [MODE ...]    Restrict the grid to these modes (grid mode only)
   --output-dir DIR      Override the config's output directory
   -v, --verbose         Enable debug logging
+```
+
+## gap rehearse
+
+```text
+usage: gap rehearse [-h] --sim SUITE/TASK [--env ENV] --cases CASES --out OUT
+                    [--previous PREVIOUS] [--skills PATH] [--tools MODULE:FUNCTION]
+                    [--ik {curobo,pyroki}] [--checkpoints {off,warn,raise}] [--objects OBJECTS]
+                    [--frames] [--no-trajectory] [--trajectory-interval N] [--video]
+                    [--video-interval N] [--claims JSON] [--inputs [K=V ...]]
+                    [--max-node-workers MAX_NODE_WORKERS] [-v]
+                    graph
+
+positional arguments:
+  graph                 Workflow directory or workflow.json path
+
+options:
+  -h, --help            show this help message and exit
+  --sim SUITE/TASK      LIBERO sim task, e.g. libero_10/0
+  --env ENV             Sim env registry name (default: libero)
+  --cases CASES         Initial-state cases as seeds: '1-8' or '1,3,5' (seed k -> init (k-1) mod
+                        n)
+  --out OUT             Output directory for this round
+  --previous PREVIOUS   Output directory of the previous round, for per-case changes and the graph
+                        diff
+  --skills PATH         Skill registry root(s); repeatable (default: resolved registries)
+  --tools MODULE:FUNCTION
+                        Plugin called with the connector before running, to register extra tools
+                        (e.g. privileged geometry stand-ins for perception)
+  --ik {curobo,pyroki}  Inverse-kinematics backend (default: the connector's, cuRobo)
+  --checkpoints {off,warn,raise}
+  --objects OBJECTS     Comma-separated body names to track (default: every non-robot, non-region
+                        body)
+  --frames              Save one camera frame per node exit under cases/<case>/frames/
+  --no-trajectory       Do not sample the privileged state at every simulator step
+  --trajectory-interval N
+                        Rows in the trajectory views: one every N simulator steps (default: 5)
+  --video               Write cases/<case>/video.mp4 from the exterior camera, one frame per
+                        --video-interval steps
+  --video-interval N    Simulator steps between video frames (default: 5, i.e. 4 fps at 20 Hz)
+  --claims JSON         JSON object mapping exit values to 'held' / 'not_held' claims, merged over
+                        the defaults
+  --inputs [K=V ...]    Initial workflow inputs
+  --max-node-workers MAX_NODE_WORKERS
+  -v, --verbose
+```
+
+## gap rehearse-loop
+
+```text
+usage: gap rehearse-loop [-h] {init,serve,status} ...
+
+positional arguments:
+  {init,serve,status}
+    init               Create the agent's workspace and the trusted directory
+    serve              Answer the agent's requests
+    status             Print the ledger, including held-out results
+
+options:
+  -h, --help           show this help message and exit
+```
+
+### gap rehearse-loop init
+
+```text
+usage: gap rehearse-loop init [-h] --graph GRAPH --sim SUITE/TASK [--env ENV] --instruction
+                              INSTRUCTION --visible VISIBLE [--holdout HOLDOUT] [--budget BUDGET]
+                              [--ik {curobo,pyroki}] [--skills PATH] [--no-frames] [--no-python]
+                              workspace trusted
+
+positional arguments:
+  workspace             Directory handed to the agent (must not exist)
+  trusted               Directory for the configuration, full results and ledger (must not exist)
+
+options:
+  -h, --help            show this help message and exit
+  --graph GRAPH         Starting graph: a workflow directory
+  --sim SUITE/TASK
+  --env ENV
+  --instruction INSTRUCTION
+                        The task in plain language, shown to the agent
+  --visible VISIBLE     Cases the agent sees: '1-8' or '1,3,5'
+  --holdout HOLDOUT     Cases the agent never sees
+  --budget BUDGET       Number of rehearsals the agent may use (default: 8)
+  --ik {curobo,pyroki}
+  --skills PATH         Skill library root(s) copied into the workspace
+  --no-frames
+  --no-python           Do not install a Python into the workspace
+```
+
+### gap rehearse-loop serve
+
+```text
+usage: gap rehearse-loop serve [-h] [--once] [--idle-timeout S] [-v] trusted
+
+positional arguments:
+  trusted
+
+options:
+  -h, --help        show this help message and exit
+  --once            Handle the pending requests and return
+  --idle-timeout S  Stop after this many seconds without a request
+  -v, --verbose
+```
+
+### gap rehearse-loop status
+
+```text
+usage: gap rehearse-loop status [-h] trusted
+
+positional arguments:
+  trusted
+
+options:
+  -h, --help  show this help message and exit
 ```
 
 ## gap policy

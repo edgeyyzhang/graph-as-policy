@@ -166,6 +166,45 @@ class ToolBundleManager:
                 logger.warning("[tool-bundle:%s] close failed",
                                m.bundle, exc_info=True)
 
+    def revive_dead(self) -> list[str]:
+        """Restart every bundle whose server has exited; return their names.
+
+        A call that exceeds its timeout terminates the server, and a long
+        run (a rehearsal over many cases) would otherwise fail every later
+        call to that bundle. The new server takes over the existing tool
+        registrations. A bundle that cannot be restarted is left dead and
+        logged; its calls keep failing.
+        """
+        from gap_core.rpc.client import ToolClient
+
+        with self._lock:
+            dead = [m for m in self._managed.values() if not getattr(m.client, "alive", True)]
+        revived: list[str] = []
+        for m in dead:
+            try:
+                m.client.close()
+            except BaseException:
+                logger.warning("[tool-bundle:%s] close of the dead client failed", m.bundle, exc_info=True)
+            info = self._skill_registry.get(m.bundle)
+            logger.warning("[tool-bundle:%s] server exited; restarting", m.bundle)
+            try:
+                client = ToolClient(
+                    bundle_name=m.bundle,
+                    bundle_dir=info.meta.bundle_dir,
+                    env=info.meta.serving.env,
+                    evict_grace_s=self._grace,
+                    call_timeout_s=self._call_timeout_s,
+                )
+            except BaseException:
+                logger.error("[tool-bundle:%s] restart failed", m.bundle, exc_info=True)
+                continue
+            for name in m.tool_names:
+                self._tool_registry.rpc_adapter.register(name, client)
+            with self._lock:
+                self._managed[m.bundle] = _Managed(bundle=m.bundle, client=client, tool_names=m.tool_names)
+            revived.append(m.bundle)
+        return revived
+
     def loaded_bundles(self) -> list[str]:
         return sorted(self._managed.keys())
 

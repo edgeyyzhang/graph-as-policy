@@ -323,3 +323,27 @@ def test_rpc_adapter_unknown_tool_raises():
     adapter = RpcAdapter()
     with pytest.raises(KeyError, match="not registered"):
         adapter.invoke("nope", None)
+
+
+def test_revive_dead_restarts_exited_servers(fake_client_cls, tmp_path):
+    skill_registry = _FakeSkillRegistry({
+        "vlm": _FakeSkillInfo(bundle_dir=tmp_path / "vlm"),
+        "sam3": _FakeSkillInfo(bundle_dir=tmp_path / "sam3"),
+    })
+    tool_registry = ToolRegistry()
+    mgr = ToolBundleManager(skill_registry, tool_registry)
+    mgr.boot_all(["vlm", "sam3"])
+    try:
+        assert mgr.revive_dead() == []          # everything alive: nothing to do
+        old = next(c for c in fake_client_cls if c.bundle_name == "vlm")
+        old.alive = False                       # a timed-out call terminated the server
+        assert mgr.revive_dead() == ["vlm"]
+        assert old.closed is True
+        new = [c for c in fake_client_cls if c.bundle_name == "vlm"][-1]
+        assert new is not old and getattr(new, "alive", True)
+        # The existing registration now dispatches to the new server.
+        assert tool_registry.invoke("vlm.echo", None, q=1) == {"echoed": {"q": 1}}
+        assert new.calls == [("vlm.echo", {"q": 1})] and old.calls == []
+        assert mgr.loaded_bundles() == ["sam3", "vlm"]
+    finally:
+        mgr.shutdown_all()

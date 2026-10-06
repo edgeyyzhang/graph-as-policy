@@ -180,6 +180,12 @@ class ToolClient:
     # ------------------------------------------------------------------
 
     @property
+    def alive(self) -> bool:
+        """True while the server subprocess is running (a call that timed out
+        terminates it, after which every call fails until a new client is made)."""
+        return self._proc is not None and self._proc.poll() is None
+
+    @property
     def catalog(self) -> list[CatalogEntry]:
         """List of tools the bundle server announced at startup."""
         return list(self._catalog)

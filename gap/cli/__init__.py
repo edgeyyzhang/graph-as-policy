@@ -30,6 +30,8 @@ def build_parser() -> argparse.ArgumentParser:
     from .generate import register as _reg_generate
     from .policy import register as _reg_policy
     from .registry import register as _reg_registry
+    from .rehearse import register as _reg_rehearse
+    from .rehearse_loop import register as _reg_rehearse_loop
     from .run import register as _reg_run
     from .skills import register as _reg_skills
     from .tools import register as _reg_tools
@@ -45,6 +47,8 @@ def build_parser() -> argparse.ArgumentParser:
     _reg_viz(sub)
     _reg_trace_diff(sub)
     _reg_benchmark(sub)
+    _reg_rehearse(sub)
+    _reg_rehearse_loop(sub)
     _reg_policy(sub)
 
     return parser

@@ -908,7 +908,7 @@ def test_script_node_typed_run(tmp_path: Path) -> None:
 
 
 _OPTIONAL_PY = '''\
-from typing import NotRequired, TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 
 class Out(TypedDict):
@@ -923,7 +923,7 @@ def run(ctx, x: int) -> Out:
 
 
 _MISSING_REQUIRED_PY = '''\
-from typing import NotRequired, TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 
 class Out(TypedDict):

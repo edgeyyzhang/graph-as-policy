@@ -19,6 +19,7 @@ list under the router's name.
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 import logging
 import os
 import threading
@@ -208,6 +209,9 @@ class WorkflowExecutor:
         subgraph_exit_hook: Callable[[SubgraphExitEvent], None] | None = None,
         max_node_workers: int = 8,
         node_visit_cap: int | None = None,
+        motion_profiles: Any = None,
+        motion_profile_resolver: Callable | None = None,
+        controller_gain_scope: Callable | None = None,
     ):
         if isinstance(workflow_dir_or_workflow, Workflow):
             self.workflow: Workflow = workflow_dir_or_workflow
@@ -217,6 +221,26 @@ class WorkflowExecutor:
             wf_path = path / "workflow.json" if path.is_dir() else path
             self.workflow = load_workflow(wf_path)
             self.workflow_dir = wf_path.parent
+
+        if motion_profiles is not None and motion_profile_resolver is not None:
+            raise ValueError("Specify static motion_profiles or a resolver, not both")
+        self.motion_profiles = dict(motion_profiles or {})
+        self.motion_profile_resolver = motion_profile_resolver
+        self.controller_gain_scope = controller_gain_scope
+        if motion_profiles is not None or motion_profile_resolver is not None:
+            if max_node_workers != 1:
+                raise ValueError("Motion profiles require max_node_workers=1")
+            definitions = dict(self.workflow.nodes)
+            for sg_name, sg in self.workflow.subgraphs.items():
+                definitions.update({f"{sg_name}.{n}": v for n, v in sg.nodes.items()})
+            if any(n.streaming or n.type == "router" for n in definitions.values()):
+                raise ValueError("Motion profiles do not support streaming nodes or routers/Send")
+            for name, profile in self.motion_profiles.items():
+                if name not in definitions or definitions[name].type not in ("tool", "script"):
+                    raise ValueError(f"Unknown/non-executable profile target: {name}")
+                from .motion_profile import MotionProfile
+                if not isinstance(profile, MotionProfile):
+                    raise TypeError(f"{name}: expected MotionProfile")
 
         self.tool_registry = tool_registry
         self.skill_registry = skill_registry
@@ -667,27 +691,41 @@ class WorkflowExecutor:
             resolved = resolve_inputs(node.inputs, scope.local_outputs)
             self.trace.record_resolved_inputs(full_id, resolved)
 
-            result: Any
-            if node.type == "tool":
-                result = execute_tool_node(
-                    full_id, node, resolved, self.tool_registry,
-                    policy_executor=self.policy_executor,
-                )
-                self.trace.record_output(full_id, result)
-            elif node.type == "script":
-                bundle_name = self._lookup_bundle_for_scope(scope_name)
-                result = execute_script_node(
-                    full_id, node, resolved, self.tool_registry, self.workflow_dir,
-                    trace=self.trace,
-                    policy_executor=self.policy_executor,
-                    bundle_name=bundle_name,
-                    skill_registry=self.skill_registry,
-                )
-                self.trace.record_output(full_id, result)
-            else:
-                raise PipelineError(
-                    f"node {full_id!r} has unknown type {node.type!r}"
-                )
+            profile = (self.motion_profile_resolver(full_id, node, resolved)
+                       if self.motion_profile_resolver is not None
+                       else self.motion_profiles.get(full_id))
+            from .motion_profile import MotionProfile
+            if profile is not None and not isinstance(profile, MotionProfile):
+                raise TypeError("Expected MotionProfile from profile resolver")
+            gain_scope = nullcontext()
+            if profile is not None and profile.controller is not None:
+                if self.controller_gain_scope is None:
+                    raise ValueError("Connector does not support controller gain profiles")
+                gain_scope = self.controller_gain_scope(profile.controller)
+            with gain_scope:
+                result: Any
+                if node.type == "tool":
+                    result = execute_tool_node(
+                        full_id, node, resolved, self.tool_registry,
+                        policy_executor=self.policy_executor,
+                        motion_profile=profile, trace=self.trace,
+                    )
+                    self.trace.record_output(full_id, result)
+                elif node.type == "script":
+                    bundle_name = self._lookup_bundle_for_scope(scope_name)
+                    result = execute_script_node(
+                        full_id, node, resolved, self.tool_registry, self.workflow_dir,
+                        trace=self.trace,
+                        policy_executor=self.policy_executor,
+                        bundle_name=bundle_name,
+                        skill_registry=self.skill_registry,
+                        motion_profile=profile,
+                    )
+                    self.trace.record_output(full_id, result)
+                else:
+                    raise PipelineError(
+                        f"node {full_id!r} has unknown type {node.type!r}"
+                    )
             success = True
             return result
         except Exception as exc:
@@ -826,7 +864,7 @@ class WorkflowExecutor:
         # postcondition checkpoints. Run only on a normal exit; on the
         # ``on_error`` path the postcondition is moot.
         if self.checkpoints != "off" and not error_path:
-            self._run_validate_checkpoints(sg_name, sg, scope, bound_outputs)
+            self._run_validate_checkpoints(sg_name, sg, scope, bound_outputs, node_name=node_name)
 
         # Fire the exit hook before returning. `_run_scope`'s finally
         # already drained streaming futures via `_teardown_streaming`, so
@@ -863,6 +901,7 @@ class WorkflowExecutor:
         sg: SubgraphDef,
         scope: _ScopeState,
         bound_outputs: dict[str, Any],
+        node_name: str | None = None,
     ) -> None:
         """Enforce ``validate=True`` postcondition checkpoints at execution time.
 
@@ -903,12 +942,18 @@ class WorkflowExecutor:
 
         checkpoints = load_checkpoints(cp_path)
         world = self.world_snapshot_fn()
+        # Trace attribution: the top-level subgraph *node* owns the results.
+        sg_node_id = node_name or sg_name
         failed: list[str] = []
         for cp in checkpoints:
             if not cp.validate:
                 continue
             result = evaluate_checkpoint(cp, world, bound_outputs)
             self.checkpoint_results.append(result)
+            try:
+                self.trace.record_checkpoint(sg_node_id, result)
+            except Exception:
+                logger.debug("trace.record_checkpoint failed", exc_info=True)
             if not result.passed:
                 failed.append(cp.name)
 
