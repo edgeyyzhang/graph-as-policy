@@ -65,18 +65,16 @@ The final graph is `results/graph/` in the workspace, and the agent's report is
 
 ## Report on a policy
 
-```bash
-CUDA_VISIBLE_DEVICES=2 examples/rehearse_loop/policy_report.sh \
-    ../gap_loops/soup_01/results/graph libero_object_all_variance/0 outputs/policy_report/soup_01
-```
+The policy card, one self-contained `report.html` about the graph as a policy, is
+the `policy-report` agent skill at `agent/skills/policy-report/`: install it into
+`.claude/skills/` and run `/policy-report GRAPH_DIR SUITE/TASK --trajs 4` in Claude
+Code, which evaluates the graph on sampled layouts with video, builds the page and
+publishes it as an artifact. Its driver can also be run by hand:
 
-This samples 4 of the 16 layouts at random (`--trajs N`, `--seed S`; `--trajs all`
-for every layout), rehearses the graph on them with video, then writes
-`outputs/policy_report/soup_01/report/report.html`: the task, the graph, a video of
-one successful case with the active node highlighted, every evaluated case's result
-with its own two-panel video, and the parameters of every node. The page embeds all
-media and stays under 16 MB, so it can be published as a single page. `report.json`
-beside it holds the numbers.
+```bash
+CUDA_VISIBLE_DEVICES=2 agent/skills/policy-report/scripts/policy_report.sh \
+    ../gap_loops/soup_01/results/graph libero_object_all_variance/0 outputs/policy_report/soup_01 --trajs 4
+```
 
 ## Rehearse a graph without the loop
 
@@ -134,8 +132,6 @@ Known limits:
 | `run.sh` | Shortcut for one `gap rehearse` |
 | `launch_agent.sh` | Starts Claude Code headless as the authoring agent |
 | `run_loop.sh` | Broker and agent together for one loop; stops the broker when the agent finishes |
-| `policy_report.sh` | Samples layouts, evaluates a graph on them with video and writes the policy card |
-| `policy_card.py` | The policy card: one self-contained `report.html` with the task, the graph drawing, a two-panel policy video, per-case results with failure videos, and the parameters of every node |
 | `agent_log.py` | Prints a readable summary of the agent's transcript |
 | `reference_fix/` | A hand-written fix for the quickstart graph: a node that removes robot points from the container's point cloud. Kept out of every workspace. |
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Evaluate a policy graph on its task and write the policy card.
 #
-#   examples/rehearse_loop/policy_report.sh GRAPH_DIR SUITE/TASK OUT_DIR
+#   agent/skills/policy-report/scripts/policy_report.sh GRAPH_DIR SUITE/TASK OUT_DIR
 #       [--trajs N|all] [--seed S] [--cases 1-16] [--skip-eval] [-- extra policy_card.py args]
 #
 # Samples N layouts at random (default 4, seed 0) from the case pool (default 1-16),
@@ -12,8 +12,11 @@
 # With --skip-eval an existing OUT_DIR/eval is reused.
 #
 # Example:
-#   CUDA_VISIBLE_DEVICES=2 examples/rehearse_loop/policy_report.sh \
+#   CUDA_VISIBLE_DEVICES=2 agent/skills/policy-report/scripts/policy_report.sh \
 #       ../gap_loops/l10_task_00/results/graph libero_10/0 outputs/policy_report/l10_task_00 --trajs 4
+#
+# Part of the policy-report agent skill; the rehearsal helpers it calls are in
+# examples/rehearse_loop/.
 set -euo pipefail
 
 if [ "$#" -lt 3 ]; then sed -n 2,16p "$0"; exit 2; fi
@@ -30,7 +33,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-gap=$(cd "$here/../.." && pwd)
+gap=$(cd "$here/../../../.." && pwd)
+tools=$gap/examples/rehearse_loop
 python=${GAP_PYTHON:-$gap/.venv/bin/python}
 
 [ -f "$graph/workflow.json" ] || { echo "no workflow.json in $graph" >&2; exit 2; }
@@ -61,7 +65,7 @@ EOF
 )
   fi
   echo "evaluating $graph on $sim cases $cases -> $out/eval  $(date +%H:%M:%S)"
-  "$here/run.sh" "$graph" "$sim" "$cases" "$out/eval" --frames --video > "$out/eval.log" 2>&1 \
+  "$tools/run.sh" "$graph" "$sim" "$cases" "$out/eval" --frames --video > "$out/eval.log" 2>&1 \
     || { echo "rehearsal failed; see $out/eval.log" >&2; exit 1; }
   grep 'rehearsal complete' "$out/eval.log" | tail -1
 fi

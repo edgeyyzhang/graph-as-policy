@@ -25,9 +25,10 @@ holds the numbers. Videos are encoded small and the total is kept under
 ``--max-mb`` so the page fits the artifact limit; failure videos beyond
 ``--max-failure-videos`` are listed without a video.
 
-Run with the rehearsal Python, e.g. ``examples/rehearse_loop/gap.sh`` sets the
-environment: ``GAP_PYTHON=... policy_card.py`` or ``.venv/bin/python`` with
-``PYTHONPATH`` covering the gap checkout and ``gap-core/src``.
+This file belongs to the ``policy-report`` agent skill (``agent/skills/policy-report``);
+``policy_report.sh`` beside it runs the evaluation and then this generator with the
+checkout's ``.venv`` Python. Run alone with ``.venv/bin/python`` and ``PYTHONPATH``
+covering the gap checkout and ``gap-core/src``.
 """
 from __future__ import annotations
 
@@ -43,9 +44,10 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-GAP_ROOT = HERE.parents[1]
-sys.path[:0] = [str(HERE), str(GAP_ROOT), str(GAP_ROOT / "gap-core" / "src")]
+HERE = Path(__file__).resolve().parent            # <gap>/agent/skills/policy-report/scripts
+GAP_ROOT = HERE.parents[3]
+sys.path[:0] = [str(GAP_ROOT / "examples" / "rehearse_loop"),   # compose_video
+                str(GAP_ROOT), str(GAP_ROOT / "gap-core" / "src")]
 
 MB = 1024 * 1024
 ENCODINGS = [  # tried in order until the page fits the budget
