@@ -6,13 +6,16 @@
 
 GRAPH_DIR holds the ``workflow.json`` and scripts of the policy. EVAL_DIR is one
 ``gap rehearse`` run of that graph, made with ``--frames --video``, over the cases
-to report (normally 1-16). The report has four sections:
+to report: either every layout of the task or, as policy_report.sh does by
+default, a random sample of them recorded in ``EVAL_DIR/sample.json``. The
+report has four sections:
 
   0. the task: suite, instruction, goal predicate, objects, cases;
   1. the policy: the graph drawing, its subgraphs, and a two-panel video of one
      successful case (simulator left, graph with the active node right);
-  2. the evaluation: success per case, steps and time, and one video per failed
-     case with the node it ended in;
+  2. the evaluation: success per case, steps and time, and the trajectories:
+     with ``--all-videos`` a two-panel video of every evaluated case, otherwise
+     one video per failed case, each with the node it ended in;
   3. the parameters of every node: literal inputs, the constants its script
      defines, and the learnable offsets when an optimization file is given.
 
@@ -356,7 +359,12 @@ def render_html(ctx: dict) -> str:
     if task.get("goal"):
         parts.append(f"<dt>Success predicate</dt><dd><div class='goal'>{esc(task['goal'])}</div></dd>")
     parts.append(f"<dt>Objects in the scene</dt><dd>{esc(', '.join(ctx['objects']))}</dd>")
-    parts.append(f"<dt>Layouts</dt><dd>cases {esc(ctx['case_spec'])}: each case resets the simulator to one of the task's stored initial states, so the same case is the same layout every time</dd>")
+    smp = ctx.get("sample")
+    if smp:
+        parts.append(f"<dt>Layouts</dt><dd>{len(cases)} of the task's layouts, sampled at random from cases {esc(smp.get('pool'))} with seed {esc(smp.get('seed'))}: "
+                     f"cases {esc(', '.join(str(c['case']) for c in cases))}. Each case resets the simulator to one of the task's stored initial states, so the same case is the same layout every time.</dd>")
+    else:
+        parts.append(f"<dt>Layouts</dt><dd>cases {esc(ctx['case_spec'])}: each case resets the simulator to one of the task's stored initial states, so the same case is the same layout every time</dd>")
     parts.append(f"<dt>Evaluated</dt><dd>{esc(ctx['started'])}, graph <code>{esc(ctx['graph_hash'])}</code></dd>")
     parts.append("</dl></section>")
 
@@ -391,22 +399,38 @@ def render_html(ctx: dict) -> str:
                      f"<td class='num'>{fmt(c['duration_s']) if c['duration_s'] is not None else '–'}</td>"
                      f"<td class='num'>{c['visits']}</td><td><code>{esc(c['last_node'])}</code></td></tr>")
     parts.append("</table></div>")
+    def failure_text(c: dict) -> str:
+        what = (f"The graph exited with <code>{esc(c['graph_exit'])}</code>"
+                + (f" after the error <code>{esc(c['error'])}</code>" if c.get("error") else "")
+                + f"; the last node to run was <code>{esc(c['last_node'])}</code>.")
+        if c["graph_exit"] == "success":
+            what += " The policy believed it had finished, but the simulator's predicate was not met."
+        return what
+
+    def video_or_note(c: dict) -> str:
+        v = ctx["case_videos"].get(c["case"])
+        if v:
+            return f"<figure><video controls preload='metadata' src='data:video/mp4;base64,{v}'></video></figure>"
+        if pv and pv["case"] == c["case"]:
+            return "<p class='lede'>This is the representative case; its video is in section 1.</p>"
+        if c["has_video"]:
+            return "<p class='lede'>Video not embedded to keep the page within its size limit; it is in the evaluation directory.</p>"
+        return "<p class='lede'>The evaluation was run without video.</p>"
+
     failures = [c for c in cases if not c["success"]]
-    if failures:
+    if ctx.get("all_videos"):
+        parts.append(f"<h3>Trajectories</h3><p>One video per evaluated layout, played at {ctx['speed']:g}x: simulator on the left, the graph with the active node on the right.</p>")
+        for c in cases:
+            res = "<span class='ok'>success</span>" if c["success"] else "<span class='fail'>failure</span>"
+            stats = f"{c['steps']} steps, {fmt(c['duration_s'])} s" if c["steps"] is not None else ""
+            parts.append(f"<div class='node'><h3>Case {c['case']} <span class='lede'>{res} {esc(stats)}</span></h3>")
+            if not c["success"]:
+                parts.append(f"<p>{failure_text(c)}</p>")
+            parts.append(video_or_note(c) + "</div>")
+    elif failures:
         parts.append("<h3>Failure modes</h3>")
         for c in failures:
-            what = (f"The graph exited with <code>{esc(c['graph_exit'])}</code>"
-                    + (f" after the error <code>{esc(c['error'])}</code>" if c.get("error") else "")
-                    + f"; the last node to run was <code>{esc(c['last_node'])}</code>.")
-            if c["graph_exit"] == "success":
-                what += " The policy believed it had finished, but the simulator's predicate was not met."
-            parts.append(f"<div class='node'><h3>Case {c['case']}</h3><p>{what}</p>")
-            fv = ctx["failure_videos"].get(c["case"])
-            if fv:
-                parts.append(f"<figure><video controls preload='metadata' src='data:video/mp4;base64,{fv}'></video></figure>")
-            elif c["has_video"]:
-                parts.append("<p class='lede'>Video not embedded to keep the page within its size limit; it is in the evaluation directory.</p>")
-            parts.append("</div>")
+            parts.append(f"<div class='node'><h3>Case {c['case']}</h3><p>{failure_text(c)}</p>" + video_or_note(c) + "</div>")
     else:
         parts.append("<p>No failures on the evaluated layouts.</p>")
     parts.append("</section>")
@@ -475,7 +499,10 @@ def main() -> int:
     ap.add_argument("--optimization", type=Path, default=None, help="optimization.json with learnable parameters")
     ap.add_argument("--title", default=None)
     ap.add_argument("--max-mb", type=float, default=15.0, help="Upper bound for report.html (default 15)")
-    ap.add_argument("--max-failure-videos", type=int, default=4)
+    ap.add_argument("--max-failure-videos", type=int, default=4,
+                    help="Without --all-videos: how many failed cases get an embedded video")
+    ap.add_argument("--all-videos", action="store_true",
+                    help="Embed a two-panel video of every evaluated case, not only the failures")
     ap.add_argument("--height", type=int, default=480, help="Video panel height (default 480)")
     ap.add_argument("--speed", type=float, default=3.0, help="Video playback speed (default 3x)")
     ap.add_argument("--keep-media", action="store_true", help="Keep the PNG and MP4 files beside the report")
@@ -508,21 +535,32 @@ def main() -> int:
     budget = int(args.max_mb * MB) - graph_png.stat().st_size * 4 // 3 - 300 * 1024
     picks = []
     successes = [c for c in cases if c["success"] and c["has_video"] and c["steps"]]
+    rep_case = None
     if successes:
         successes.sort(key=lambda c: c["steps"])
-        rep = successes[len(successes) // 2]
-        picks.append({"label": "policy", "case": rep["case"], "dir": rep["dir"]})
-    for c in [c for c in cases if not c["success"] and c["has_video"]][: args.max_failure_videos]:
+        rep_case = successes[len(successes) // 2]["case"]
+        picks.append({"label": "policy", "case": rep_case, "dir": successes[len(successes) // 2]["dir"]})
+    failures = [c for c in cases if not c["success"] and c["has_video"]]
+    if not args.all_videos:
+        failures = failures[: args.max_failure_videos]
+    for c in failures:
         picks.append({"label": "failure", "case": c["case"], "dir": c["dir"]})
+    if args.all_videos:  # the remaining successes, dropped first if the budget is short
+        for c in cases:
+            if c["success"] and c["has_video"] and c["case"] != rep_case:
+                picks.append({"label": "traj", "case": c["case"], "dir": c["dir"]})
     videos = make_videos(graph_dir, picks, media, budget, args.height, args.speed, args.title) if picks else {}
 
     policy_video = None
-    if successes and successes[len(successes) // 2]["case"] in videos:
-        rep = successes[len(successes) // 2]
+    if rep_case in videos:
+        rep = next(c for c in cases if c["case"] == rep_case)
         policy_video = {"case": rep["case"], "b64": b64(videos[rep["case"]]),
                         "note": f"{rep['steps']} steps, {fmt(rep['duration_s'])} s, played at {args.speed:g}x."}
-    failure_videos = {c["case"]: b64(videos[c["case"]]) for c in cases
-                      if not c["success"] and c["case"] in videos}
+    case_videos = {c["case"]: b64(videos[c["case"]]) for c in cases
+                   if c["case"] in videos and c["case"] != rep_case}
+    failure_videos = {k: v for k, v in case_videos.items()
+                      if not next(c for c in cases if c["case"] == k)["success"]}
+    sample = load_json(eval_dir / "sample.json") if (eval_dir / "sample.json").exists() else None
 
     # parameters
     nodes = qualified_nodes(wf)
@@ -540,6 +578,7 @@ def main() -> int:
         "started": run.get("started") or "unknown date", "graph_hash": graph_hash(graph_dir),
         "subgraphs": subgraph_summary(wf), "nodes": nodes, "nodes_by_owner": by_owner,
         "graph_png": b64(graph_png), "policy_video": policy_video, "failure_videos": failure_videos,
+        "case_videos": case_videos, "all_videos": args.all_videos, "sample": sample, "speed": args.speed,
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M"), "eval_dir": str(eval_dir),
     }
     page = render_html(ctx)
@@ -554,6 +593,7 @@ def main() -> int:
                    "source": n["spec"].get("script") or n["spec"].get("tool"),
                    "inputs": n["inputs"], "constants": n["constants"], "learnable": n["learnable"]} for n in nodes],
         "videos": {str(k): str(v.relative_to(out)) for k, v in videos.items()},
+        "sample": sample, "all_videos": args.all_videos,
         "report_bytes": (out / "report.html").stat().st_size,
     }
     (out / "report.json").write_text(json.dumps(summary, indent=2) + "\n")
@@ -563,7 +603,7 @@ def main() -> int:
     size_mb = summary["report_bytes"] / MB
     print(f"{out / 'report.html'}  {size_mb:.1f} MB  "
           f"{summary['successes']}/{summary['cases']} successes  "
-          f"{len(failure_videos)} failure video(s)" + ("" if size_mb <= args.max_mb else "  OVER BUDGET"))
+          f"{len(videos)} video(s)" + ("" if size_mb <= args.max_mb else "  OVER BUDGET"))
     return 0
 
 
